@@ -2,88 +2,437 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-  <meta name="theme-color" content="#1d9e75"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#F47920"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
   <style>
+    /* ── LIQUID GLASS DESIGN SYSTEM ─────────────────────────────────── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body,#root{height:100%;min-height:100%}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--color-background-tertiary);color:var(--color-text-primary);-webkit-font-smoothing:antialiased}
-    :root{
-      --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-      --color-background-primary:#ffffff;--color-background-secondary:#f5f5f3;
-      --color-background-tertiary:#eeede9;--color-background-info:#e6f1fb;
-      --color-background-success:#e1f5ee;--color-background-warning:#faeeda;
-      --color-background-danger:#fcebeb;--color-text-primary:#1a1a1a;
-      --color-text-secondary:#6b6b6b;--color-text-tertiary:#9b9b9b;
-      --color-text-info:#185fa5;--color-text-success:#0f6e56;
-      --color-text-warning:#854f0b;--color-text-danger:#a32d2d;
-      --color-border-tertiary:rgba(0,0,0,0.12);--color-border-secondary:rgba(0,0,0,0.22);
-      --color-border-primary:rgba(0,0,0,0.35);--color-border-info:#378add;
-      --color-border-success:#1d9e75;--color-border-warning:#ba7517;
-      --color-border-danger:#e24b4a;--border-radius-md:8px;
-      --border-radius-lg:12px;--border-radius-xl:16px;
+    
+    body{
+      font-family:"Inter",-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;
+      background:var(--bg-base);color:var(--text-primary);
+      -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+      transition:background .3s,color .3s;
     }
+
+    /* ── LIGHT MODE ─────────────────────────────────────────────────── */
+    :root{
+      /* SC Brand colors from logo */
+      --sc-orange:#F47920;
+      --sc-green:#5BAD41;
+      --sc-blue:#2E86C1;
+      --sc-gradient:linear-gradient(135deg,#F47920 0%,#5BAD41 50%,#2E86C1 100%);
+      --sc-gradient-soft:linear-gradient(135deg,rgba(244,121,32,0.12) 0%,rgba(91,173,65,0.12) 50%,rgba(46,134,193,0.12) 100%);
+
+      /* Backgrounds */
+      --bg-base:#F0F2F5;
+      --bg-elevated:rgba(255,255,255,0.72);
+      --bg-card:rgba(255,255,255,0.65);
+      --bg-card-hover:rgba(255,255,255,0.85);
+      --bg-input:rgba(255,255,255,0.8);
+      --bg-nav:rgba(255,255,255,0.78);
+      --bg-modal:rgba(255,255,255,0.92);
+      --bg-tint-green:rgba(91,173,65,0.12);
+      --bg-tint-orange:rgba(244,121,32,0.12);
+      --bg-tint-blue:rgba(46,134,193,0.12);
+      --bg-tint-red:rgba(220,53,69,0.10);
+      --bg-tint-amber:rgba(255,149,0,0.12);
+      --bg-overlay:rgba(0,0,0,0.45);
+
+      /* Glass effect */
+      --glass-blur:blur(20px) saturate(1.8);
+      --glass-border:rgba(255,255,255,0.55);
+      --glass-shadow:0 8px 32px rgba(0,0,0,0.10),0 1.5px 0 rgba(255,255,255,0.7) inset;
+      --glass-shadow-sm:0 2px 12px rgba(0,0,0,0.07),0 1px 0 rgba(255,255,255,0.6) inset;
+      --glass-shadow-lg:0 20px 60px rgba(0,0,0,0.14),0 1.5px 0 rgba(255,255,255,0.65) inset;
+
+      /* Text */
+      --text-primary:#1C1C1E;
+      --text-secondary:#636366;
+      --text-tertiary:#AEAEB2;
+      --text-success:#1A7F3C;
+      --text-warning:#B25000;
+      --text-danger:#C0392B;
+      --text-info:#1A5FA5;
+      --text-on-color:#fff;
+
+      /* Borders */
+      --border-sm:0.5px solid rgba(0,0,0,0.10);
+      --border-md:0.5px solid rgba(0,0,0,0.16);
+      --border-card:0.5px solid rgba(255,255,255,0.8);
+      --border-input:0.5px solid rgba(0,0,0,0.18);
+      --border-focus:rgba(46,134,193,0.6);
+      --border-success:rgba(91,173,65,0.4);
+      --border-danger:rgba(192,57,43,0.3);
+
+      /* Radius */
+      --r-sm:8px;--r-md:12px;--r-lg:18px;--r-xl:24px;--r-pill:100px;
+
+      /* Semantic aliases (keep old names working) */
+      --font-sans:"Inter",-apple-system,sans-serif;
+      --color-background-primary:var(--bg-card);
+      --color-background-secondary:rgba(240,242,245,0.8);
+      --color-background-tertiary:var(--bg-base);
+      --color-background-success:var(--bg-tint-green);
+      --color-background-warning:var(--bg-tint-amber);
+      --color-background-danger:var(--bg-tint-red);
+      --color-background-info:var(--bg-tint-blue);
+      --color-text-primary:var(--text-primary);
+      --color-text-secondary:var(--text-secondary);
+      --color-text-tertiary:var(--text-tertiary);
+      --color-text-success:var(--text-success);
+      --color-text-warning:var(--text-warning);
+      --color-text-danger:var(--text-danger);
+      --color-text-info:var(--text-info);
+      --color-border-tertiary:rgba(0,0,0,0.08);
+      --color-border-secondary:rgba(0,0,0,0.14);
+      --color-border-primary:rgba(0,0,0,0.28);
+      --color-border-success:rgba(91,173,65,0.4);
+      --color-border-danger:rgba(192,57,43,0.3);
+      --color-border-info:rgba(46,134,193,0.4);
+      --color-border-warning:rgba(178,80,0,0.3);
+      --border-radius-md:var(--r-md);
+      --border-radius-lg:var(--r-lg);
+      --border-radius-xl:var(--r-xl);
+    }
+
+    /* ── DARK MODE ───────────────────────────────────────────────────── */
     @media(prefers-color-scheme:dark){:root{
-      --color-background-primary:#1e1e1c;--color-background-secondary:#2a2a28;
-      --color-background-tertiary:#141412;--color-background-info:#0c2a4a;
-      --color-background-success:#082e22;--color-background-warning:#2e1c04;
-      --color-background-danger:#2e0e0e;--color-text-primary:#f0efeb;
-      --color-text-secondary:#9b9b9b;--color-text-tertiary:#6b6b6b;
-      --color-text-info:#85b7eb;--color-text-success:#5dcaa5;
-      --color-text-warning:#ef9f27;--color-text-danger:#f09595;
-      --color-border-tertiary:rgba(255,255,255,0.10);
-      --color-border-secondary:rgba(255,255,255,0.20);
-      --color-border-primary:rgba(255,255,255,0.32);
+      --bg-base:#0E0E10;
+      --bg-elevated:rgba(28,28,30,0.85);
+      --bg-card:rgba(28,28,30,0.72);
+      --bg-card-hover:rgba(44,44,46,0.85);
+      --bg-input:rgba(44,44,46,0.8);
+      --bg-nav:rgba(18,18,20,0.85);
+      --bg-modal:rgba(28,28,30,0.95);
+      --bg-tint-green:rgba(91,173,65,0.18);
+      --bg-tint-orange:rgba(244,121,32,0.18);
+      --bg-tint-blue:rgba(46,134,193,0.18);
+      --bg-tint-red:rgba(220,53,69,0.16);
+      --bg-tint-amber:rgba(255,149,0,0.16);
+      --glass-border:rgba(255,255,255,0.12);
+      --glass-shadow:0 8px 32px rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08) inset;
+      --glass-shadow-sm:0 2px 12px rgba(0,0,0,0.3),0 1px 0 rgba(255,255,255,0.06) inset;
+      --glass-shadow-lg:0 20px 60px rgba(0,0,0,0.6),0 1px 0 rgba(255,255,255,0.08) inset;
+      --text-primary:#F2F2F7;
+      --text-secondary:#AEAEB2;
+      --text-tertiary:#636366;
+      --text-success:#5BAD41;
+      --text-warning:#F47920;
+      --text-danger:#FF6B6B;
+      --text-info:#5B9BD5;
+      --border-sm:0.5px solid rgba(255,255,255,0.10);
+      --border-md:0.5px solid rgba(255,255,255,0.14);
+      --border-card:0.5px solid rgba(255,255,255,0.10);
+      --border-input:0.5px solid rgba(255,255,255,0.16);
     }}
     [data-theme="dark"]{
-      --color-background-primary:#1e1e1c;--color-background-secondary:#2a2a28;
-      --color-background-tertiary:#141412;--color-background-info:#0c2a4a;
-      --color-background-success:#082e22;--color-background-warning:#2e1c04;
-      --color-background-danger:#2e0e0e;--color-text-primary:#f0efeb;
-      --color-text-secondary:#9b9b9b;--color-tertiary:#6b6b6b;
-      --color-text-info:#85b7eb;--color-text-success:#5dcaa5;
-      --color-text-warning:#ef9f27;--color-text-danger:#f09595;
-      --color-border-tertiary:rgba(255,255,255,0.10);
-      --color-border-secondary:rgba(255,255,255,0.20);
-      --color-border-primary:rgba(255,255,255,0.32);
+      --bg-base:#0E0E10;
+      --bg-elevated:rgba(28,28,30,0.85);
+      --bg-card:rgba(28,28,30,0.72);
+      --bg-card-hover:rgba(44,44,46,0.85);
+      --bg-input:rgba(44,44,46,0.8);
+      --bg-nav:rgba(18,18,20,0.85);
+      --bg-modal:rgba(28,28,30,0.95);
+      --bg-tint-green:rgba(91,173,65,0.18);
+      --bg-tint-orange:rgba(244,121,32,0.18);
+      --bg-tint-blue:rgba(46,134,193,0.18);
+      --bg-tint-red:rgba(220,53,69,0.16);
+      --bg-tint-amber:rgba(255,149,0,0.16);
+      --glass-border:rgba(255,255,255,0.12);
+      --glass-shadow:0 8px 32px rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08) inset;
+      --glass-shadow-sm:0 2px 12px rgba(0,0,0,0.3),0 1px 0 rgba(255,255,255,0.06) inset;
+      --glass-shadow-lg:0 20px 60px rgba(0,0,0,0.6),0 1px 0 rgba(255,255,255,0.08) inset;
+      --text-primary:#F2F2F7;
+      --text-secondary:#AEAEB2;
+      --text-tertiary:#636366;
+      --text-success:#5BAD41;
+      --text-warning:#F47920;
+      --text-danger:#FF6B6B;
+      --text-info:#5B9BD5;
+      --border-sm:0.5px solid rgba(255,255,255,0.10);
+      --border-md:0.5px solid rgba(255,255,255,0.14);
+      --border-card:0.5px solid rgba(255,255,255,0.10);
+      --border-input:0.5px solid rgba(255,255,255,0.16);
+      --color-background-primary:var(--bg-card);
+      --color-background-secondary:rgba(28,28,30,0.6);
+      --color-background-tertiary:var(--bg-base);
+      --color-background-success:var(--bg-tint-green);
+      --color-background-warning:var(--bg-tint-amber);
+      --color-background-danger:var(--bg-tint-red);
+      --color-background-info:var(--bg-tint-blue);
+      --color-text-primary:var(--text-primary);
+      --color-text-secondary:var(--text-secondary);
+      --color-text-tertiary:var(--text-tertiary);
+      --color-text-success:var(--text-success);
+      --color-text-warning:var(--text-warning);
+      --color-text-danger:var(--text-danger);
+      --color-text-info:var(--text-info);
+      --color-border-tertiary:rgba(255,255,255,0.08);
+      --color-border-secondary:rgba(255,255,255,0.14);
     }
     [data-theme="light"]{
-      --color-background-primary:#ffffff;--color-background-secondary:#f5f5f3;
-      --color-background-tertiary:#eeede9;--color-background-info:#e6f1fb;
-      --color-background-success:#e1f5ee;--color-background-warning:#faeeda;
-      --color-background-danger:#fcebeb;--color-text-primary:#1a1a1a;
-      --color-text-secondary:#6b6b6b;--color-text-tertiary:#9b9b9b;
-      --color-text-info:#185fa5;--color-text-success:#0f6e56;
-      --color-text-warning:#854f0b;--color-text-danger:#a32d2d;
-      --color-border-tertiary:rgba(0,0,0,0.12);--color-border-secondary:rgba(0,0,0,0.22);
-      --color-border-primary:rgba(0,0,0,0.35);
+      --bg-base:#F0F2F5;
+      --bg-card:rgba(255,255,255,0.65);
+      --text-primary:#1C1C1E;
+      --text-secondary:#636366;
+      --color-background-primary:rgba(255,255,255,0.65);
+      --color-background-secondary:rgba(240,242,245,0.8);
+      --color-text-primary:#1C1C1E;
+      --color-text-secondary:#636366;
     }
-    input,select,textarea{font-family:inherit;font-size:14px;padding:8px 10px;
-      border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);
-      background:var(--color-background-primary);color:var(--color-text-primary);
-      outline:none;transition:border-color .15s;width:100%}
-    input:focus,select:focus,textarea:focus{border-color:#378add;box-shadow:0 0 0 3px rgba(55,138,221,0.12)}
-    button{font-family:inherit;cursor:pointer}
-    #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-      flex-direction:column;gap:14px;background:var(--color-background-tertiary);z-index:9999}
-    .spin{width:32px;height:32px;border:2.5px solid rgba(0,0,0,0.12);
-      border-top-color:#1d9e75;border-radius:50%;animation:sp .7s linear infinite}
+
+    /* ── GLOBAL AMBIENT BACKGROUND ──────────────────────────────────── */
+    body::before{
+      content:"";position:fixed;inset:0;z-index:-1;
+      background:
+        radial-gradient(ellipse 60% 50% at 10% 10%,rgba(244,121,32,0.18) 0%,transparent 70%),
+        radial-gradient(ellipse 50% 60% at 90% 20%,rgba(91,173,65,0.14) 0%,transparent 70%),
+        radial-gradient(ellipse 70% 50% at 50% 90%,rgba(46,134,193,0.16) 0%,transparent 70%),
+        var(--bg-base);
+      pointer-events:none;
+    }
+
+    /* ── GLASS CARD ─────────────────────────────────────────────────── */
+    .glass{
+      background:var(--bg-card);
+      backdrop-filter:var(--glass-blur);
+      -webkit-backdrop-filter:var(--glass-blur);
+      border:0.5px solid var(--glass-border);
+      box-shadow:var(--glass-shadow);
+    }
+    .glass-sm{
+      background:var(--bg-card);
+      backdrop-filter:blur(12px) saturate(1.6);
+      -webkit-backdrop-filter:blur(12px) saturate(1.6);
+      border:0.5px solid var(--glass-border);
+      box-shadow:var(--glass-shadow-sm);
+    }
+    .glass-nav{
+      background:var(--bg-nav);
+      backdrop-filter:blur(24px) saturate(2);
+      -webkit-backdrop-filter:blur(24px) saturate(2);
+      border-bottom:0.5px solid var(--glass-border);
+    }
+
+    /* ── INPUTS ─────────────────────────────────────────────────────── */
+    input,select,textarea{
+      font-family:inherit;font-size:14px;padding:9px 12px;
+      border:var(--border-input);border-radius:var(--r-sm);
+      background:var(--bg-input);
+      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      color:var(--text-primary);outline:none;
+      transition:border-color .15s,box-shadow .15s;width:100%;
+    }
+    input:focus,select:focus,textarea:focus{
+      border-color:var(--border-focus);
+      box-shadow:0 0 0 3px rgba(46,134,193,0.15);
+    }
+    input::placeholder{color:var(--text-tertiary)}
+
+    /* ── BUTTONS ─────────────────────────────────────────────────────── */
+    button{font-family:inherit;cursor:pointer;}
+    .btn-primary{
+      background:var(--sc-gradient);color:#fff;border:none;
+      padding:9px 18px;border-radius:var(--r-pill);font-size:13px;font-weight:600;
+      box-shadow:0 4px 16px rgba(244,121,32,0.3);
+      transition:transform .12s,box-shadow .12s,opacity .12s;
+      letter-spacing:0.01em;
+    }
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(244,121,32,0.4);}
+    .btn-primary:active{transform:translateY(0);opacity:.9;}
+    .btn-glass{
+      background:var(--bg-card);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+      border:var(--border-card);color:var(--text-primary);
+      padding:8px 16px;border-radius:var(--r-pill);font-size:13px;font-weight:500;
+      box-shadow:var(--glass-shadow-sm);transition:transform .12s,box-shadow .12s;
+    }
+    .btn-glass:hover{transform:translateY(-1px);box-shadow:var(--glass-shadow);}
+    .btn-danger{
+      background:var(--bg-tint-red);color:var(--text-danger);
+      border:0.5px solid var(--border-danger);
+      padding:6px 12px;border-radius:var(--r-pill);font-size:12px;font-weight:500;
+    }
+    .btn-success{
+      background:linear-gradient(135deg,#5BAD41,#3D8B2A);color:#fff;border:none;
+      padding:9px 18px;border-radius:var(--r-pill);font-size:13px;font-weight:600;
+      box-shadow:0 4px 16px rgba(91,173,65,0.35);
+      transition:transform .12s,box-shadow .12s;
+    }
+    .btn-success:hover{transform:translateY(-1px);}
+
+    /* ── PILLS / BADGES ─────────────────────────────────────────────── */
+    .pill{display:inline-flex;align-items:center;padding:3px 10px;font-size:11px;font-weight:500;border-radius:var(--r-pill);}
+    .pill-green{background:var(--bg-tint-green);color:var(--text-success);}
+    .pill-orange{background:var(--bg-tint-orange);color:var(--text-warning);}
+    .pill-blue{background:var(--bg-tint-blue);color:var(--text-info);}
+    .pill-red{background:var(--bg-tint-red);color:var(--text-danger);}
+    .pill-gray{background:rgba(120,120,128,0.12);color:var(--text-secondary);}
+
+    /* ── PROGRESS BAR ───────────────────────────────────────────────── */
+    .progress-track{height:5px;background:rgba(120,120,128,0.15);border-radius:3px;overflow:hidden;}
+    .progress-fill{height:100%;border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1);}
+
+    /* ── TABLE ──────────────────────────────────────────────────────── */
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{padding:8px 10px;text-align:left;font-size:10px;font-weight:600;
+      color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;
+      border-bottom:var(--border-sm);}
+    td{padding:9px 10px;border-bottom:var(--border-sm);color:var(--text-primary);vertical-align:middle;}
+    tr:last-child td{border-bottom:none;}
+    tr:hover td{background:rgba(120,120,128,0.05);}
+
+    /* ── LOADING ─────────────────────────────────────────────────────── */
+    #loading{
+      position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+      flex-direction:column;gap:16px;z-index:9999;
+      background:var(--bg-base);
+    }
+    #loading::before{
+      content:"";position:absolute;inset:0;
+      background:
+        radial-gradient(ellipse 60% 50% at 20% 20%,rgba(244,121,32,0.2) 0%,transparent 70%),
+        radial-gradient(ellipse 50% 60% at 80% 80%,rgba(91,173,65,0.16) 0%,transparent 70%);
+    }
+    .spin{
+      width:36px;height:36px;border-radius:50%;
+      border:2.5px solid rgba(120,120,128,0.15);
+      border-top-color:var(--sc-orange);
+      animation:sp .7s linear infinite;z-index:1;
+    }
     @keyframes sp{to{transform:rotate(360deg)}}
-    #loading p{font-size:13px;color:#6b6b6b}
+    #loading p{font-size:13px;color:var(--text-secondary);z-index:1;font-weight:500;}
+    #loading .brand{
+      font-size:22px;font-weight:700;letter-spacing:-.02em;z-index:1;
+      background:var(--sc-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+
+    /* ── ERROR ───────────────────────────────────────────────────────── */
     #err{display:none;position:fixed;inset:0;align-items:center;justify-content:center;
-      flex-direction:column;gap:12px;background:#eeede9;padding:2rem;text-align:center;z-index:9999}
-    #err h3{color:#a32d2d;font-size:15px;margin-bottom:8px}
-    #err pre{font-size:11px;color:#6b6b6b;white-space:pre-wrap;max-width:500px;
-      background:#fff;padding:12px;border-radius:8px;max-height:300px;overflow:auto;text-align:left}
-    #err button{margin-top:8px;padding:8px 16px;border:none;background:#185fa5;color:#fff;border-radius:8px;font-size:13px;cursor:pointer}
+      flex-direction:column;gap:12px;background:var(--bg-base);padding:2rem;text-align:center;z-index:9999}
+    #err h3{color:var(--text-danger);font-size:15px;margin-bottom:8px}
+    #err pre{font-size:11px;color:var(--text-secondary);white-space:pre-wrap;max-width:500px;
+      background:var(--bg-card);padding:12px;border-radius:var(--r-md);max-height:300px;overflow:auto;text-align:left;border:var(--border-sm)}
+    #err button{margin-top:8px;padding:9px 20px;border:none;background:var(--sc-gradient);color:#fff;border-radius:var(--r-pill);font-size:13px;font-weight:600;cursor:pointer}
+
+    /* ── SCROLLBAR ───────────────────────────────────────────────────── */
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(120,120,128,0.3);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(120,120,128,0.5)}
+
+    /* ── TOAST ───────────────────────────────────────────────────────── */
+    .toast{
+      position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:10000;
+      background:var(--bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+      border:var(--border-card);box-shadow:var(--glass-shadow-lg);
+      padding:10px 20px;border-radius:var(--r-pill);
+      font-size:13px;font-weight:500;color:var(--text-primary);
+      animation:toastIn .25s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;
+    }
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-12px) scale(.95)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+
+    /* ── MODAL ───────────────────────────────────────────────────────── */
+    .modal-overlay{
+      position:fixed;inset:0;z-index:1000;
+      background:rgba(0,0,0,0.5);
+      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      display:flex;align-items:flex-start;justify-content:center;
+      overflow-y:auto;padding:1rem;
+    }
+    .modal-box{
+      background:var(--bg-modal);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);
+      border:0.5px solid var(--glass-border);box-shadow:var(--glass-shadow-lg);
+      border-radius:var(--r-xl);width:100%;max-width:560px;padding:24px;
+      margin:auto;animation:modalIn .3s cubic-bezier(.34,1.2,.64,1);
+    }
+    @keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+
+    /* ── SC HEADER GRADIENT ──────────────────────────────────────────── */
+    .sc-header{
+      background:var(--sc-gradient);
+      padding:3px 12px 3px 4px;border-radius:var(--r-pill);
+      display:inline-flex;align-items:center;gap:6px;
+    }
+    .sc-header span{color:#fff;font-weight:700;font-size:12px;letter-spacing:.02em;}
+
+    /* ── METRIC CARD ─────────────────────────────────────────────────── */
+    .metric-card{
+      background:var(--bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+      border:0.5px solid var(--glass-border);box-shadow:var(--glass-shadow-sm);
+      border-radius:var(--r-lg);padding:14px 16px;
+    }
+    .metric-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:6px;}
+    .metric-value{font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--text-primary);}
+    .metric-sub{font-size:11px;color:var(--text-secondary);margin-top:3px;}
+
+    /* ── NAV TAB ─────────────────────────────────────────────────────── */
+    .nav-tab{
+      background:none;border:none;padding:10px 12px;cursor:pointer;
+      font-size:12px;font-weight:500;color:var(--text-secondary);
+      border-bottom:2px solid transparent;white-space:nowrap;
+      transition:color .15s,border-color .15s;
+    }
+    .nav-tab.active{color:var(--text-primary);border-bottom-color:var(--sc-orange);}
+    .nav-tab:hover:not(.active){color:var(--text-primary);}
+
+    /* ── SECTION CARD ─────────────────────────────────────────────────── */
+    .card{
+      background:var(--bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+      border:0.5px solid var(--glass-border);box-shadow:var(--glass-shadow-sm);
+      border-radius:var(--r-lg);padding:16px 18px;margin-bottom:12px;
+    }
+    .card-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:12px;}
+
+    /* ── FORM LABEL ──────────────────────────────────────────────────── */
+    .form-label{font-size:11px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:5px;}
+
+    /* ── DIVIDER ─────────────────────────────────────────────────────── */
+    .divider{height:0.5px;background:var(--glass-border);margin:12px 0;}
+
+    /* ── MOBILE BOTTOM NAV ───────────────────────────────────────────── */
+    @media(max-width:640px){
+      .bottom-nav{
+        position:fixed;bottom:0;left:0;right:0;z-index:100;
+        background:var(--bg-nav);backdrop-filter:blur(24px) saturate(2);-webkit-backdrop-filter:blur(24px) saturate(2);
+        border-top:0.5px solid var(--glass-border);
+        display:flex;padding:8px 0 calc(8px + env(safe-area-inset-bottom));
+        box-shadow:0 -8px 24px rgba(0,0,0,0.08);
+      }
+      .bottom-nav-item{
+        flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+        background:none;border:none;cursor:pointer;padding:6px 4px;
+        font-size:9px;font-weight:500;color:var(--text-secondary);
+        transition:color .15s;
+      }
+      .bottom-nav-item.active{color:var(--sc-orange);}
+      .bottom-nav-icon{font-size:20px;line-height:1;}
+      .main-content{padding-bottom:80px;}
+      .top-nav{display:none!important;}
+    }
+    @media(min-width:641px){
+      .bottom-nav{display:none!important;}
+      .main-content{padding-bottom:0;}
+    }
+
+    /* ── ANIMATIONS ──────────────────────────────────────────────────── */
+    @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .fade-up{animation:fadeUp .3s cubic-bezier(.4,0,.2,1);}
   </style>
 </head>
 <body>
-  <div id="loading"><div class="spin"></div><p id="msg">Iniciando…</p></div>
+  <div id="loading">
+    <div class="spin"></div>
+    <div class="brand">Sistema Eliel</div>
+    <p id="msg">Iniciando…</p>
+  </div>
   <div id="err">
     <h3>&#9888; Error al cargar</h3>
     <pre id="err-txt"></pre>
@@ -91,7 +440,6 @@
   </div>
   <div id="root"></div>
 
-  <!-- Helpers globales disponibles desde el inicio -->
   <script>
     function setMsg(t){var e=document.getElementById("msg");if(e)e.textContent=t;}
     function showErr(e){
@@ -103,9 +451,8 @@
     }
   </script>
 
-  <!-- Firebase compat: expone window.firebase global -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"
-    onerror="showErr('No se pudo cargar Firebase. Verificá tu conexión a internet.')"></script>
+    onerror="showErr('No se pudo cargar Firebase.')"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"
     onerror="showErr('No se pudo cargar Firestore.')"></script>
 
@@ -122,23 +469,16 @@
       });
       window._fbDB=firebase.firestore();
       console.log("\u2713 Firebase OK");
-    }catch(e){
-      console.warn("Firebase no disponible, modo local:",e.message);
-      window._fbDB=null;
-    }
+    }catch(e){console.warn("Firebase:",e);window._fbDB=null;}
   </script>
 
-  <!-- React 18 -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"
     onerror="showErr('No se pudo cargar React.')"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
     onerror="showErr('No se pudo cargar ReactDOM.')"></script>
-
-  <!-- Babel standalone - SOLO preset react (sin env), mucho mas rapido -->
   <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"
     onerror="showErr('No se pudo cargar Babel.')"></script>
 
-  <!-- Codigo JSX de la app (tipo text/raw para que el browser no lo ejecute) -->
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -421,11 +761,11 @@ function App(){
 
   // Módulos de navegación superior
   const modulos=[
-    {id:"dashboard",icon:"◈",label:"Dashboard"},
-    {id:"supercoating",icon:"⚗",label:"Super Coating"},
-    {id:"bhtrade",icon:"⬡",label:"BH Trade"},
-    {id:"dj",icon:"♪",label:"DJ"},
-    {id:"finanzas",icon:"◎",label:"Finanzas"},
+    {id:"dashboard",icon:"🏠",label:"Inicio"},
+    {id:"supercoating",icon:"📦",label:"S.Coating"},
+    {id:"bhtrade",icon:"🚢",label:"BH Trade"},
+    {id:"dj",icon:"🎵",label:"DJ"},
+    {id:"finanzas",icon:"💰",label:"Finanzas"},
   ];
 
   // Sub-navegación SC
@@ -443,39 +783,123 @@ function App(){
   const goModulo=m=>{setModulo(m);if(m==="supercoating")setView("dashboard");setContSel(null);};
 
   return(
-    <div style={{fontFamily:"var(--font-sans)",minHeight:"100vh",background:"var(--color-background-tertiary)"}}>
+    <div style={{fontFamily:'"Inter",-apple-system,sans-serif',minHeight:"100vh"}}>
+
+      {/* TOAST */}
       {toastMsg&&(
-        <div style={{background:"var(--color-text-success)",color:"var(--color-background-primary)",padding:"10px 18px",fontSize:13,fontWeight:500,textAlign:"center",borderBottom:"none",letterSpacing:"0.01em"}}>{toastMsg}</div>
+        <div style={{
+          position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",zIndex:10000,
+          background:"var(--bg-card)",backdropFilter:"blur(20px) saturate(1.8)",WebkitBackdropFilter:"blur(20px) saturate(1.8)",
+          border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",
+          padding:"10px 20px",borderRadius:"var(--r-pill)",
+          fontSize:13,fontWeight:500,color:"var(--text-primary)",whiteSpace:"nowrap",
+        }}>
+          <span style={{marginRight:6,color:"var(--text-success)"}}>✓</span>{toastMsg}
+        </div>
       )}
+
       {showPedido&&<PedidoModal data={data} save={save} blue={blue} onClose={()=>setShowPedido(false)} showToast={showToast} clienteIdx={clienteIdx}/>}
 
-      {/* NAV MÓDULOS PRINCIPAL */}
-      <div style={{background:"var(--color-background-primary)",borderBottom:"0.5px solid var(--color-border-tertiary)",padding:"0 0.75rem",display:"flex",alignItems:"center",gap:2,overflowX:"auto"}}>
-        <span style={{fontWeight:600,fontSize:12,padding:"12px 8px 12px 2px",whiteSpace:"nowrap",color:"var(--color-text-secondary)",letterSpacing:"0.08em",flexShrink:0}}>ELIEL</span>
+      {/* TOP NAV ── desktop (hidden on mobile via CSS) */}
+      <div className="top-nav" style={{
+        position:"sticky",top:0,zIndex:50,
+        background:"var(--bg-nav)",backdropFilter:"blur(24px) saturate(2)",WebkitBackdropFilter:"blur(24px) saturate(2)",
+        borderBottom:"0.5px solid var(--glass-border)",
+        padding:"0 1rem",display:"flex",alignItems:"center",gap:0,minHeight:52,
+      }}>
+        {/* Brand mark */}
+        <div style={{display:"flex",alignItems:"center",gap:8,marginRight:16,flexShrink:0,padding:"8px 0"}}>
+          <div style={{
+            width:28,height:28,borderRadius:8,
+            background:"linear-gradient(135deg,#F47920,#5BAD41,#2E86C1)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:15,fontWeight:900,color:"#fff",fontFamily:"-apple-system,sans-serif",
+            boxShadow:"0 2px 8px rgba(244,121,32,0.4)",flexShrink:0,
+          }}>E</div>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,letterSpacing:"-.01em",lineHeight:1.1,
+              background:"linear-gradient(135deg,#F47920,#5BAD41,#2E86C1)",
+              WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>Sistema</div>
+            <div style={{fontSize:9,fontWeight:600,color:"var(--text-secondary)",letterSpacing:".06em",textTransform:"uppercase"}}>Eliel</div>
+          </div>
+        </div>
+
+        {/* Module tabs */}
         {modulos.map(m=>(
-          <button key={m.id} onClick={()=>goModulo(m.id)} style={{background:"none",border:"none",padding:"12px 10px",cursor:"pointer",fontSize:12,fontWeight:modulo===m.id?600:400,color:modulo===m.id?"var(--color-text-primary)":"var(--color-text-secondary)",borderBottom:modulo===m.id?"2px solid var(--color-text-primary)":"2px solid transparent",whiteSpace:"nowrap",transition:"all .15s"}}>
-            <span style={{marginRight:5}}>{m.icon}</span>{m.label}
+          <button key={m.id} onClick={()=>goModulo(m.id)}
+            style={{
+              background:"none",border:"none",padding:"14px 12px",cursor:"pointer",
+              fontSize:12,fontWeight:modulo===m.id?600:400,
+              color:modulo===m.id?"var(--text-primary)":"var(--text-secondary)",
+              borderBottom:modulo===m.id?"2px solid var(--sc-orange)":"2px solid transparent",
+              whiteSpace:"nowrap",transition:"color .15s,border-color .15s",
+            }}>
+            {m.label}
           </button>
         ))}
-        {blue&&<div style={{marginLeft:"auto",flexShrink:0,fontSize:11,padding:"0 6px",color:"var(--color-text-success)",whiteSpace:"nowrap",fontWeight:500}}>💵 ${fmt(blue)}</div>}
-        <div style={{flexShrink:0,fontSize:10,padding:"0 6px",whiteSpace:"nowrap",color:fbReady?"var(--color-text-success)":"var(--color-text-warning)"}}>
-          {fbReady?"☁ sync":"⚠ local"}
+
+        {/* Right controls */}
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          {blue&&(
+            <div style={{
+              fontSize:11,fontWeight:600,color:"var(--text-success)",
+              padding:"4px 10px",background:"var(--bg-tint-green)",
+              borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-success)",
+            }}>💵 ${fmt(blue)}</div>
+          )}
+          <div style={{
+            fontSize:10,fontWeight:500,padding:"4px 9px",borderRadius:"var(--r-pill)",
+            background:fbReady?"var(--bg-tint-green)":"var(--bg-tint-amber)",
+            color:fbReady?"var(--text-success)":"var(--text-warning)",
+            border:fbReady?"0.5px solid var(--border-success)":"0.5px solid rgba(244,121,32,0.3)",
+          }}>
+            {fbReady?"● sync":"⚠ local"}
+          </div>
+          <button onClick={toggleTheme} style={{
+            width:30,height:30,borderRadius:"50%",
+            border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",
+            backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:14,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)",
+          }}>
+            {theme==="dark"?"☀️":"🌙"}
+          </button>
         </div>
       </div>
 
       {/* SUB-NAV SC */}
       {modulo==="supercoating"&&(
-        <div style={{background:"var(--color-background-primary)",borderBottom:"0.5px solid var(--color-border-tertiary)",padding:"0 0.75rem",display:"flex",alignItems:"center",gap:1,overflowX:"auto"}}>
+        <div style={{
+          position:"sticky",top:52,zIndex:49,
+          background:"var(--bg-nav)",backdropFilter:"blur(20px) saturate(1.8)",WebkitBackdropFilter:"blur(20px) saturate(1.8)",
+          borderBottom:"0.5px solid var(--glass-border)",
+          padding:"0 1rem",display:"flex",alignItems:"center",gap:0,overflowX:"auto",minHeight:40,
+        }}>
           {navSC.map(n=>(
-            <button key={n.id} onClick={()=>{setView(n.id);setContSel(null);}} style={{background:"none",border:"none",padding:"8px 10px",cursor:"pointer",fontSize:11,color:view===n.id?"var(--color-text-primary)":"var(--color-text-secondary)",fontWeight:view===n.id?500:400,borderBottom:view===n.id?"2px solid var(--color-text-primary)":"2px solid transparent",whiteSpace:"nowrap"}}>
+            <button key={n.id} onClick={()=>{setView(n.id);setContSel(null);}}
+              style={{
+                background:"none",border:"none",padding:"10px 10px",cursor:"pointer",
+                fontSize:11,fontWeight:view===n.id?600:400,
+                color:view===n.id?"var(--text-primary)":"var(--text-secondary)",
+                borderBottom:view===n.id?"2px solid var(--sc-orange)":"2px solid transparent",
+                whiteSpace:"nowrap",transition:"color .15s",
+              }}>
               {n.label}
             </button>
           ))}
-          <button onClick={()=>setShowPedido(true)} style={{marginLeft:"auto",flexShrink:0,fontSize:11,padding:"5px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-success)",color:"var(--color-background-primary)",whiteSpace:"nowrap",fontWeight:500}}>+ Pedido</button>
+          <button onClick={()=>setShowPedido(true)} style={{
+            marginLeft:"auto",flexShrink:0,fontSize:12,padding:"6px 16px",
+            background:"linear-gradient(135deg,#F47920,#5BAD41)",color:"#fff",border:"none",
+            borderRadius:"var(--r-pill)",fontWeight:600,cursor:"pointer",
+            boxShadow:"0 3px 12px rgba(244,121,32,0.35)",letterSpacing:".01em",
+          }}>
+            + Pedido
+          </button>
         </div>
       )}
 
-      <div style={{padding:"1rem"}}>
+      {/* MAIN CONTENT */}
+      <div style={{padding:"1rem",maxWidth:900,margin:"0 auto",paddingBottom:90}}>
         {/* DASHBOARD CENTRAL */}
         {modulo==="dashboard"&&(
           <DashboardCentral
@@ -519,9 +943,33 @@ function App(){
           />
         )}
       </div>
+
+      {/* BOTTOM NAV ── mobile */}
+      <div style={{
+        position:"fixed",bottom:0,left:0,right:0,zIndex:100,
+        background:"var(--bg-nav)",backdropFilter:"blur(24px) saturate(2)",WebkitBackdropFilter:"blur(24px) saturate(2)",
+        borderTop:"0.5px solid var(--glass-border)",
+        display:"flex",padding:"8px 0 calc(8px + env(safe-area-inset-bottom))",
+        boxShadow:"0 -8px 24px rgba(0,0,0,0.08)",
+      }} className="bottom-nav">
+        {modulos.map(m=>(
+          <button key={m.id} onClick={()=>goModulo(m.id)}
+            style={{
+              flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+              background:"none",border:"none",cursor:"pointer",padding:"6px 4px",
+              fontSize:9,fontWeight:modulo===m.id?600:400,
+              color:modulo===m.id?"var(--sc-orange)":"var(--text-secondary)",
+              transition:"color .15s",
+            }}>
+            <span style={{fontSize:22,lineHeight:1}}>{m.icon}</span>
+            <span>{m.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
+
 
 // ══════════════════════════════════════════════════════════════════════════
 // DASHBOARD CENTRAL
@@ -530,12 +978,18 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
   const tcActual=blue||1450;
   const balance=totalIngresos-totalGastos;
   const Card=({label,value,sub,color,onClick})=>(
-    <div onClick={onClick} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px",cursor:onClick?"pointer":"default",transition:"border-color .15s"}}
-      onMouseEnter={e=>{if(onClick)e.currentTarget.style.borderColor="var(--color-border-primary)"}}
-      onMouseLeave={e=>{if(onClick)e.currentTarget.style.borderColor="var(--color-border-tertiary)"}}>
-      <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>{label}</div>
-      <div style={{fontSize:20,fontWeight:500,color:color||"var(--color-text-primary)"}}>{value}</div>
-      {sub&&<div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:3}}>{sub}</div>}
+    <div onClick={onClick}
+      style={{
+        background:"var(--bg-card)",backdropFilter:"blur(20px) saturate(1.8)",WebkitBackdropFilter:"blur(20px) saturate(1.8)",
+        border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",
+        borderRadius:"var(--r-lg)",padding:"14px 16px",
+        cursor:onClick?"pointer":"default",transition:"transform .15s,box-shadow .15s",
+      }}
+      onMouseEnter={e=>{if(onClick){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="var(--glass-shadow)";}}}
+      onMouseLeave={e=>{if(onClick){e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="var(--glass-shadow-sm)";}}}> 
+      <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:6}}>{label}</div>
+      <div style={{fontSize:22,fontWeight:600,letterSpacing:"-.02em",color:color||"var(--text-primary)"}}>{value}</div>
+      {sub&&<div style={{fontSize:11,color:"var(--text-secondary)",marginTop:3}}>{sub}</div>}
     </div>
   );
 
@@ -571,7 +1025,7 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:"1rem"}}>
-        <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px"}}>
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
           <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Ingresos por módulo</div>
           {fuentes.map(f=>(
             <div key={f.n} style={{marginBottom:10}}>
@@ -579,14 +1033,14 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
                 <span style={{color:"var(--color-text-primary)"}}>{f.n}</span>
                 <span style={{color:"var(--color-text-secondary)"}}>${fmt(f.v)}</span>
               </div>
-              <div style={{height:6,background:"var(--color-background-secondary)",borderRadius:3,overflow:"hidden"}}>
+              <div style={{height:6,background:"rgba(120,120,128,0.08)",borderRadius:3,overflow:"hidden"}}>
                 <div style={{height:"100%",width:(f.v/maxBar*100)+"%",background:f.c,borderRadius:3}}/>
               </div>
             </div>
           ))}
         </div>
 
-        <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px"}}>
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
           <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Últimos movimientos</div>
           {recientes.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:13}}>Sin movimientos aún.</p>:recientes.map((m,i)=>(
             <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
@@ -610,7 +1064,7 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
           {mod:"dj",icon:"♪",title:"DJ",desc:"Eventos y ganancia por show"},
           {mod:"finanzas",icon:"◎",title:"Finanzas",desc:"Gastos y balance personal"},
         ].map(x=>(
-          <button key={x.mod} onClick={()=>goModulo(x.mod)} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 14px",cursor:"pointer",textAlign:"left",transition:"border-color .15s"}}
+          <button key={x.mod} onClick={()=>goModulo(x.mod)} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px 14px",cursor:"pointer",textAlign:"left",transition:"border-color .15s"}}
             onMouseEnter={e=>e.currentTarget.style.borderColor="var(--color-border-primary)"}
             onMouseLeave={e=>e.currentTarget.style.borderColor="var(--color-border-tertiary)"}>
             <div style={{fontSize:20,marginBottom:6}}>{x.icon}</div>
@@ -681,7 +1135,7 @@ function BHTradeView({data,save,showToast,blue}){
       </div>
 
       {/* Formulario */}
-      <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px",marginBottom:"1rem"}}>
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",marginBottom:"1rem"}}>
         <div style={{fontSize:13,fontWeight:500,marginBottom:10}}>Cargar despacho — {MESES[mesActivo]}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:8}}>
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Expediente</label><input value={form.exp} onChange={e=>setForm({...form,exp:e.target.value})} placeholder="SKY-INTR-260" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
@@ -694,7 +1148,7 @@ function BHTradeView({data,save,showToast,blue}){
       </div>
 
       {/* Tabla */}
-      <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px"}}>
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
         <div style={{fontSize:13,fontWeight:500}}>Despachos — {MESES[mesActivo]}</div>
         {despMes.length>0&&<button onClick={()=>{if(confirm("¿Borrar todos los despachos de "+MESES[mesActivo]+"?"))save({...data,bh:{...data.bh,despachos:despachos.filter(d=>d.mes!==mesActivo)}});}} style={{fontSize:11,padding:"4px 10px",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-danger)",background:"var(--color-background-danger)",color:"var(--color-text-danger)"}}>Borrar mes</button>}
@@ -716,7 +1170,7 @@ function BHTradeView({data,save,showToast,blue}){
                 ))}</tbody>
               </table>
             </div>
-            <div style={{marginTop:12,padding:"10px 12px",background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",fontSize:13}}>
+            <div style={{marginTop:12,padding:"10px 12px",background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",fontSize:13}}>
               <span>Subtotal despachos: <strong>${fmt(s.total)}</strong></span>
               <span style={{marginLeft:16}}>+ Base fija: <strong>${fmt(s.base)}</strong></span>
               {s.aguinaldo&&<span style={{marginLeft:16,color:"var(--color-text-warning)"}}>× 1.5 aguinaldo ✦</span>}
@@ -784,7 +1238,7 @@ function DJView({data,save,showToast}){
       </div>
 
       {/* Formulario */}
-      <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px",marginBottom:"1.5rem"}}>
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",marginBottom:"1.5rem"}}>
         <div style={{fontSize:13,fontWeight:500,marginBottom:10}}>{editId?"Editar evento":"Nuevo evento"}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Nombre del evento</label><input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Casamiento García — Salón XYZ" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
@@ -798,7 +1252,7 @@ function DJView({data,save,showToast}){
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cobro total ($)</label><input type="number" value={form.cobro} onChange={e=>setForm({...form,cobro:e.target.value})} placeholder="0" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
         </div>
         {(form.costo||form.cobro)&&(
-          <div style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:8,fontSize:12,display:"flex",gap:16}}>
+          <div style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:8,fontSize:12,display:"flex",gap:16}}>
             <span>Ganancia: <strong style={{color:ganARS>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>${fmt(ganARS)}</strong></span>
             {Number(form.cobro)>0&&<span>Margen: <strong>{fmtPct(ganARS/Number(form.cobro)*100)}</strong></span>}
           </div>
@@ -814,7 +1268,7 @@ function DJView({data,save,showToast}){
       {eventos.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:14}}>Sin eventos todavía.</p>:(
         <div style={{display:"grid",gap:8}}>
           {[...eventos].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(e=>(
-            <div key={e.id} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px"}}>
+            <div key={e.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                 <div>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
@@ -925,7 +1379,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
       </div>
 
       {/* Formulario */}
-      <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"16px 18px",marginBottom:"1.5rem"}}>
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"16px 18px",marginBottom:"1.5rem"}}>
         <div style={{fontSize:13,fontWeight:500,marginBottom:12,color:"var(--color-text-primary)"}}>Cargar gasto</div>
 
         {/* Toggle moneda */}
@@ -990,7 +1444,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
 
       {/* Gráficos */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:"1.5rem"}}>
-        <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px"}}>
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
           <div style={{fontSize:11,fontWeight:500,marginBottom:12,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em"}}>Por categoría</div>
           {catArr.length===0
             ?<p style={{color:"var(--color-text-secondary)",fontSize:13,margin:0}}>Sin gastos aún.</p>
@@ -1000,14 +1454,14 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
                   <span style={{color:"var(--color-text-primary)"}}>{cat}</span>
                   <span style={{color:"var(--color-text-secondary)",fontWeight:500}}>${fmt(v)}</span>
                 </div>
-                <div style={{height:5,background:"var(--color-background-secondary)",borderRadius:3,overflow:"hidden"}}>
+                <div style={{height:5,background:"rgba(120,120,128,0.08)",borderRadius:3,overflow:"hidden"}}>
                   <div style={{height:"100%",width:(v/maxCat*100)+"%",background:catColors[i%catColors.length],borderRadius:3,transition:"width .3s"}}/>
                 </div>
               </div>
             ))
           }
         </div>
-        <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px"}}>
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
           <div style={{fontSize:11,fontWeight:500,marginBottom:12,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em"}}>Ingresos por módulo</div>
           {fuentes.map(f=>(
             <div key={f.n} style={{marginBottom:10}}>
@@ -1015,7 +1469,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
                 <span style={{color:"var(--color-text-primary)"}}>{f.n}</span>
                 <span style={{color:"var(--color-text-secondary)",fontWeight:500}}>${fmt(f.v)}</span>
               </div>
-              <div style={{height:5,background:"var(--color-background-secondary)",borderRadius:3,overflow:"hidden"}}>
+              <div style={{height:5,background:"rgba(120,120,128,0.08)",borderRadius:3,overflow:"hidden"}}>
                 <div style={{height:"100%",width:(f.v/maxFuente*100)+"%",background:f.c,borderRadius:3,transition:"width .3s"}}/>
               </div>
             </div>
@@ -1030,7 +1484,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
 
       {/* Lista gastos */}
       {gastos.length>0&&(
-        <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px"}}>
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
           <div style={{fontSize:13,fontWeight:500,marginBottom:12}}>Historial de gastos</div>
           {[...gastos].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(g=>(
             <div key={g.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
@@ -1124,7 +1578,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
             <h2 style={{fontSize:20,fontWeight:600,margin:0,color:"var(--color-text-primary)"}}>Nuevo pedido</h2>
             <p style={{fontSize:13,color:"var(--color-text-secondary)",margin:"3px 0 0"}}>Completá los datos y el sistema distribuye automáticamente</p>
           </div>
-          <button onClick={onClose} style={{border:"1px solid #ddd",background:"var(--color-background-secondary)",cursor:"pointer",fontSize:15,color:"var(--color-text-secondary)",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          <button onClick={onClose} style={{border:"1px solid #ddd",background:"rgba(120,120,128,0.08)",cursor:"pointer",fontSize:15,color:"var(--color-text-secondary)",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:"1rem"}}>
@@ -1138,7 +1592,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
           <div><label style={{fontSize:12,color:"var(--color-text-secondary)"}}>{blue?"Blue · $"+fmt(blue):"Blue ($/USD)"}</label><input type="number" value={tc} onChange={e=>setTc(e.target.value)} style={{width:"100%",marginTop:3,boxSizing:"border-box"}}/></div>
         </div>
 
-        <div style={{background:"var(--color-background-secondary)",borderRadius:10,padding:"12px",marginBottom:"1rem"}}>
+        <div style={{background:"rgba(120,120,128,0.08)",borderRadius:10,padding:"12px",marginBottom:"1rem"}}>
           <p style={{fontSize:13,fontWeight:500,margin:"0 0 10px",color:"var(--color-text-primary)"}}>Artículos</p>
           {items.map((it,i)=>(
             <div key={i} style={{background:"var(--color-background-primary)",borderRadius:8,padding:"10px",marginBottom:8,border:"1px solid #eee"}}>
@@ -1158,7 +1612,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
           <button onClick={addItem} style={{fontSize:12,padding:"5px 10px",borderRadius:6,cursor:"pointer",border:"1px solid #ddd",background:"transparent",color:"var(--color-text-secondary)"}}>+ Artículo</button>
         </div>
 
-        {totalPedido>0&&<div style={{background:"var(--color-background-secondary)",borderRadius:8,padding:"10px 12px",marginBottom:"1rem",display:"flex",justifyContent:"space-between"}}>
+        {totalPedido>0&&<div style={{background:"rgba(120,120,128,0.08)",borderRadius:8,padding:"10px 12px",marginBottom:"1rem",display:"flex",justifyContent:"space-between"}}>
           <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Total del pedido</span>
           <span style={{fontWeight:500,fontSize:15}}>${fmt(totalPedido)} · {fmtUSD(totalPedido/Number(tc||1450))}</span>
         </div>}
@@ -1260,7 +1714,7 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro}){
         ))}
       </div>
       {data.contenedores.length===0?(
-        <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"2rem",textAlign:"center"}}>
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"2rem",textAlign:"center"}}>
           <p style={{color:"var(--color-text-secondary)",fontSize:14,margin:0}}>Creá tu primer contenedor en la pestaña Contenedores.</p>
         </div>
       ):(
@@ -1269,7 +1723,7 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro}){
             const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
             const costo=c.costoTotal||0;const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;const enG=costo>0&&cobUSD>costo;
             return(
-              <div key={c.id} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 1rem"}}>
+              <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px 1rem"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?6:0}}>
                   <span style={{fontWeight:500,fontSize:13}}>{c.nombre}</span>
                   <span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:enG?"var(--color-background-success)":costo===0?"var(--color-background-secondary)":"var(--color-background-warning)",color:enG?"var(--color-text-success)":costo===0?"var(--color-text-secondary)":"var(--color-text-warning)"}}>
@@ -1277,7 +1731,7 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro}){
                   </span>
                 </div>
                 {costo>0&&(<>
-                  <div style={{height:5,background:"var(--color-background-secondary)",borderRadius:3,overflow:"hidden",marginBottom:5}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:3}}/></div>
+                  <div style={{height:5,background:"rgba(120,120,128,0.08)",borderRadius:3,overflow:"hidden",marginBottom:5}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:3}}/></div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}>
                     <span>Cobrado: {fmtUSD(cobUSD)}</span><span>Costo: {fmtUSD(costo)}</span>
                     {!enG&&<span style={{color:"var(--color-text-warning)"}}>Faltan: {fmtUSD(costo-cobUSD)}</span>}
@@ -1305,7 +1759,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
         <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Contenedores</h2>
         <button onClick={()=>setNuevo(true)} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>+ Nuevo</button>
       </div>
-      {nuevo&&(<div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem",marginBottom:"1rem"}}>
+      {nuevo&&(<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej: 15vo CONT PAPEL" style={{width:"100%",marginBottom:8,boxSizing:"border-box"}} onKeyDown={e=>e.key==="Enter"&&crear()}/>
         <div style={{display:"flex",gap:8}}>
           <button onClick={crear} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>Crear</button>
@@ -1317,7 +1771,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
         {(data.contenedores||[]).map(c=>{
           const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
           const costo=c.costoTotal||0;const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;const enG=costo>0&&cobUSD>costo;
-          return(<div key={c.id} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 1rem",cursor:"pointer"}} onClick={()=>{setContSel(c);setContTab("armado");}}>
+          return(<div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px 1rem",cursor:"pointer"}} onClick={()=>{setContSel(c);setContTab("armado");}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?6:0}}>
               <div><div style={{fontWeight:500,fontSize:14}}>{c.nombre}</div><div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:1}}>{(c.articulos||[]).length+" artículos"}</div></div>
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -1325,7 +1779,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
                 <button onClick={e=>{e.stopPropagation();if(window.confirm("¿Borrar '"+c.nombre+"'? Se eliminarán también sus ventas.")){save({...data,contenedores:data.contenedores.filter(x=>x.id!==c.id),ventas:(data.ventas||[]).filter(v=>v.contId!==c.id)});showToast("Contenedor eliminado");}}} style={{fontSize:11,padding:"3px 8px",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-danger)",background:"var(--color-background-danger)",color:"var(--color-text-danger)",flexShrink:0}}>Borrar</button>
               </div>
             </div>
-            {costo>0&&(<><div style={{height:4,background:"var(--color-background-secondary)",borderRadius:2,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:2}}/></div><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}><span>{fmtPct(pct)+" cobrado"}</span>{!enG&&<span style={{color:"var(--color-text-warning)",fontWeight:500}}>{"Faltan "+fmtUSD(costo-cobUSD)}</span>}</div></>)}
+            {costo>0&&(<><div style={{height:4,background:"rgba(120,120,128,0.08)",borderRadius:2,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:2}}/></div><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}><span>{fmtPct(pct)+" cobrado"}</span>{!enG&&<span style={{color:"var(--color-text-warning)",fontWeight:500}}>{"Faltan "+fmtUSD(costo-cobUSD)}</span>}</div></>)}
           </div>);
         })}
       </div>
@@ -1343,7 +1797,7 @@ function ContenedorDetail({cont,data,save,tab,setTab,onBack,showToast,blue}){
         <button onClick={onBack} style={{fontSize:13,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"transparent",color:"var(--color-text-secondary)"}}>← Volver</button>
         <h2 style={{fontSize:15,fontWeight:500,margin:0}}>{c.nombre}</h2>
       </div>
-      <div style={{display:"flex",gap:4,marginBottom:"1rem",background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:4}}>
+      <div style={{display:"flex",gap:4,marginBottom:"1rem",background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:4}}>
         {["armado","costos","ventas"].map(t=>(
           <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"7px 4px",border:"none",borderRadius:"var(--border-radius-md)",cursor:"pointer",fontSize:12,background:tab===t?"var(--color-background-primary)":"transparent",color:tab===t?"var(--color-text-primary)":"var(--color-text-secondary)",fontWeight:tab===t?500:400}}>
             {t==="armado"?"Armado":t==="costos"?"Costos":"Ventas"}
@@ -1383,7 +1837,7 @@ function TabArmado({cont,updateCont,showToast}){
     <div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:"1rem"}}>
         {[{l:"Peso total",v:fmt(pesoTotal)+" kg",w:pesoTotal>LIMITE},{l:"Límite",v:fmt(LIMITE)+" kg"},{l:"FOB total",v:fmt(fobTot)},{l:"Unidades",v:fmt((cont.articulos||[]).reduce((a,x)=>a+Number(x.cantidad),0))}].map(x=>(
-          <div key={x.l} style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.6rem"}}>
+          <div key={x.l} style={{background:"rgba(120,120,128,0.08)",backdropFilter:"blur(8px)",borderRadius:"var(--r-md)",padding:"10px 12px"}}>
             <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{x.l}</div>
             <div style={{fontSize:14,fontWeight:500,color:x.w?"var(--color-text-danger)":"var(--color-text-primary)"}}>{x.v}</div>
           </div>
@@ -1391,9 +1845,9 @@ function TabArmado({cont,updateCont,showToast}){
       </div>
       <div style={{marginBottom:"1rem"}}>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)",marginBottom:3}}><span>Uso del contenedor</span><span>{fmtPct(pctPeso)}</span></div>
-        <div style={{height:6,background:"var(--color-background-secondary)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:pctPeso+"%",background:pctPeso>95?"var(--color-border-danger)":"var(--color-border-info)",borderRadius:3}}/></div>
+        <div style={{height:6,background:"rgba(120,120,128,0.08)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:pctPeso+"%",background:pctPeso>95?"var(--color-border-danger)":"var(--color-border-info)",borderRadius:3}}/></div>
       </div>
-      <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem",marginBottom:"1rem"}}>
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>{editId?"Editar artículo":"Agregar artículo"}</p>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} style={{width:"100%",marginTop:2}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
@@ -1411,7 +1865,7 @@ function TabArmado({cont,updateCont,showToast}){
       {(cont.articulos||[]).length>0&&(
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{background:"var(--color-background-secondary)"}}>{["Artículo","Cant","Peso/u","Peso tot","Precio","Total","% FOB",""].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:500,fontSize:11,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+            <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Artículo","Cant","Peso/u","Peso tot","Precio","Total","% FOB",""].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:500,fontSize:11,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
             <tbody>{cont.articulos.map(art=>{const pr=pesoRollo(art),pt=pr*art.cantidad,tot=Number(art.precio||0)*art.cantidad,p=fobTot>0?(tot/fobTot*100):0,mon=art.moneda==="USD"?"USD":art.moneda==="RMB"?"¥":"";return(<tr key={art.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
               <td style={{padding:"6px 8px"}}>{art.nombre}</td><td style={{padding:"6px 8px"}}>{fmt(art.cantidad)}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{pr>0?pr.toFixed(2)+"kg":"—"}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{pt>0?pt.toFixed(0)+"kg":"—"}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{mon+fmt(art.precio||0)}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{mon+fmt(tot)}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtPct(p)}</td>
               <td style={{padding:"6px 8px"}}><button onClick={()=>startEdit(art)} style={{border:"none",background:"none",cursor:"pointer",fontSize:13,marginRight:4}}>✏️</button><button onClick={()=>removeArt(art.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:13}}>✕</button></td>
@@ -1442,13 +1896,13 @@ function TabCostos({cont,updateCont,showToast,blue}){
   return(
     <div>
       {blue&&<div style={{background:"var(--color-background-success)",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:"1rem",fontSize:12,color:"var(--color-text-success)"}}>💵 Blue en tiempo real: ${fmt(blue)}</div>}
-      <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem",marginBottom:"1rem"}}>
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Tipo de cambio Blue ($/USD)</label><input type="number" value={form.tipoCambio} onChange={e=>setForm({...form,tipoCambio:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Costo China</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form.costoChina||""} onChange={e=>setForm({...form,costoChina:e.target.value})} style={{flex:1,boxSizing:"border-box"}}/><select value={form.costoMoneda||"ARS"} onChange={e=>setForm({...form,costoMoneda:e.target.value})} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>
           {campos.map(c=>(<div key={c.k}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{c.l}</label><input type="number" value={form[c.k]||""} onChange={e=>setForm({...form,[c.k]:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>))}
         </div>
-        <div style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:10}}>
+        <div style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:10}}>
           <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Total costo estimado</div>
           <div style={{fontSize:18,fontWeight:500}}>{fmtUSD(totalUSD)}</div>
         </div>
@@ -1462,7 +1916,7 @@ function TabCostos({cont,updateCont,showToast,blue}){
             <input type="number" value={tcPesos} onChange={e=>setTcPesos(e.target.value)} style={{width:80,fontSize:11,padding:"2px 6px"}}/>
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{background:"var(--color-background-secondary)"}}>{["Artículo","% FOB","Costo USD","Costo/u USD","Costo/u $ARS"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:500,fontSize:11,color:"var(--color-text-secondary)"}}>{h}</th>)}</tr></thead>
+            <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Artículo","% FOB","Costo USD","Costo/u USD","Costo/u $ARS"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:500,fontSize:11,color:"var(--color-text-secondary)"}}>{h}</th>)}</tr></thead>
             <tbody>{cont.artsCostoDetalle.map(a=>{const ars=a.costoUnitario*Number(tcPesos||1450);return(<tr key={a.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
               <td style={{padding:"6px 8px"}}>{a.nombre}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtPct(a.pct)}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(a.costoProporcional)}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(a.costoUnitario)}</td><td style={{padding:"6px 8px",fontWeight:500}}>{"$"+fmt(ars)}</td>
             </tr>);})}
@@ -1506,7 +1960,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
       </div>
       {!enG&&costo>0&&<div style={{background:"var(--color-background-warning)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:"1rem",fontSize:12,color:"var(--color-text-warning)"}}>Faltan {fmtUSD(costo-cobUSD)} cobrados para recuperar</div>}
       {estimacion&&(
-        <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px",marginBottom:"1rem"}}>
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px",marginBottom:"1rem"}}>
           <p style={{fontSize:12,fontWeight:500,margin:"0 0 8px",color:"var(--color-text-secondary)"}}>📊 Proyección si se vende el stock restante (precio promedio último mes)</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
             {[{l:"Stock restante est.",v:fmtUSD(estimacion.stockRestUSD)},{l:"Ganancia estimada",v:fmtUSD(estimacion.ganFutura)},{l:"Mi 30% estimado",v:fmtUSD(estimacion.mi30Fut),g:true}].map(x=>(
@@ -1518,7 +1972,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
           </div>
         </div>
       )}
-      <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem",marginBottom:"1rem"}}>
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>Registrar venta manual</p>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm({...form,fecha:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
@@ -1536,7 +1990,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
       {ventasCont.length>0&&(
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead><tr style={{background:"var(--color-background-secondary)"}}>{["Fecha","Artículo","Cant","Cliente","$","Cobrado","Estado",""].map(h=><th key={h} style={{padding:"5px 7px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+            <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Fecha","Artículo","Cant","Cliente","$","Cobrado","Estado",""].map(h=><th key={h} style={{padding:"5px 7px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
             <tbody>{[...ventasCont].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).map(v=>{
               const cobV=pagadoVenta(v,data.pagos);const saldo=Number(v.total||0)-cobV;
               return(<tr key={v.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
@@ -1562,7 +2016,7 @@ function StockView({stockUni,data}){
   const tintas=items.filter(([k])=>k.includes("TINTA"));
   const Row=([art,cant])=>{
     const conts=data.contenedores.filter(c=>(c.articulos||[]).some(a=>a.nombre===art)).map(c=>c.nombre).join(", ");
-    return(<div key={art} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"10px 1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    return(<div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"10px 1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
       <div><div style={{fontWeight:500,fontSize:13}}>{art}</div><div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:1}}>{conts}</div></div>
       <div style={{fontSize:20,fontWeight:500}}>{cant}</div>
     </div>);
@@ -1591,7 +2045,7 @@ function VentasView({data,save,showToast}){
     {ventas.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:14}}>Sin ventas.</p>:(
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-          <thead><tr style={{background:"var(--color-background-secondary)"}}>{["Fecha","Cont","Artículo","Cant","Cliente","USD","Estado",""].map(h=><th key={h} style={{padding:"6px 7px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+          <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Fecha","Cont","Artículo","Cant","Cliente","USD","Estado",""].map(h=><th key={h} style={{padding:"6px 7px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
           <tbody>{ventas.map(v=>{const cont=data.contenedores.find(c=>c.id===v.contId);return(<tr key={v.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
             <td style={{padding:"6px 7px",color:"var(--color-text-secondary)"}}>{v.fecha}</td>
             <td style={{padding:"6px 7px",color:"var(--color-text-secondary)",fontSize:9}}>{cont?.nombre?.split(" ")[0]||"—"}</td>
@@ -1641,7 +2095,7 @@ function CuentasView({data,save,showToast}){
     {clientes.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:14}}>Todos al día.</p>:(
       <div style={{display:"grid",gap:10}}>
         {clientes.map(([cliente,info])=>(
-          <div key={cliente} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 1rem"}}>
+          <div key={cliente} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px 1rem"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
               <span style={{fontWeight:500,fontSize:14}}>{cliente}</span>
               <div style={{display:"flex",gap:6}}>
@@ -1684,7 +2138,7 @@ function ExtractoView({data}){
         {filtrados.map((m,i)=>{
           const cont=m.contId?(data.contenedores||[]).find(c=>c.id===m.contId):null;
           const color=m.tipo==="Retiro 30%"?"var(--color-text-warning)":m.tipo==="Pago posterior"?"var(--color-text-info)":"var(--color-text-success)";
-          return(<div key={i} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"10px 1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          return(<div key={i} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"10px 1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
               <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
                 <span style={{fontSize:11,fontWeight:500,color,padding:"1px 6px",borderRadius:4,background:color+"22"}}>{m.tipo}</span>
@@ -1731,7 +2185,7 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
         </div>
       ))}
     </div>
-    <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem",marginBottom:"1.5rem"}}>
+    <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1.5rem"}}>
       <p style={{fontSize:13,fontWeight:500,margin:"0 0 10px"}}>Registrar retiro</p>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
         <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Moneda</label><select value={form.moneda} onChange={e=>setForm({...form,moneda:e.target.value})} style={{width:"100%",marginTop:2}}><option value="USD">USD</option><option value="ARS">$ARS</option></select></div>
@@ -1740,14 +2194,14 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
         <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm({...form,fecha:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
         <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Nota (opcional)</label><input value={form.nota} onChange={e=>setForm({...form,nota:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
       </div>
-      {form.monto>0&&<div style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"8px 10px",marginBottom:10,fontSize:12,color:"var(--color-text-secondary)"}}>{form.moneda==="ARS"?"Equivale a "+fmtUSD(montoEnUSD)+" al TC $"+fmt(form.tcRetiro||tcActual):"Equivale a $"+fmt(montoEnUSD*tcActual)+" ARS al blue $"+fmt(tcActual)}</div>}
+      {form.monto>0&&<div style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:"8px 10px",marginBottom:10,fontSize:12,color:"var(--color-text-secondary)"}}>{form.moneda==="ARS"?"Equivale a "+fmtUSD(montoEnUSD)+" al TC $"+fmt(form.tcRetiro||tcActual):"Equivale a $"+fmt(montoEnUSD*tcActual)+" ARS al blue $"+fmt(tcActual)}</div>}
       <button onClick={registrar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-success)",color:"var(--color-background-primary)",fontWeight:500}}>Registrar retiro</button>
     </div>
     {retiros.length>0&&(<div>
       <p style={{fontSize:13,fontWeight:500,marginBottom:8}}>Historial de retiros</p>
       <div style={{display:"grid",gap:6}}>
         {retiros.map(r=>(
-          <div key={r.id} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"10px 1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div key={r.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"10px 1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
               <div style={{fontSize:13,fontWeight:500}}>{fmtUSD(r.montoUSD)}{r.montoPesos?" ($"+fmt(r.montoPesos)+" ARS)":""}</div>
               <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{r.fecha+(r.nota?" · "+r.nota:"")+(r.tcRetiro?" · TC $"+fmt(r.tcRetiro):"")}</div>
@@ -1859,7 +2313,7 @@ function DespachosView({data,save,showToast}){
         <button onClick={()=>setManual(true)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>+ Manual</button>
       </div>
     </div>
-    {manual&&(<div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem",marginBottom:"1rem"}}>
+    {manual&&(<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
       <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>Nuevo despacho manual</p>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
         <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Nombre completo</label><input value={form.cliente} onChange={e=>setForm({...form,cliente:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
@@ -1899,41 +2353,28 @@ function DespachosView({data,save,showToast}){
 }
   </script>
 
-  <!-- Compilar y montar -->
   <script>
-    (function(){
-      // Verificar que todo cargo
-      if(typeof Babel === "undefined"){ showErr("Babel no se cargo correctamente. Recarga la pagina."); return; }
-      if(typeof React === "undefined"){ showErr("React no se cargo correctamente."); return; }
-
+    function runApp() {
+      if(typeof Babel==="undefined"){showErr("Babel no cargó. Recargá la página.");return;}
       try{
         setMsg("Compilando…");
-        var src = document.getElementById("src").textContent;
-
-        // Compilar JSX a JS plano - SOLO plugin transform-react-jsx (rapido)
-        var result = Babel.transform(src, {
-          presets: [["react", {"runtime":"classic","pragma":"React.createElement"}]],
-          filename: "app.jsx"
+        var src=document.getElementById("src").textContent;
+        var result=Babel.transform(src,{
+          presets:[["react",{"runtime":"classic","pragma":"React.createElement"}]],
+          filename:"app.jsx"
         });
-
         setMsg("Iniciando…");
-        // Ejecutar el JS compilado con React en scope
-        var {useState,useEffect,useRef} = React;
-        var run = new Function(
-          "React","useState","useEffect","useRef",
-          result.code + "\nreturn App;"
-        );
-        var AppComp = run(React, useState, useEffect, useRef);
-
-        var root = ReactDOM.createRoot(document.getElementById("root"));
+        var {useState,useEffect,useRef}=React;
+        var run=new Function("React","useState","useEffect","useRef",result.code+"\nreturn App;");
+        var AppComp=run(React,useState,useEffect,useRef);
+        var root=ReactDOM.createRoot(document.getElementById("root"));
         root.render(React.createElement(AppComp));
         document.getElementById("loading").style.display="none";
         console.log("\u2713 App lista");
-      }catch(e){
-        console.error("Error al iniciar:",e);
-        showErr(e);
-      }
-    })();
+      }catch(e){console.error("Error:",e);showErr(e);}
+    }
+    if(document.readyState==="complete"){runApp();}
+    else{window.addEventListener("load",runApp);}
   </script>
 </body>
 </html>
