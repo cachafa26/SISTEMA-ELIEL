@@ -53,27 +53,40 @@
     #loading p{font-size:13px;color:#6b6b6b}
     #err{display:none;position:fixed;inset:0;align-items:center;justify-content:center;
       flex-direction:column;gap:12px;background:#eeede9;padding:2rem;text-align:center;z-index:9999}
-    #err h3{color:#a32d2d;font-size:15px}
+    #err h3{color:#a32d2d;font-size:15px;margin-bottom:8px}
     #err pre{font-size:11px;color:#6b6b6b;white-space:pre-wrap;max-width:500px;
-      background:#fff;padding:12px;border-radius:8px;max-height:300px;overflow:auto}
+      background:#fff;padding:12px;border-radius:8px;max-height:300px;overflow:auto;text-align:left}
+    #err button{margin-top:8px;padding:8px 16px;border:none;background:#185fa5;color:#fff;border-radius:8px;font-size:13px;cursor:pointer}
   </style>
 </head>
 <body>
-  <div id="loading"><div class="spin"></div><p id="loading-msg">Iniciando…</p></div>
-  <div id="err"><h3>⚠ Error al cargar</h3><pre id="err-txt"></pre>
-    <button onclick="location.reload()" style="padding:8px 16px;border:none;background:#185fa5;color:#fff;border-radius:8px;font-size:13px;cursor:pointer">Reintentar</button></div>
+  <div id="loading"><div class="spin"></div><p id="msg">Iniciando…</p></div>
+  <div id="err">
+    <h3>&#9888; Error al cargar</h3>
+    <pre id="err-txt"></pre>
+    <button onclick="location.reload()">Reintentar</button>
+  </div>
   <div id="root"></div>
 
-  <!-- Firebase compat: carga como window.firebase global -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <!-- Helpers globales disponibles desde el inicio -->
   <script>
-    function setMsg(t){var el=document.getElementById("loading-msg");if(el)el.textContent=t;}
+    function setMsg(t){var e=document.getElementById("msg");if(e)e.textContent=t;}
     function showErr(e){
       document.getElementById("loading").style.display="none";
-      var d=document.getElementById("err"); d.style.display="flex";
-      document.getElementById("err-txt").textContent=String(e)+"\n"+(e&&e.stack?e.stack:"");
+      var d=document.getElementById("err");
+      d.style.display="flex";
+      document.getElementById("err-txt").textContent=
+        (typeof e==="string"?e:e.message||String(e))+"\n\n"+(e&&e.stack?e.stack:"");
     }
+  </script>
+
+  <!-- Firebase compat: expone window.firebase global -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"
+    onerror="showErr('No se pudo cargar Firebase. Verificá tu conexión a internet.')"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"
+    onerror="showErr('No se pudo cargar Firestore.')"></script>
+
+  <script>
     setMsg("Conectando a Firebase…");
     try{
       firebase.initializeApp({
@@ -85,22 +98,25 @@
         appId:"1:511968601006:web:acd30969ec0184b845de3f"
       });
       window._fbDB=firebase.firestore();
-      console.log("✓ Firebase OK");
-    }catch(e){console.warn("Firebase init:",e);window._fbDB=null;}
+      console.log("\u2713 Firebase OK");
+    }catch(e){
+      console.warn("Firebase no disponible, modo local:",e.message);
+      window._fbDB=null;
+    }
   </script>
 
-  <!-- React 18 UMD -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- React 18 -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"
+    onerror="showErr('No se pudo cargar React.')"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    onerror="showErr('No se pudo cargar ReactDOM.')"></script>
 
-  <!-- Sucrase: JSX compiler 10x faster than Babel, made for this use case -->
-  <script src="https://unpkg.com/sucrase@3.35.0/dist/index.umd.js" onerror="showErr(new Error('No se pudo cargar Sucrase. Verificá tu conexión.'))"></script>
+  <!-- Babel standalone - SOLO preset react (sin env), mucho mas rapido -->
+  <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"
+    onerror="showErr('No se pudo cargar Babel.')"></script>
 
-  <script>
-    setMsg("Compilando aplicación…");
-    var { useState, useEffect, useRef } = React;
-  </script>
-  <script id="app-src" type="text/jsx-source">
+  <!-- Codigo JSX de la app (tipo text/raw para que el browser no lo ejecute) -->
+  <script id="src" type="text/raw">
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1778,35 +1794,42 @@ function DespachosView({data,save,showToast}){
 }
 
   </script>
+
+  <!-- Compilar y montar -->
   <script>
-    function runApp() {
-      try {
-        if(typeof sucrase === "undefined") {
-          showErr(new Error("Sucrase no cargó. Verificá tu conexión a internet y recargá la página."));
-          return;
-        }
-        setMsg("Compilando JSX…");
-        var src = document.getElementById("app-src").textContent;
-        var compiled = sucrase.transform(src, {transforms:["jsx"]}).code;
-        compiled = "var {useState,useEffect,useRef}=React;\n" + compiled;
-        setMsg("Iniciando interfaz…");
-        var fn = new Function(compiled + "\nreturn App;");
-        var AppComp = fn();
+    (function(){
+      // Verificar que todo cargo
+      if(typeof Babel === "undefined"){ showErr("Babel no se cargo correctamente. Recarga la pagina."); return; }
+      if(typeof React === "undefined"){ showErr("React no se cargo correctamente."); return; }
+
+      try{
+        setMsg("Compilando…");
+        var src = document.getElementById("src").textContent;
+
+        // Compilar JSX a JS plano - SOLO plugin transform-react-jsx (rapido)
+        var result = Babel.transform(src, {
+          presets: [["react", {"runtime":"classic","pragma":"React.createElement"}]],
+          filename: "app.jsx"
+        });
+
+        setMsg("Iniciando…");
+        // Ejecutar el JS compilado con React en scope
+        var {useState,useEffect,useRef} = React;
+        var run = new Function(
+          "React","useState","useEffect","useRef",
+          result.code + "\nreturn App;"
+        );
+        var AppComp = run(React, useState, useEffect, useRef);
+
         var root = ReactDOM.createRoot(document.getElementById("root"));
         root.render(React.createElement(AppComp));
         document.getElementById("loading").style.display="none";
-        console.log("\u2713 App renderizada");
-      } catch(e) {
-        console.error("Error:",e);
+        console.log("\u2713 App lista");
+      }catch(e){
+        console.error("Error al iniciar:",e);
         showErr(e);
       }
-    }
-    // Wait for all scripts to be ready
-    if(document.readyState === "complete") {
-      runApp();
-    } else {
-      window.addEventListener("load", runApp);
-    }
+    })();
   </script>
 </body>
 </html>
