@@ -2277,74 +2277,87 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
 // SC — DASHBOARD INTERNO
 // ══════════════════════════════════════════════════════════════════════════
 function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro}){
+  const tc=blue||1450;
   const totalFactUSD=(data.ventas||[]).reduce((a,v)=>a+Number(v.usd||0),0);
   const totalCobUSD=(data.ventas||[]).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+
+  const stockPapel={}, stockTinta={};
+  let totalPapel=0, totalTinta=0;
+  Object.entries(stockUni).forEach(([nombre,cant])=>{
+    if(nombre.includes("TINTA")){stockTinta[nombre]=cant;totalTinta+=cant;}
+    else{stockPapel[nombre]=cant;totalPapel+=cant;}
+  });
+
+  const MC=({l,v,green,info,warn,sub})=>(
+    <div style={{background:green?"var(--bg-tint-green)":info?"var(--bg-tint-blue)":warn?"var(--bg-tint-amber)":"rgba(120,120,128,0.10)",border:"0.5px solid "+(green?"var(--border-success)":info?"var(--border-info)":warn?"rgba(244,121,32,.3)":"var(--glass-border)"),borderRadius:"var(--r-lg)",padding:"12px 14px",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",boxShadow:"var(--glass-shadow-sm)"}}>
+      <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:green?"var(--text-success)":info?"var(--text-info)":warn?"var(--text-warning)":"var(--text-secondary)",marginBottom:4}}>{l}</div>
+      <div style={{fontSize:16,fontWeight:700,letterSpacing:"-.01em",color:green?"var(--text-success)":info?"var(--text-info)":warn?"var(--text-warning)":"var(--text-primary)"}}>{v}</div>
+      {sub&&<div style={{fontSize:10,color:green?"var(--text-success)":info?"var(--text-info)":"var(--text-secondary)",marginTop:3,opacity:.8}}>{sub}</div>}
+    </div>
+  );
+
   return(
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-        <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Super Coating — Resumen</h2>
-        {blue&&<span style={{fontSize:12,background:"var(--color-background-success)",color:"var(--color-text-success)",padding:"3px 10px",borderRadius:"var(--border-radius-md)",fontWeight:500}}>💵 Blue ${fmt(blue)}</span>}
+        <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:0,color:"var(--text-primary)"}}>Super Coating</h2>
+        {blue&&<span style={{fontSize:11,fontWeight:600,color:"var(--text-success)",padding:"4px 10px",background:"var(--bg-tint-green)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-pill)"}}>💵 ${fmt(blue)}</span>}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:"1.5rem"}}>
-        {[
-          {l:"Contenedores",v:(data.contenedores||[]).length},
-          {l:"Facturado (USD)",v:fmtUSD(totalFactUSD),info:true},
-          {l:"Cobrado (USD)",v:fmtUSD(totalCobUSD)},
-          {l:"Mi 30% PENDIENTE",v:fmtUSD(pendienteRetiro),green:pendienteRetiro>0},
-          {l:"30% total devengado",v:fmtUSD(mi30Total)},
-          {l:"Stock disponible",v:fmt(Object.values(stockUni).reduce((a,v)=>a+v,0))},
-        ].map(x=>(
-          <div key={x.l} style={{
-            background:x.green?"var(--bg-tint-green)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.10)",
-            border:"0.5px solid "+(x.green?"var(--border-success)":x.info?"var(--border-info)":"var(--glass-border)"),
-            borderRadius:"var(--r-lg)",padding:"12px 14px",
-            backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
-            boxShadow:"var(--glass-shadow-sm)",
-          }}>
-            <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",
-              color:x.green?"var(--text-success)":x.info?"var(--text-info)":"var(--text-secondary)",marginBottom:4}}>{x.l}</div>
-            <div style={{fontSize:16,fontWeight:700,letterSpacing:"-.01em",
-              color:x.green?"var(--text-success)":x.info?"var(--text-info)":"var(--text-primary)"}}>{x.v}</div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.25rem"}}>
+        <MC l="Mi 30% PENDIENTE"     v={fmtUSD(pendienteRetiro)} green={pendienteRetiro>0} sub={"≈$"+fmt(pendienteRetiro*tc)+" ARS"}/>
+        <MC l="30% devengado total"  v={fmtUSD(mi30Total)}/>
+        <MC l="Facturado (USD)"      v={fmtUSD(totalFactUSD)} info/>
+        <MC l="Cobrado (USD)"        v={fmtUSD(totalCobUSD)}/>
+        <MC l="Stock papel"          v={fmt(totalPapel)+" rollos"}/>
+        <MC l="Stock tinta"          v={fmt(totalTinta)+" u"} info/>
+      </div>
+
+      <div style={{display:"grid",gap:8}}>
+        {(data.contenedores||[]).length===0?(
+          <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"2rem",textAlign:"center"}}>
+            <p style={{color:"var(--text-secondary)",fontSize:14,margin:0}}>Creá tu primer contenedor.</p>
           </div>
-        ))}
-      </div>
-      {data.contenedores.length===0?(
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"2rem",textAlign:"center"}}>
-          <p style={{color:"var(--color-text-secondary)",fontSize:14,margin:0}}>Creá tu primer contenedor en la pestaña Contenedores.</p>
-        </div>
-      ):(
-        <div style={{display:"grid",gap:8}}>
-          {data.contenedores.map(c=>{
-            const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
-            const costo=c.costoTotal||0;const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;const enG=costo>0&&cobUSD>costo;
-            return(
-              <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px 1rem"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?6:0}}>
-                  <span style={{fontWeight:500,fontSize:13}}>{c.nombre}</span>
-                  <span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:enG?"var(--color-background-success)":costo===0?"var(--color-background-secondary)":"var(--color-background-warning)",color:enG?"var(--color-text-success)":costo===0?"var(--color-text-secondary)":"var(--color-text-warning)"}}>
-                    {costo===0?"Sin costo":enG?"✓ Mi 30%: "+fmtUSD((cobUSD-costo)*0.3):fmtPct(pct)+" cobrado"}
-                  </span>
-                </div>
-                {costo>0&&(<>
-                  <div style={{height:5,background:"rgba(120,120,128,0.08)",borderRadius:3,overflow:"hidden",marginBottom:5}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:3}}/></div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}>
-                    <span>Cobrado: {fmtUSD(cobUSD)}</span><span>Costo: {fmtUSD(costo)}</span>
-                    {!enG&&<span style={{color:"var(--color-text-warning)"}}>Faltan: {fmtUSD(costo-cobUSD)}</span>}
-                  </div>
-                </>)}
+        ):(data.contenedores||[]).map(c=>{
+          const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
+          const totalVCont=ventasCont.reduce((a,v)=>a+Number(v.usd||0),0);
+          const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+          const costo=c.costoTotal||0;
+          const pct=costo>0?Math.min(100,(totalVCont/costo)*100):0;
+          const enG=costo>0&&totalVCont>=costo;
+          const mi30C=Math.max(0,totalVCont-costo)*0.3;
+          return(
+            <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",boxShadow:"var(--glass-shadow-sm)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?6:0}}>
+                <span style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</span>
+                <span style={{fontSize:11,padding:"2px 9px",borderRadius:"var(--r-pill)",fontWeight:600,
+                  background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",
+                  color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)"}}>
+                  {costo===0?"Sin costo":enG?"Mi 30%: "+fmtUSD(mi30C):fmtPct(pct)+" recuperado"}
+                </span>
               </div>
-            );
-          })}
-        </div>
-      )}
+              {costo>0&&(
+                <>
+                  <div style={{height:4,background:"rgba(120,120,128,0.15)",borderRadius:2,overflow:"hidden",margin:"6px 0"}}>
+                    <div style={{height:"100%",width:Math.min(100,pct)+"%",background:enG?"var(--text-success)":"#F47920",borderRadius:2,transition:"width .5s"}}/>
+                  </div>
+                  <div style={{display:"flex",gap:10,fontSize:11,color:"var(--text-secondary)",flexWrap:"wrap"}}>
+                    <span>Facturado: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(totalVCont)}</strong></span>
+                    <span>Costo: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(costo)}</strong></span>
+                    {enG
+                      ?<span style={{color:"var(--text-success)",fontWeight:600}}>Gan: {fmtUSD(totalVCont-costo)} · Mi30%: {fmtUSD(mi30C)}</span>
+                      :<span style={{color:"var(--text-warning)"}}>Faltan: {fmtUSD(costo-totalVCont)}</span>
+                    }
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// SC — CONTENEDORES, STOCK, VENTAS, CUENTAS, EXTRACTO, MI30%, DESPACHOS
-// (código original intacto)
-// ══════════════════════════════════════════════════════════════════════════
 function ContenedoresList({data,save,setContSel,setContTab,showToast}){
   const [nuevo,setNuevo]=useState(false);const[nombre,setNombre]=useState("");
   const crear=()=>{if(!nombre.trim())return;const c={id:Date.now().toString(),nombre:nombre.trim(),estado:"activo",articulos:[],costos:{},costoTotal:0,pesoTotal:0};save({...data,contenedores:[...(data.contenedores||[]),c]});setNuevo(false);setNombre("");showToast("Contenedor creado");};
@@ -2683,23 +2696,58 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
 }
 
 function StockView({stockUni,data}){
-  const items=Object.entries(stockUni).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  const papeles=items.filter(([k])=>!k.includes("TINTA"));
-  const tintas=items.filter(([k])=>k.includes("TINTA"));
-  const Row=([art,cant])=>{
-    const conts=data.contenedores.filter(c=>(c.articulos||[]).some(a=>a.nombre===art)).map(c=>c.nombre).join(", ");
-    return(<div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"10px 1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-      <div><div style={{fontWeight:500,fontSize:13}}>{art}</div><div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:1}}>{conts}</div></div>
-      <div style={{fontSize:20,fontWeight:500}}>{cant}</div>
-    </div>);
+  const stockPapel={}, stockTinta={};
+  let totalPapel=0, totalTinta=0;
+  Object.entries(stockUni).filter(([,v])=>v>0).forEach(([nombre,cant])=>{
+    if(nombre.includes("TINTA")){stockTinta[nombre]=cant;totalTinta+=cant;}
+    else{stockPapel[nombre]=cant;totalPapel+=cant;}
+  });
+  const Row=([art,cant],esTinta)=>{
+    const conts=(data.contenedores||[]).filter(c=>(c.articulos||[]).some(a=>a.nombre===art)).map(c=>c.nombre).join(", ");
+    return(
+      <div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"var(--glass-shadow-sm)"}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art}</div>
+          <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{conts}</div>
+        </div>
+        <div style={{fontSize:22,fontWeight:700,color:esTinta?"var(--text-info)":"var(--text-primary)",marginLeft:12}}>{fmt(cant)}</div>
+      </div>
+    );
   };
-  return(<div>
-    <h2 style={{fontSize:18,fontWeight:500,margin:"0 0 1rem"}}>Stock unificado</h2>
-    {items.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:14}}>Sin stock.</p>:(
-      <>{papeles.length>0&&<><h3 style={{fontSize:12,fontWeight:500,margin:"0 0 6px",color:"var(--color-text-secondary)"}}>PAPELES</h3><div style={{display:"grid",gap:5,marginBottom:"1rem"}}>{papeles.map(Row)}</div></>}
-      {tintas.length>0&&<><h3 style={{fontSize:12,fontWeight:500,margin:"0 0 6px",color:"var(--color-text-secondary)"}}>TINTAS</h3><div style={{display:"grid",gap:5}}>{tintas.map(Row)}</div></>}</>
-    )}
-  </div>);
+  return(
+    <div>
+      <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:"0 0 1.25rem",color:"var(--text-primary)"}}>Stock unificado</h2>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:"1.5rem"}}>
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
+          <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:6}}>📄 Total Papel</div>
+          <div style={{fontSize:28,fontWeight:700,letterSpacing:"-.03em",color:"var(--text-primary)"}}>{fmt(totalPapel)}</div>
+          <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>rollos disponibles</div>
+        </div>
+        <div style={{background:"var(--bg-tint-blue)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
+          <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:6}}>🖨️ Total Tinta</div>
+          <div style={{fontSize:28,fontWeight:700,letterSpacing:"-.03em",color:"var(--text-info)"}}>{fmt(totalTinta)}</div>
+          <div style={{fontSize:11,color:"var(--text-info)",marginTop:2,opacity:.8}}>unidades disponibles</div>
+        </div>
+      </div>
+      {totalPapel===0&&totalTinta===0
+        ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin stock.</div>
+        :<>
+          {Object.keys(stockPapel).length>0&&(
+            <div style={{marginBottom:"1.5rem"}}>
+              <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>📄 Papeles</div>
+              <div style={{display:"grid",gap:6}}>{Object.entries(stockPapel).sort((a,b)=>b[1]-a[1]).map(e=>Row(e,false))}</div>
+            </div>
+          )}
+          {Object.keys(stockTinta).length>0&&(
+            <div>
+              <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:8}}>🖨️ Tintas</div>
+              <div style={{display:"grid",gap:6}}>{Object.entries(stockTinta).sort((a,b)=>b[1]-a[1]).map(e=>Row(e,true))}</div>
+            </div>
+          )}
+        </>
+      }
+    </div>
+  );
 }
 
 function VentasView({data,save,showToast}){
