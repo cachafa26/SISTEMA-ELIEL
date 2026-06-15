@@ -94,7 +94,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
   <!-- Sucrase: JSX compiler 10x faster than Babel, made for this use case -->
-  <script src="https://cdn.jsdelivr.net/npm/sucrase@3.35.0/dist/index.umd.js"></script>
+  <script src="https://unpkg.com/sucrase@3.35.0/dist/index.umd.js" onerror="showErr(new Error('No se pudo cargar Sucrase. Verificá tu conexión.'))"></script>
 
   <script>
     setMsg("Compilando aplicación…");
@@ -1779,12 +1779,15 @@ function DespachosView({data,save,showToast}){
 
   </script>
   <script>
-    (function(){
+    function runApp() {
       try {
+        if(typeof sucrase === "undefined") {
+          showErr(new Error("Sucrase no cargó. Verificá tu conexión a internet y recargá la página."));
+          return;
+        }
         setMsg("Compilando JSX…");
         var src = document.getElementById("app-src").textContent;
         var compiled = sucrase.transform(src, {transforms:["jsx"]}).code;
-        // Make React hooks available in the compiled scope
         compiled = "var {useState,useEffect,useRef}=React;\n" + compiled;
         setMsg("Iniciando interfaz…");
         var fn = new Function(compiled + "\nreturn App;");
@@ -1792,12 +1795,18 @@ function DespachosView({data,save,showToast}){
         var root = ReactDOM.createRoot(document.getElementById("root"));
         root.render(React.createElement(AppComp));
         document.getElementById("loading").style.display="none";
-        console.log("✓ App renderizada");
+        console.log("\u2713 App renderizada");
       } catch(e) {
         console.error("Error:",e);
         showErr(e);
       }
-    })();
+    }
+    // Wait for all scripts to be ready
+    if(document.readyState === "complete") {
+      runApp();
+    } else {
+      window.addEventListener("load", runApp);
+    }
   </script>
 </body>
 </html>
