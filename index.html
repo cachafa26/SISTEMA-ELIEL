@@ -650,6 +650,20 @@ function cobradoUSD(v,pagos){
 function stockDisp(contId,artNombre,ventas){
   return(ventas||[]).filter(v=>v.contId===contId&&v.articulo===artNombre).reduce((a,v)=>a+Number(v.cantidad),0);
 }
+// USD value of a venta with fallback chain (handles bad/missing usd field)
+function ventaUSD(v, tcBlue){
+  const u=Number(v.usd||0);
+  if(u>0) return u;
+  const tcUsado=Number(v.tipoCambioUsado||v.tipoCambio||0);
+  if(tcUsado>0&&Number(v.total||0)>0) return Number(v.total)/tcUsado;
+  if(Number(v.total||0)>0&&tcBlue>0) return Number(v.total)/tcBlue;
+  return 0;
+}
+function ventaCobradoUSD(v, pagos, tcBlue){
+  const totalARS=Number(v.total||0); if(totalARS===0) return 0;
+  const fraccion=Math.min(1, pagadoVenta(v,pagos)/totalARS);
+  return ventaUSD(v,tcBlue)*fraccion;
+}
 function distribuir(items,contenedores,ventas){
   const resultado=[];const errores=[];
   for(const item of items){
@@ -881,24 +895,6 @@ function App(){
       stockUni[art.nombre]+=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
     }
   }
-  // Helper: get USD value of a venta, with fallback chain
-  function ventaUSD(v, tcBlue){
-    const u=Number(v.usd||0);
-    if(u>0) return u;
-    // fallback: use tipoCambioUsado stored at sale time
-    const tcUsado=Number(v.tipoCambioUsado||v.tipoCambio||0);
-    if(tcUsado>0 && Number(v.total||0)>0) return Number(v.total)/tcUsado;
-    // last resort: use current blue
-    if(Number(v.total||0)>0 && tcBlue>0) return Number(v.total)/tcBlue;
-    return 0;
-  }
-  function ventaCobradoUSD(v, pagos, tcBlue){
-    const totalARS=Number(v.total||0); if(totalARS===0) return 0;
-    const pagadoARS=pagadoVenta(v,pagos);
-    const fraccion=Math.min(1, pagadoARS/totalARS);
-    return ventaUSD(v,tcBlue)*fraccion;
-  }
-
   let totalCobUSD=0,totalCostoUSD=0,totalVentaUSD=0,mi30Total=0;
   const tcForCalc=blue||1450;
   for(const c of data.contenedores){
