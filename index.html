@@ -508,6 +508,7 @@
       }
       .main-content{padding-bottom:86px;}
       .top-nav{display:none!important;}
+      :root{--subnav-top:0px;}
     }
     @media(min-width:641px){
       .bottom-nav{display:none!important;}
@@ -551,12 +552,15 @@
     (function(){
       var SESSION_KEY = "eliel_session";
       var VALID_TOKEN = "ELsys_7x9k2mQpR";
-      var tok = sessionStorage.getItem(SESSION_KEY);
-      if(tok !== VALID_TOKEN){
-        // Allow direct access from same origin (refresh keeps session)
-        // But redirect if no token at all
-        window.location.replace("login.html");
-      }
+      try {
+        var raw = localStorage.getItem(SESSION_KEY);
+        if(!raw) { window.location.replace("login.html"); return; }
+        var auth = JSON.parse(raw);
+        if(auth.token !== VALID_TOKEN || Date.now() > auth.exp) {
+          localStorage.removeItem(SESSION_KEY);
+          window.location.replace("login.html"); return;
+        }
+      } catch(e) { window.location.replace("login.html"); }
     })();
   </script>
   <div id="loading">
@@ -1058,10 +1062,11 @@ function App(){
       {/* SUB-NAV SC */}
       {modulo==="supercoating"&&(
         <div style={{
-          position:"sticky",top:52,zIndex:49,
+          position:"sticky",top:"var(--subnav-top,52px)",zIndex:49,
           background:"var(--bg-nav)",backdropFilter:"blur(20px) saturate(1.8)",WebkitBackdropFilter:"blur(20px) saturate(1.8)",
           borderBottom:"0.5px solid var(--glass-border)",
-          padding:"0 1rem",display:"flex",alignItems:"center",gap:0,overflowX:"auto",minHeight:40,
+          padding:"0 0.5rem",display:"flex",alignItems:"center",gap:0,overflowX:"auto",minHeight:44,
+          WebkitOverflowScrolling:"touch",
         }}>
           {navSC.map(n=>(
             <button key={n.id} onClick={()=>{setView(n.id);setContSel(null);}}
@@ -1105,7 +1110,7 @@ function App(){
         {/* SUPER COATING */}
         {modulo==="supercoating"&&(
           <>
-            {view==="dashboard"&&<Dashboard data={data} stockUni={stockUni} blue={blue} mi30Total={mi30Total} pendienteRetiro={pendienteRetiro}/>}
+            {view==="dashboard"&&<Dashboard data={data} stockUni={stockUni} blue={blue} mi30Total={mi30Total} pendienteRetiro={pendienteRetiro} setView={setView} setContSel={setContSel} setContTab={setContTab}/>}
             {view==="contenedores"&&!contSel&&<ContenedoresList data={data} save={save} setContSel={setContSel} setContTab={setContTab} showToast={showToast}/>}
             {view==="contenedores"&&contSel&&<ContenedorDetail cont={contSel} data={data} save={save} tab={contTab} setTab={setContTab} onBack={()=>setContSel(null)} showToast={showToast} blue={blue}/>}
             {view==="stock"&&<StockView stockUni={stockUni} data={data}/>}
@@ -2301,7 +2306,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
 // ══════════════════════════════════════════════════════════════════════════
 // SC — DASHBOARD INTERNO
 // ══════════════════════════════════════════════════════════════════════════
-function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro}){
+function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setContSel,setContTab}){
   const tc=blue||1450;
   const totalFactUSD=(data.ventas||[]).reduce((a,v)=>a+Number(v.usd||0),0);
   const totalCobUSD=(data.ventas||[]).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
@@ -2353,7 +2358,10 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro}){
           return(
             <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",boxShadow:"var(--glass-shadow-sm)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?6:0}}>
-                <span style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</span>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</span>
+                  <span style={{fontSize:11,color:"var(--text-secondary)"}}>→</span>
+                </div>
                 <span style={{fontSize:11,padding:"2px 9px",borderRadius:"var(--r-pill)",fontWeight:600,
                   background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",
                   color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)"}}>
