@@ -1775,14 +1775,81 @@ function DespachosView({data,save,showToast}){
     setManual(false);showToast("Despacho agregado");
   };
   const actualizarEstado=(id,estado)=>save({...data,despachos:data.despachos.map(d=>d.id===id?{...d,estado}:d)});
-  const htmlRotulo=d=>"<div class='r'><div class='row'><div class='t'>DESTINATARIO</div><div class='v'>"+d.cliente+"</div></div><div class='row'><div class='t'>DNI</div><div class='v'>"+(d.dni||"—")+"</div></div><div class='row'><div class='t'>DIRECCIÓN</div><div class='v'>"+d.direccion+"</div></div><div class='row'><div class='t'>LOCALIDAD</div><div class='v'>"+d.localidad+"</div></div><div class='row'><div class='t'>PROVINCIA</div><div class='v'>"+d.provincia+"</div></div><div class='row'><div class='t'>EXPRESO</div><div class='v'>"+(d.expreso||"—")+"</div></div>"+(d.articulos?"<div class='row'><div class='t'>ARTÍCULOS</div><div class='v' style='font-size:12px'>"+d.articulos+"</div></div>":"")+"</div>";
-  const imprimirUno=desp=>{const html="<!DOCTYPE html><html><head><meta charset='utf-8'><title>Rótulo</title><style>body{margin:20px;font-family:Arial;}.r{border:2px solid #000;padding:16px;max-width:12cm;}.t{font-size:11px;color:#555;margin-bottom:2px;}.v{font-size:15px;font-weight:bold;margin-bottom:8px;}.row{margin-bottom:6px;}</style></head><body>"+htmlRotulo(desp)+"<script>window.onload=()=>window.print();<\/script></body></html>";const w=window.open("","_blank");if(w){w.document.write(html);w.document.close();}};
+  const calcularBultos=d=>{
+    // Parsea "30GR x5, TINTA NEGRO x3" -> [{nombre,cantidad,esTinta}]
+    if(!d.articulos)return[{...d,bultoLabel:"",bultoNum:1,bultoTotal:1}];
+    const items=d.articulos.split(",").map(s=>{
+      const m=s.trim().match(/^(.+?)\s*[xX×]\s*(\d+)$/);
+      if(!m)return null;
+      const nombre=m[1].trim();const cantidad=parseInt(m[2]);
+      const esTinta=nombre.includes("TINTA");
+      return{nombre,cantidad,esTinta};
+    }).filter(Boolean);
+    const rollos=items.filter(i=>!i.esTinta);
+    const tintas=items.filter(i=>i.esTinta);
+    const bultos=[];
+    // 1 etiqueta por cada rollo individual
+    rollos.forEach(r=>{
+      for(let i=0;i<r.cantidad;i++){
+        bultos.push({tipo:"rollo",desc:r.nombre+" (1 rollo)"});
+      }
+    });
+    // Tintas: hasta 20 unidades por bulto
+    const totalTintas=tintas.reduce((a,t)=>a+t.cantidad,0);
+    const descTintas=tintas.map(t=>t.nombre.replace("TINTA ","")+" x"+t.cantidad).join(", ");
+    if(totalTintas>0){
+      const numBultosTinta=Math.ceil(totalTintas/20);
+      for(let i=0;i<numBultosTinta;i++){
+        const desde=i*20+1;const hasta=Math.min((i+1)*20,totalTintas);
+        const label=numBultosTinta>1?"Tintas "+desde+"-"+hasta+" de "+totalTintas+" ("+descTintas+")":"Tintas ("+descTintas+")";
+        bultos.push({tipo:"tinta",desc:label});
+      }
+    }
+    // Si no hay artículos reconocibles, 1 bulto genérico
+    if(bultos.length===0)return[{...d,bultoLabel:"",bultoNum:1,bultoTotal:1}];
+    return bultos.map((b,i)=>({...d,bultoLabel:b.desc,bultoNum:i+1,bultoTotal:bultos.length}));
+  };
+  const CSS_ETIQUETA="*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px}"+
+    ".page{display:flex;flex-wrap:wrap;gap:4mm;padding:5mm}"+
+    ".r{border:1.5px solid #000;padding:4mm 5mm;width:95mm;page-break-inside:avoid;break-inside:avoid}"+
+    ".dest{font-size:13px;font-weight:bold;margin-bottom:2mm}"+
+    ".row{display:flex;gap:3mm;margin-bottom:1mm;line-height:1.3}"+
+    ".t{color:#444;min-width:18mm;font-size:9px;text-transform:uppercase;padding-top:1px}"+
+    ".v{font-weight:600;font-size:11px;flex:1}"+
+    ".bulto{margin-top:3mm;padding-top:2mm;border-top:1px dashed #999;font-size:9px;color:#444;display:flex;justify-content:space-between}"+
+    ".bnum{font-size:14px;font-weight:bold;color:#000}"+
+    "@media print{body{margin:0}.page{padding:3mm;gap:3mm}}";
+  const htmlEtiqueta=(b)=>{
+    const total=b.bultoTotal||1;const num=b.bultoNum||1;
+    return "<div class='r'>"+
+      "<div class='dest'>"+(b.cliente||"")+"</div>"+
+      "<div class='row'><div class='t'>DNI</div><div class='v'>"+(b.dni||"—")+"</div></div>"+
+      "<div class='row'><div class='t'>Dirección</div><div class='v'>"+(b.direccion||"—")+"</div></div>"+
+      "<div class='row'><div class='t'>Localidad</div><div class='v'>"+(b.localidad||"—")+"</div></div>"+
+      "<div class='row'><div class='t'>Provincia</div><div class='v'>"+(b.provincia||"—")+"</div></div>"+
+      "<div class='row'><div class='t'>Expreso</div><div class='v'>"+(b.expreso||"—")+"</div></div>"+
+      (b.bultoLabel?"<div class='bulto'><span>"+b.bultoLabel+"</span><span class='bnum'>"+num+"/"+total+"</span></div>":"")+
+      "</div>";
+  };
+  const abrirPDF=(etiquetas,titulo)=>{
+    const w=window.open("","_blank");
+    if(!w)return;
+    const body="<div class='page'>"+etiquetas.map(htmlEtiqueta).join("")+"</div>";
+    w.document.write("<!DOCTYPE html><html><head><meta charset='utf-8'><title>"+titulo+"</title><style>"+CSS_ETIQUETA+"</style></head><body>"+body+"<script>window.onload=()=>{setTimeout(()=>window.print(),300);}<\/script></body></html>");
+    w.document.close();
+  };
+  const imprimirUno=desp=>{
+    const bultos=calcularBultos(desp);
+    abrirPDF(bultos,"Rótulo — "+desp.cliente);
+  };
   const imprimirTodosPendientes=()=>{
     if(!pendientes.length){showToast("No hay pendientes");return;}
-    const html="<!DOCTYPE html><html><head><meta charset='utf-8'><title>Rótulos pendientes</title><style>body{margin:10px;font-family:Arial;}.r{border:2px solid #000;padding:14px;max-width:12cm;margin-bottom:10px;page-break-inside:avoid;}.t{font-size:11px;color:#555;margin-bottom:2px;}.v{font-size:15px;font-weight:bold;margin-bottom:8px;}.row{margin-bottom:6px;}</style></head><body>"+pendientes.map(htmlRotulo).join("")+"<script>window.onload=()=>window.print();<\/script></body></html>";
-    const w=window.open("","_blank");if(w){w.document.write(html);w.document.close();}
+    const todasEtiquetas=pendientes.flatMap(d=>calcularBultos(d));
+    const totalBultos=todasEtiquetas.length;
+    abrirPDF(todasEtiquetas,"Rótulos — "+pendientes.length+" despachos");
     const nuevosDespachos=data.despachos.map(d=>pendientes.some(p=>p.id===d.id)?{...d,estado:"Despachado"}:d);
-    save({...data,despachos:nuevosDespachos});showToast(pendientes.length+" despachos marcados como enviados");
+    save({...data,despachos:nuevosDespachos});
+    showToast(pendientes.length+" despachos · "+totalBultos+" etiquetas generadas");
   };
   return(<div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
