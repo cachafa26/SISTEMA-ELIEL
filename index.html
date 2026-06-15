@@ -9,107 +9,109 @@
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body, #root { height: 100%; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f5f5f3;
-      color: #1a1a1a;
-      -webkit-font-smoothing: antialiased;
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body,#root{height:100%}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f5f3;color:#1a1a1a;-webkit-font-smoothing:antialiased}
+    :root{
+      --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      --font-serif:Georgia,serif;
+      --font-mono:"SF Mono",Consolas,monospace;
+      --color-background-primary:#ffffff;
+      --color-background-secondary:#f5f5f3;
+      --color-background-tertiary:#eeede9;
+      --color-background-info:#e6f1fb;
+      --color-background-success:#e1f5ee;
+      --color-background-warning:#faeeda;
+      --color-background-danger:#fcebeb;
+      --color-text-primary:#1a1a1a;
+      --color-text-secondary:#6b6b6b;
+      --color-text-tertiary:#9b9b9b;
+      --color-text-info:#185fa5;
+      --color-text-success:#0f6e56;
+      --color-text-warning:#854f0b;
+      --color-text-danger:#a32d2d;
+      --color-border-tertiary:rgba(0,0,0,0.12);
+      --color-border-secondary:rgba(0,0,0,0.22);
+      --color-border-primary:rgba(0,0,0,0.35);
+      --color-border-info:#378add;
+      --color-border-success:#1d9e75;
+      --color-border-warning:#ba7517;
+      --color-border-danger:#e24b4a;
+      --border-radius-md:8px;
+      --border-radius-lg:12px;
+      --border-radius-xl:16px;
     }
-    :root {
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --font-serif: Georgia, serif;
-      --font-mono: "SF Mono", Consolas, monospace;
-      --color-background-primary: #ffffff;
-      --color-background-secondary: #f5f5f3;
-      --color-background-tertiary: #eeede9;
-      --color-background-info: #e6f1fb;
-      --color-background-success: #e1f5ee;
-      --color-background-warning: #faeeda;
-      --color-background-danger: #fcebeb;
-      --color-text-primary: #1a1a1a;
-      --color-text-secondary: #6b6b6b;
-      --color-text-tertiary: #9b9b9b;
-      --color-text-info: #185fa5;
-      --color-text-success: #0f6e56;
-      --color-text-warning: #854f0b;
-      --color-text-danger: #a32d2d;
-      --color-border-tertiary: rgba(0,0,0,0.12);
-      --color-border-secondary: rgba(0,0,0,0.22);
-      --color-border-primary: rgba(0,0,0,0.35);
-      --color-border-info: #378add;
-      --color-border-success: #1d9e75;
-      --color-border-warning: #ba7517;
-      --color-border-danger: #e24b4a;
-      --border-radius-md: 8px;
-      --border-radius-lg: 12px;
-      --border-radius-xl: 16px;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --color-background-primary: #1e1e1c;
-        --color-background-secondary: #2a2a28;
-        --color-background-tertiary: #141412;
-        --color-background-info: #0c2a4a;
-        --color-background-success: #082e22;
-        --color-background-warning: #2e1c04;
-        --color-background-danger: #2e0e0e;
-        --color-text-primary: #f0efeb;
-        --color-text-secondary: #9b9b9b;
-        --color-text-tertiary: #6b6b6b;
-        --color-text-info: #85b7eb;
-        --color-text-success: #5dcaa5;
-        --color-text-warning: #ef9f27;
-        --color-text-danger: #f09595;
-        --color-border-tertiary: rgba(255,255,255,0.10);
-        --color-border-secondary: rgba(255,255,255,0.20);
-        --color-border-primary: rgba(255,255,255,0.32);
+    @media(prefers-color-scheme:dark){
+      :root{
+        --color-background-primary:#1e1e1c;
+        --color-background-secondary:#2a2a28;
+        --color-background-tertiary:#141412;
+        --color-background-info:#0c2a4a;
+        --color-background-success:#082e22;
+        --color-background-warning:#2e1c04;
+        --color-background-danger:#2e0e0e;
+        --color-text-primary:#f0efeb;
+        --color-text-secondary:#9b9b9b;
+        --color-text-tertiary:#6b6b6b;
+        --color-text-info:#85b7eb;
+        --color-text-success:#5dcaa5;
+        --color-text-warning:#ef9f27;
+        --color-text-danger:#f09595;
+        --color-border-tertiary:rgba(255,255,255,0.10);
+        --color-border-secondary:rgba(255,255,255,0.20);
+        --color-border-primary:rgba(255,255,255,0.32);
       }
     }
-    input, select, textarea {
-      font-family: inherit;
-      font-size: 14px;
-      padding: 8px 10px;
-      border: 0.5px solid var(--color-border-secondary);
-      border-radius: var(--border-radius-md);
-      background: var(--color-background-primary);
-      color: var(--color-text-primary);
-      outline: none;
-      transition: border-color .15s;
-      width: 100%;
-    }
-    input:focus, select:focus, textarea:focus { border-color: #378add; box-shadow: 0 0 0 3px rgba(55,138,221,0.12); }
-    button { font-family: inherit; cursor: pointer; }
-    #loading {
-      position: fixed; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 14px;
-      background: var(--color-background-tertiary);
-    }
-    .spinner {
-      width: 32px; height: 32px;
-      border: 2.5px solid var(--color-border-tertiary);
-      border-top-color: #1d9e75;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    #loading p { font-size: 13px; color: var(--color-text-secondary); }
+    input,select,textarea{font-family:inherit;font-size:14px;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);outline:none;transition:border-color .15s;width:100%}
+    input:focus,select:focus,textarea:focus{border-color:#378add;box-shadow:0 0 0 3px rgba(55,138,221,0.12)}
+    button{font-family:inherit;cursor:pointer}
+    #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:var(--color-background-tertiary);z-index:9999}
+    .spin{width:32px;height:32px;border:2.5px solid var(--color-border-tertiary);border-top-color:#1d9e75;border-radius:50%;animation:sp .7s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    #loading p{font-size:13px;color:var(--color-text-secondary)}
+    #error-msg{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:var(--color-background-tertiary);padding:2rem;text-align:center}
+    #error-msg h2{font-size:16px;color:var(--color-text-danger)}
+    #error-msg pre{font-size:11px;color:var(--color-text-secondary);white-space:pre-wrap;max-width:500px;background:var(--color-background-secondary);padding:12px;border-radius:8px}
   </style>
 </head>
 <body>
-  <div id="loading">
-    <div class="spinner"></div>
-    <p>Cargando sistema…</p>
-  </div>
+  <div id="loading"><div class="spin"></div><p>Cargando sistema…</p></div>
+  <div id="error-msg"><h2>Error al cargar</h2><pre id="error-text"></pre><button onclick="location.reload()" style="padding:8px 16px;border:none;background:#185fa5;color:#fff;border-radius:8px;font-size:13px">Reintentar</button></div>
   <div id="root"></div>
 
+  <!-- Firebase compat (carga como window.firebase global, sin módulos ES) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- Inicializar Firebase ANTES de React -->
+  <script>
+    try {
+      firebase.initializeApp({
+        apiKey:            "AIzaSyCvBnUdCaX9iEStAspkbMDJCf9iA5ctQV8",
+        authDomain:        "sistema-eliel.firebaseapp.com",
+        projectId:         "sistema-eliel",
+        storageBucket:     "sistema-eliel.firebasestorage.app",
+        messagingSenderId: "511968601006",
+        appId:             "1:511968601006:web:acd30969ec0184b845de3f"
+      });
+      window._fbDB = firebase.firestore();
+      console.log("Firebase OK");
+    } catch(e) {
+      console.error("Firebase init error:", e);
+      window._fbDB = null;
+    }
+  </script>
+
+  <!-- React -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+  <!-- Babel para compilar JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <script type="text/babel" data-presets="react">
+  <script type="text/babel" data-presets="react,env" data-plugins="">
+    const { useState, useEffect, useRef } = React;
+
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -289,7 +291,7 @@ function bhSueldoMes(despachosMes, mes){
 // ══════════════════════════════════════════════════════════════════════════
 // APP PRINCIPAL
 // ══════════════════════════════════════════════════════════════════════════
-export default function App(){
+function App(){
   const [data,setData]=useState(null);
   const [modulo,setModulo]=useState("dashboard");
   const [view,setView]=useState("dashboard");
@@ -299,58 +301,27 @@ export default function App(){
   const [blue,setBlue]=useState(null);
   const [showPedido,setShowPedido]=useState(false);
 
-  // ── FIREBASE CONFIG ───────────────────────────────────────────────────
-  const FB_CONFIG = {
-    apiKey:            "AIzaSyCvBnUdCaX9iEStAspkbMDJCf9iA5ctQV8",
-    authDomain:        "sistema-eliel.firebaseapp.com",
-    projectId:         "sistema-eliel",
-    storageBucket:     "sistema-eliel.firebasestorage.app",
-    messagingSenderId: "511968601006",
-    appId:             "1:511968601006:web:acd30969ec0184b845de3f",
-  };
-  const FB_DOC = "eliel/datos"; // colección/documento en Firestore
-  // ──────────────────────────────────────────────────────────────────────
-
   const [fbReady, setFbReady] = useState(false);
   const dbRef = useRef(null);
 
-  // Carga Firebase dinámicamente y escucha cambios en tiempo real
   useEffect(()=>{
     let unsub = null;
     (async()=>{
-      // Cargar blue siempre
       setBlue(await fetchBlue());
-
-      // Si las credenciales no están configuradas, caer a localStorage
-      if(FB_CONFIG.apiKey==="REEMPLAZAR_API_KEY"){
-        const raw=localStorage.getItem("eliel_v9");
-        setData(raw?JSON.parse(raw):EMPTY);
-        return;
-      }
-
       try{
-        // Importar Firebase modular desde CDN
-        const {initializeApp,getApps}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-        const {getFirestore,doc,getDoc,setDoc,onSnapshot}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-
-        const app = getApps().length ? getApps()[0] : initializeApp(FB_CONFIG);
-        const db  = getFirestore(app);
-        const [col,docId] = FB_DOC.split("/");
-        const docRef = doc(db, col, docId);
-        dbRef.current = {db, docRef, setDoc};
-
-        // Leer dato inicial
-        const snap = await getDoc(docRef);
-        if(snap.exists()){
+        const db = window._fbDB;
+        if(!db) throw new Error("Firebase no disponible");
+        const docRef = db.doc("eliel/datos");
+        dbRef.current = docRef;
+        const snap = await docRef.get();
+        if(snap.exists){
           const remote = snap.data().payload;
           setData(remote&&remote._v===9?remote:EMPTY);
         } else {
           setData(EMPTY);
         }
-
-        // Escuchar cambios en tiempo real (otro dispositivo guardó)
-        unsub = onSnapshot(docRef, snap=>{
-          if(snap.exists()){
+        unsub = docRef.onSnapshot(snap=>{
+          if(snap.exists){
             const remote = snap.data().payload;
             if(remote&&remote._v===9) setData(remote);
           }
@@ -358,7 +329,6 @@ export default function App(){
         setFbReady(true);
       } catch(e){
         console.error("Firebase error:",e);
-        // Fallback a localStorage si Firebase falla
         const raw=localStorage.getItem("eliel_v9");
         setData(raw?JSON.parse(raw):EMPTY);
       }
@@ -368,13 +338,10 @@ export default function App(){
 
   const save=async nd=>{
     setData(nd);
-    // Guardar siempre en localStorage como backup offline
     try{localStorage.setItem("eliel_v9",JSON.stringify(nd));}catch{}
-    // Si Firebase está listo, sincronizar a la nube
     if(dbRef.current){
       try{
-        const {docRef,setDoc}=dbRef.current;
-        await setDoc(docRef,{payload:nd,ts:Date.now()});
+        await dbRef.current.set({payload:nd,ts:Date.now()});
       }catch(e){console.error("Firebase save error:",e);}
     }
   };
@@ -457,7 +424,7 @@ export default function App(){
           </button>
         ))}
         {blue&&<div style={{marginLeft:"auto",flexShrink:0,fontSize:11,padding:"0 6px",color:"#1D9E75",whiteSpace:"nowrap",fontWeight:500}}>💵 ${fmt(blue)}</div>}
-        <div style={{flexShrink:0,fontSize:10,padding:"0 6px",whiteSpace:"nowrap",color:fbReady?"#1D9E75":"#854F0B",title:fbReady?"Sincronizado con la nube":"Sin conexión a Firebase"}}>
+        <div style={{flexShrink:0,fontSize:10,padding:"0 6px",whiteSpace:"nowrap",color:fbReady?"#1D9E75":"#854F0B"}}>
           {fbReady?"☁ sync":"⚠ local"}
         </div>
       </div>
@@ -1821,10 +1788,19 @@ function DespachosView({data,save,showToast}){
   </div>);
 }
 
-  // Renderizar la app
-  const _root = ReactDOM.createRoot(document.getElementById("root"));
-  _root.render(React.createElement(App));
-  document.getElementById("loading").style.display = "none";
+    // Montar la app
+    try {
+      const rootEl = document.getElementById("root");
+      const reactRoot = ReactDOM.createRoot(rootEl);
+      reactRoot.render(React.createElement(App));
+      document.getElementById("loading").style.display = "none";
+    } catch(e) {
+      document.getElementById("loading").style.display = "none";
+      const errDiv = document.getElementById("error-msg");
+      errDiv.style.display = "flex";
+      document.getElementById("error-text").textContent = e.toString() + "\n\n" + (e.stack||"");
+      console.error("Render error:", e);
+    }
   </script>
 </body>
 </html>
