@@ -10,108 +10,97 @@
   <title>Sistema Eliel</title>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html,body,#root{height:100%}
+    html,body,#root{height:100%;min-height:100%}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f5f3;color:#1a1a1a;-webkit-font-smoothing:antialiased}
     :root{
       --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-      --font-serif:Georgia,serif;
-      --font-mono:"SF Mono",Consolas,monospace;
-      --color-background-primary:#ffffff;
-      --color-background-secondary:#f5f5f3;
-      --color-background-tertiary:#eeede9;
-      --color-background-info:#e6f1fb;
-      --color-background-success:#e1f5ee;
-      --color-background-warning:#faeeda;
-      --color-background-danger:#fcebeb;
-      --color-text-primary:#1a1a1a;
-      --color-text-secondary:#6b6b6b;
-      --color-text-tertiary:#9b9b9b;
-      --color-text-info:#185fa5;
-      --color-text-success:#0f6e56;
-      --color-text-warning:#854f0b;
-      --color-text-danger:#a32d2d;
-      --color-border-tertiary:rgba(0,0,0,0.12);
-      --color-border-secondary:rgba(0,0,0,0.22);
-      --color-border-primary:rgba(0,0,0,0.35);
-      --color-border-info:#378add;
-      --color-border-success:#1d9e75;
-      --color-border-warning:#ba7517;
-      --color-border-danger:#e24b4a;
-      --border-radius-md:8px;
-      --border-radius-lg:12px;
-      --border-radius-xl:16px;
+      --color-background-primary:#ffffff;--color-background-secondary:#f5f5f3;
+      --color-background-tertiary:#eeede9;--color-background-info:#e6f1fb;
+      --color-background-success:#e1f5ee;--color-background-warning:#faeeda;
+      --color-background-danger:#fcebeb;--color-text-primary:#1a1a1a;
+      --color-text-secondary:#6b6b6b;--color-text-tertiary:#9b9b9b;
+      --color-text-info:#185fa5;--color-text-success:#0f6e56;
+      --color-text-warning:#854f0b;--color-text-danger:#a32d2d;
+      --color-border-tertiary:rgba(0,0,0,0.12);--color-border-secondary:rgba(0,0,0,0.22);
+      --color-border-primary:rgba(0,0,0,0.35);--color-border-info:#378add;
+      --color-border-success:#1d9e75;--color-border-warning:#ba7517;
+      --color-border-danger:#e24b4a;--border-radius-md:8px;
+      --border-radius-lg:12px;--border-radius-xl:16px;
     }
-    @media(prefers-color-scheme:dark){
-      :root{
-        --color-background-primary:#1e1e1c;
-        --color-background-secondary:#2a2a28;
-        --color-background-tertiary:#141412;
-        --color-background-info:#0c2a4a;
-        --color-background-success:#082e22;
-        --color-background-warning:#2e1c04;
-        --color-background-danger:#2e0e0e;
-        --color-text-primary:#f0efeb;
-        --color-text-secondary:#9b9b9b;
-        --color-text-tertiary:#6b6b6b;
-        --color-text-info:#85b7eb;
-        --color-text-success:#5dcaa5;
-        --color-text-warning:#ef9f27;
-        --color-text-danger:#f09595;
-        --color-border-tertiary:rgba(255,255,255,0.10);
-        --color-border-secondary:rgba(255,255,255,0.20);
-        --color-border-primary:rgba(255,255,255,0.32);
-      }
-    }
-    input,select,textarea{font-family:inherit;font-size:14px;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);outline:none;transition:border-color .15s;width:100%}
+    @media(prefers-color-scheme:dark){:root{
+      --color-background-primary:#1e1e1c;--color-background-secondary:#2a2a28;
+      --color-background-tertiary:#141412;--color-background-info:#0c2a4a;
+      --color-background-success:#082e22;--color-background-warning:#2e1c04;
+      --color-background-danger:#2e0e0e;--color-text-primary:#f0efeb;
+      --color-text-secondary:#9b9b9b;--color-text-tertiary:#6b6b6b;
+      --color-text-info:#85b7eb;--color-text-success:#5dcaa5;
+      --color-text-warning:#ef9f27;--color-text-danger:#f09595;
+      --color-border-tertiary:rgba(255,255,255,0.10);
+      --color-border-secondary:rgba(255,255,255,0.20);
+      --color-border-primary:rgba(255,255,255,0.32);
+    }}
+    input,select,textarea{font-family:inherit;font-size:14px;padding:8px 10px;
+      border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);
+      background:var(--color-background-primary);color:var(--color-text-primary);
+      outline:none;transition:border-color .15s;width:100%}
     input:focus,select:focus,textarea:focus{border-color:#378add;box-shadow:0 0 0 3px rgba(55,138,221,0.12)}
     button{font-family:inherit;cursor:pointer}
-    #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:var(--color-background-tertiary);z-index:9999}
-    .spin{width:32px;height:32px;border:2.5px solid var(--color-border-tertiary);border-top-color:#1d9e75;border-radius:50%;animation:sp .7s linear infinite}
+    #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+      flex-direction:column;gap:14px;background:var(--color-background-tertiary);z-index:9999}
+    .spin{width:32px;height:32px;border:2.5px solid rgba(0,0,0,0.12);
+      border-top-color:#1d9e75;border-radius:50%;animation:sp .7s linear infinite}
     @keyframes sp{to{transform:rotate(360deg)}}
-    #loading p{font-size:13px;color:var(--color-text-secondary)}
-    #error-msg{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:var(--color-background-tertiary);padding:2rem;text-align:center}
-    #error-msg h2{font-size:16px;color:var(--color-text-danger)}
-    #error-msg pre{font-size:11px;color:var(--color-text-secondary);white-space:pre-wrap;max-width:500px;background:var(--color-background-secondary);padding:12px;border-radius:8px}
+    #loading p{font-size:13px;color:#6b6b6b}
+    #err{display:none;position:fixed;inset:0;align-items:center;justify-content:center;
+      flex-direction:column;gap:12px;background:#eeede9;padding:2rem;text-align:center;z-index:9999}
+    #err h3{color:#a32d2d;font-size:15px}
+    #err pre{font-size:11px;color:#6b6b6b;white-space:pre-wrap;max-width:500px;
+      background:#fff;padding:12px;border-radius:8px;max-height:300px;overflow:auto}
   </style>
 </head>
 <body>
-  <div id="loading"><div class="spin"></div><p>Cargando sistema…</p></div>
-  <div id="error-msg"><h2>Error al cargar</h2><pre id="error-text"></pre><button onclick="location.reload()" style="padding:8px 16px;border:none;background:#185fa5;color:#fff;border-radius:8px;font-size:13px">Reintentar</button></div>
+  <div id="loading"><div class="spin"></div><p id="loading-msg">Iniciando…</p></div>
+  <div id="err"><h3>⚠ Error al cargar</h3><pre id="err-txt"></pre>
+    <button onclick="location.reload()" style="padding:8px 16px;border:none;background:#185fa5;color:#fff;border-radius:8px;font-size:13px;cursor:pointer">Reintentar</button></div>
   <div id="root"></div>
 
-  <!-- Firebase compat (carga como window.firebase global, sin módulos ES) -->
+  <!-- Firebase compat: carga como window.firebase global -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-  <!-- Inicializar Firebase ANTES de React -->
   <script>
-    try {
-      firebase.initializeApp({
-        apiKey:            "AIzaSyCvBnUdCaX9iEStAspkbMDJCf9iA5ctQV8",
-        authDomain:        "sistema-eliel.firebaseapp.com",
-        projectId:         "sistema-eliel",
-        storageBucket:     "sistema-eliel.firebasestorage.app",
-        messagingSenderId: "511968601006",
-        appId:             "1:511968601006:web:acd30969ec0184b845de3f"
-      });
-      window._fbDB = firebase.firestore();
-      console.log("Firebase OK");
-    } catch(e) {
-      console.error("Firebase init error:", e);
-      window._fbDB = null;
+    function setMsg(t){var el=document.getElementById("loading-msg");if(el)el.textContent=t;}
+    function showErr(e){
+      document.getElementById("loading").style.display="none";
+      var d=document.getElementById("err"); d.style.display="flex";
+      document.getElementById("err-txt").textContent=String(e)+"\n"+(e&&e.stack?e.stack:"");
     }
+    setMsg("Conectando a Firebase…");
+    try{
+      firebase.initializeApp({
+        apiKey:"AIzaSyCvBnUdCaX9iEStAspkbMDJCf9iA5ctQV8",
+        authDomain:"sistema-eliel.firebaseapp.com",
+        projectId:"sistema-eliel",
+        storageBucket:"sistema-eliel.firebasestorage.app",
+        messagingSenderId:"511968601006",
+        appId:"1:511968601006:web:acd30969ec0184b845de3f"
+      });
+      window._fbDB=firebase.firestore();
+      console.log("✓ Firebase OK");
+    }catch(e){console.warn("Firebase init:",e);window._fbDB=null;}
   </script>
 
-  <!-- React -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- React 18 UMD -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-  <!-- Babel para compilar JSX -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Sucrase: JSX compiler 10x faster than Babel, made for this use case -->
+  <script src="https://cdn.jsdelivr.net/npm/sucrase@3.35.0/dist/index.umd.js"></script>
 
-  <script type="text/babel" data-presets="react,env" data-plugins="">
-    const { useState, useEffect, useRef } = React;
-
+  <script>
+    setMsg("Compilando aplicación…");
+    var { useState, useEffect, useRef } = React;
+  </script>
+  <script id="app-src" type="text/jsx-source">
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -310,8 +299,8 @@ function App(){
       setBlue(await fetchBlue());
       try{
         const db = window._fbDB;
-        if(!db) throw new Error("Firebase no disponible");
-        const docRef = db.doc("eliel/datos");
+        if(!db) throw new Error("Firebase no cargado");
+        const docRef = window.firebase.firestore().doc("eliel/datos");
         dbRef.current = docRef;
         const snap = await docRef.get();
         if(snap.exists){
@@ -1788,19 +1777,27 @@ function DespachosView({data,save,showToast}){
   </div>);
 }
 
-    // Montar la app
-    try {
-      const rootEl = document.getElementById("root");
-      const reactRoot = ReactDOM.createRoot(rootEl);
-      reactRoot.render(React.createElement(App));
-      document.getElementById("loading").style.display = "none";
-    } catch(e) {
-      document.getElementById("loading").style.display = "none";
-      const errDiv = document.getElementById("error-msg");
-      errDiv.style.display = "flex";
-      document.getElementById("error-text").textContent = e.toString() + "\n\n" + (e.stack||"");
-      console.error("Render error:", e);
-    }
+  </script>
+  <script>
+    (function(){
+      try {
+        setMsg("Compilando JSX…");
+        var src = document.getElementById("app-src").textContent;
+        var compiled = sucrase.transform(src, {transforms:["jsx"]}).code;
+        // Make React hooks available in the compiled scope
+        compiled = "var {useState,useEffect,useRef}=React;\n" + compiled;
+        setMsg("Iniciando interfaz…");
+        var fn = new Function(compiled + "\nreturn App;");
+        var AppComp = fn();
+        var root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(React.createElement(AppComp));
+        document.getElementById("loading").style.display="none";
+        console.log("✓ App renderizada");
+      } catch(e) {
+        console.error("Error:",e);
+        showErr(e);
+      }
+    })();
   </script>
 </body>
 </html>
