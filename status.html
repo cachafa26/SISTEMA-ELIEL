@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="theme-color" content="#1d9e75"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="Status Super Coating"/>
+  <title>Status Super Coating</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body,#root{height:100%;min-height:100%}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      background:var(--color-background-tertiary);color:var(--color-text-primary);
+      -webkit-font-smoothing:antialiased}
+    :root{
+      --color-background-primary:#ffffff;--color-background-secondary:#f5f5f3;
+      --color-background-tertiary:#eeede9;--color-background-info:#e6f1fb;
+      --color-background-success:#e1f5ee;--color-background-warning:#faeeda;
+      --color-background-danger:#fcebeb;--color-text-primary:#1a1a1a;
+      --color-text-secondary:#6b6b6b;--color-text-info:#185fa5;
+      --color-text-success:#0f6e56;--color-text-warning:#854f0b;
+      --color-text-danger:#a32d2d;
+      --color-border-tertiary:rgba(0,0,0,0.12);--color-border-secondary:rgba(0,0,0,0.22);
+      --border-radius-md:8px;--border-radius-lg:12px;
+    }
+    @media(prefers-color-scheme:dark){:root{
+      --color-background-primary:#1e1e1c;--color-background-secondary:#2a2a28;
+      --color-background-tertiary:#141412;--color-background-info:#0c2a4a;
+      --color-background-success:#082e22;--color-background-warning:#2e1c04;
+      --color-background-danger:#2e0e0e;--color-text-primary:#f0efeb;
+      --color-text-secondary:#9b9b9b;--color-text-info:#85b7eb;
+      --color-text-success:#5dcaa5;--color-text-warning:#ef9f27;--color-text-danger:#f09595;
+      --color-border-tertiary:rgba(255,255,255,0.10);--color-border-secondary:rgba(255,255,255,0.20);
+    }}
+    [data-theme="dark"]{
+      --color-background-primary:#1e1e1c;--color-background-secondary:#2a2a28;
+      --color-background-tertiary:#141412;--color-background-info:#0c2a4a;
+      --color-background-success:#082e22;--color-background-warning:#2e1c04;
+      --color-background-danger:#2e0e0e;--color-text-primary:#f0efeb;
+      --color-text-secondary:#9b9b9b;--color-text-info:#85b7eb;
+      --color-text-success:#5dcaa5;--color-text-warning:#ef9f27;--color-text-danger:#f09595;
+      --color-border-tertiary:rgba(255,255,255,0.10);--color-border-secondary:rgba(255,255,255,0.20);
+    }
+    [data-theme="light"]{
+      --color-background-primary:#ffffff;--color-background-secondary:#f5f5f3;
+      --color-background-tertiary:#eeede9;--color-text-primary:#1a1a1a;
+      --color-text-secondary:#6b6b6b;--color-border-tertiary:rgba(0,0,0,0.12);
+    }
+    #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+      flex-direction:column;gap:14px;background:var(--color-background-tertiary);z-index:9999}
+    .spin{width:32px;height:32px;border:2.5px solid rgba(0,0,0,0.12);
+      border-top-color:#1d9e75;border-radius:50%;animation:sp .7s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    #loading p{font-size:13px;color:var(--color-text-secondary)}
+  </style>
+</head>
+<body>
+  <div id="loading"><div class="spin"></div><p id="msg">Cargando…</p></div>
+  <div id="root"></div>
+
+  <script>
+    function setMsg(t){var e=document.getElementById("msg");if(e)e.textContent=t;}
+    function showErr(e){
+      document.getElementById("loading").innerHTML=
+        '<p style="color:#a32d2d;font-size:14px;padding:2rem;text-align:center">'+
+        '⚠ Error: '+(typeof e==="string"?e:e.message||String(e))+'<br><br>'+
+        '<button onclick="location.reload()" style="padding:8px 16px;border:none;background:#185fa5;color:#fff;border-radius:8px;cursor:pointer">Reintentar</button></p>';
+    }
+  </script>
+
+  <!-- Firebase compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script>
+    setMsg("Conectando…");
+    try{
+      firebase.initializeApp({
+        apiKey:"AIzaSyCvBnUdCaX9iEStAspkbMDJCf9iA5ctQV8",
+        authDomain:"sistema-eliel.firebaseapp.com",
+        projectId:"sistema-eliel",
+        storageBucket:"sistema-eliel.firebasestorage.app",
+        messagingSenderId:"511968601006",
+        appId:"1:511968601006:web:acd30969ec0184b845de3f"
+      });
+      window._fbDB=firebase.firestore();
+    }catch(e){console.warn("Firebase:",e);window._fbDB=null;}
+  </script>
+
+  <!-- React 18 -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+
+  <script id="src" type="text/raw">
+const {useState,useEffect,useRef}=React;
+
+// ── helpers ───────────────────────────────────────────────────────────────
+const fmt = n => Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
+const fmtUSD = n => "USD "+Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct = n => Number(n||0).toFixed(1)+"%";
+const pesoRollo = a => (Number(a.gramaje||0)/1000)*Number(a.ancho||0)*Number(a.largo||0);
+const haceUnMes = () => { const d=new Date(); d.setMonth(d.getMonth()-1); return d.toISOString().split("T")[0]; };
+
+async function fetchBlue(){
+  try{const r=await fetch("https://dolarapi.com/v1/dolares/blue");const d=await r.json();return d.venta||d.compra||null;}catch{return null;}
+}
+function pagadoVenta(v,pagos){
+  return Number(v.pago||0)+(pagos||[]).filter(p=>p.ventaId===v.id).reduce((a,p)=>a+Number(p.monto),0);
+}
+function cobradoUSD(v,pagos){
+  const total=Number(v.total||0);if(total===0)return 0;
+  return Number(v.usd||0)*Math.min(1,pagadoVenta(v,pagos)/total);
+}
+function stockDisp(contId,artNombre,ventas){
+  return(ventas||[]).filter(v=>v.contId===contId&&v.articulo===artNombre).reduce((a,v)=>a+Number(v.cantidad),0);
+}
+function precioPromedioUltimoMes(contId,artNombre,ventas){
+  const desde=haceUnMes();
+  const vs=(ventas||[]).filter(v=>v.contId===contId&&v.articulo===artNombre&&v.fecha>=desde&&Number(v.precioVenta||0)>0);
+  if(!vs.length){const all=(ventas||[]).filter(v=>v.contId===contId&&v.articulo===artNombre&&Number(v.precioVenta||0)>0);if(!all.length)return 0;return all.reduce((a,v)=>a+Number(v.precioVenta),0)/all.length;}
+  return vs.reduce((a,v)=>a+Number(v.precioVenta),0)/vs.length;
+}
+
+// ── APP ───────────────────────────────────────────────────────────────────
+function App(){
+  const [data,setData]=useState(null);
+  const [blue,setBlue]=useState(null);
+  const [view,setView]=useState("dashboard");
+  const [contSel,setContSel]=useState(null);
+  const [theme,setTheme]=useState(()=>localStorage.getItem("sc_status_theme")||"light");
+  const [syncStatus,setSyncStatus]=useState("conectando");
+  const [lastUpdate,setLastUpdate]=useState(null);
+
+  const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("sc_status_theme",n);return n;});
+
+  useEffect(()=>{
+    const root=document.documentElement;
+    root.setAttribute("data-theme",theme);
+  },[theme]);
+
+  useEffect(()=>{
+    let unsub=null;
+    (async()=>{
+      setBlue(await fetchBlue());
+      try{
+        const db=window._fbDB;
+        if(!db)throw new Error("Sin Firebase");
+        const docRef=db.doc("eliel/datos");
+        const snap=await docRef.get();
+        if(snap.exists){
+          const d=snap.data().payload;
+          setData(d||{contenedores:[],ventas:[],pagos:[],retiros:[]});
+        } else {
+          setData({contenedores:[],ventas:[],pagos:[],retiros:[]});
+        }
+        setSyncStatus("ok");
+        // Escuchar cambios en tiempo real
+        unsub=docRef.onSnapshot(snap=>{
+          if(snap.exists){
+            const d=snap.data().payload;
+            if(d){setData(d);setLastUpdate(new Date());setSyncStatus("ok");}
+          }
+        });
+      }catch(e){
+        console.error(e);
+        setSyncStatus("error");
+        setData({contenedores:[],ventas:[],pagos:[],retiros:[]});
+      }
+    })();
+    return()=>{if(unsub)unsub();};
+  },[]);
+
+  if(!data)return(
+    <div style={{padding:"2rem",textAlign:"center",color:"var(--color-text-secondary)"}}>
+      Cargando datos…
+    </div>
+  );
+
+  // ── calculos globales ──────────────────────────────────────────────────
+  const stockUni={};
+  for(const c of data.contenedores||[]){
+    for(const art of(c.articulos||[])){
+      if(!stockUni[art.nombre])stockUni[art.nombre]=0;
+      stockUni[art.nombre]+=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
+    }
+  }
+  const tcActual=blue||1450;
+
+  const navItems=[
+    {id:"dashboard",label:"Resumen"},
+    {id:"contenedores",label:"Contenedores"},
+    {id:"stock",label:"Stock"},
+    {id:"costos",label:"Costos"},
+  ];
+
+  return(
+    <div style={{fontFamily:"var(--font-sans,-apple-system,sans-serif)",minHeight:"100vh",background:"var(--color-background-tertiary)"}}>
+      {/* Barra superior */}
+      <div style={{background:"var(--color-background-primary)",borderBottom:"0.5px solid var(--color-border-tertiary)",padding:"0 0.75rem",display:"flex",alignItems:"center",gap:4,overflowX:"auto"}}>
+        <div style={{display:"flex",flexDirection:"column",padding:"8px 4px 8px 0",flexShrink:0}}>
+          <span style={{fontSize:13,fontWeight:600,color:"var(--color-text-primary)",lineHeight:1.2}}>Super Coating</span>
+          <span style={{fontSize:10,color:"var(--color-text-secondary)",letterSpacing:"0.04em"}}>STATUS · ACTUALIZACIÓN EN TIEMPO REAL</span>
+        </div>
+        <div style={{width:"0.5px",height:32,background:"var(--color-border-tertiary)",margin:"0 6px",flexShrink:0}}/>
+        {navItems.map(n=>(
+          <button key={n.id} onClick={()=>{setView(n.id);setContSel(null);}}
+            style={{background:"none",border:"none",padding:"12px 10px",cursor:"pointer",
+              fontSize:12,fontWeight:view===n.id?600:400,
+              color:view===n.id?"var(--color-text-primary)":"var(--color-text-secondary)",
+              borderBottom:view===n.id?"2px solid var(--color-text-primary)":"2px solid transparent",
+              whiteSpace:"nowrap"}}>
+            {n.label}
+          </button>
+        ))}
+        <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+          {blue&&<span style={{fontSize:11,color:"var(--color-text-success)",fontWeight:500}}>💵 ${fmt(blue)}</span>}
+          <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,
+            background:syncStatus==="ok"?"var(--color-background-success)":"var(--color-background-warning)",
+            color:syncStatus==="ok"?"var(--color-text-success)":"var(--color-text-warning)"}}>
+            {syncStatus==="ok"?"● en vivo":"⚠ sin sync"}
+          </span>
+          <button onClick={toggleTheme} style={{fontSize:14,border:"none",background:"none",cursor:"pointer",color:"var(--color-text-secondary)",padding:"4px"}}>
+            {theme==="dark"?"☀":"🌙"}
+          </button>
+        </div>
+      </div>
+
+      <div style={{padding:"1rem"}}>
+        {view==="dashboard"&&!contSel&&<ViewDashboard data={data} stockUni={stockUni} blue={blue} tcActual={tcActual} setView={setView} lastUpdate={lastUpdate}/>}
+        {view==="contenedores"&&!contSel&&<ViewContenedores data={data} stockUni={stockUni} blue={blue} tcActual={tcActual} setContSel={setContSel}/>}
+        {view==="contenedores"&&contSel&&<ViewContenedorDetalle cont={contSel} data={data} blue={blue} tcActual={tcActual} onBack={()=>setContSel(null)}/>}
+        {view==="stock"&&<ViewStock stockUni={stockUni} data={data}/>}
+        {view==="costos"&&<ViewCostos data={data} blue={blue} tcActual={tcActual}/>}
+      </div>
+    </div>
+  );
+}
+
+// ── TARJETA MÉTRICA ────────────────────────────────────────────────────────
+function Metric({label,value,sub,green,warn,info}){
+  const bg=green?"var(--color-background-success)":warn?"var(--color-background-warning)":info?"var(--color-background-info)":"var(--color-background-secondary)";
+  const col=green?"var(--color-text-success)":warn?"var(--color-text-warning)":info?"var(--color-text-info)":"var(--color-text-primary)";
+  return(
+    <div style={{background:bg,borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
+      <div style={{fontSize:11,color:green||warn||info?col:"var(--color-text-secondary)",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.04em"}}>{label}</div>
+      <div style={{fontSize:18,fontWeight:500,color:col}}>{value}</div>
+      {sub&&<div style={{fontSize:11,color:col,opacity:0.75,marginTop:3}}>{sub}</div>}
+    </div>
+  );
+}
+
+// ── BARRA DE PROGRESO ──────────────────────────────────────────────────────
+function BarraProgreso({pct,enGanancia}){
+  return(
+    <div style={{height:6,background:"var(--color-background-secondary)",borderRadius:3,overflow:"hidden",margin:"6px 0"}}>
+      <div style={{height:"100%",width:Math.min(100,pct)+"%",background:enGanancia?"var(--color-text-success)":"var(--color-border-info)",borderRadius:3,transition:"width .4s"}}/>
+    </div>
+  );
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────
+function ViewDashboard({data,stockUni,blue,tcActual,setView,lastUpdate}){
+  const conts=data.contenedores||[];
+  let totalCosto=0,totalCobrado=0;
+  const resumen=conts.map(c=>{
+    const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+    const costo=c.costoTotal||0;
+    const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;
+    const enG=costo>0&&cobUSD>=costo;
+    const ganancia=enG?cobUSD-costo:0;
+    totalCosto+=costo;totalCobrado+=cobUSD;
+    return{c,cobUSD,costo,pct,enG,ganancia};
+  });
+  const gananciaTotal=Math.max(0,totalCobrado-totalCosto);
+  const stockTotal=Object.values(stockUni).reduce((a,v)=>a+v,0);
+  const contsEnG=resumen.filter(r=>r.enG).length;
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"1.25rem"}}>
+        <div>
+          <h1 style={{fontSize:20,fontWeight:500,margin:"0 0 2px",color:"var(--color-text-primary)"}}>Resumen general</h1>
+          <p style={{fontSize:12,color:"var(--color-text-secondary)",margin:0}}>Datos en tiempo real · Solo lectura</p>
+        </div>
+        {lastUpdate&&<div style={{fontSize:10,color:"var(--color-text-secondary)",textAlign:"right"}}>
+          Actualizado<br/>{lastUpdate.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+        </div>}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1.5rem"}}>
+        <Metric label="Contenedores activos" value={conts.length} sub={contsEnG+" en ganancia"} green={contsEnG>0}/>
+        <Metric label="Total invertido" value={fmtUSD(totalCosto)}/>
+        <Metric label="Total cobrado" value={fmtUSD(totalCobrado)} info/>
+        <Metric label="Ganancia acumulada" value={fmtUSD(gananciaTotal)} green={gananciaTotal>0}/>
+        <Metric label="Stock disponible" value={fmt(stockTotal)+" u"} sub="todos los contenedores"/>
+        {blue&&<Metric label="Dólar blue" value={"$"+fmt(blue)} sub="cotización actual" info/>}
+      </div>
+
+      {/* Progreso por contenedor */}
+      <div style={{marginBottom:"1rem"}}>
+        <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.05em"}}>Estado por contenedor</div>
+        <div style={{display:"grid",gap:8}}>
+          {resumen.map(({c,cobUSD,costo,pct,enG,ganancia})=>(
+            <div key={c.id} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px",cursor:"pointer"}}
+              onClick={()=>{setView("contenedores");}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?8:0}}>
+                <span style={{fontWeight:500,fontSize:14,color:"var(--color-text-primary)"}}>{c.nombre}</span>
+                <span style={{fontSize:11,padding:"2px 9px",borderRadius:20,
+                  background:enG?"var(--color-background-success)":costo===0?"var(--color-background-secondary)":"var(--color-background-warning)",
+                  color:enG?"var(--color-text-success)":costo===0?"var(--color-text-secondary)":"var(--color-text-warning)",fontWeight:500}}>
+                  {costo===0?"Sin costo":enG?"✓ En ganancia":fmtPct(pct)+" recuperado"}
+                </span>
+              </div>
+              {costo>0&&(
+                <>
+                  <BarraProgreso pct={pct} enGanancia={enG}/>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)",marginTop:4,flexWrap:"wrap",gap:8}}>
+                    <span>Cobrado: <strong style={{color:"var(--color-text-primary)"}}>{fmtUSD(cobUSD)}</strong></span>
+                    <span>Inversión: <strong style={{color:"var(--color-text-primary)"}}>{fmtUSD(costo)}</strong></span>
+                    {enG
+                      ?<span style={{color:"var(--color-text-success)",fontWeight:500}}>Ganancia: {fmtUSD(ganancia)}</span>
+                      :<span style={{color:"var(--color-text-warning)"}}>Faltan: {fmtUSD(costo-cobUSD)}</span>
+                    }
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+          {resumen.length===0&&<div style={{padding:"2rem",textAlign:"center",color:"var(--color-text-secondary)",fontSize:13}}>Sin contenedores cargados aún.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── CONTENEDORES ───────────────────────────────────────────────────────────
+function ViewContenedores({data,stockUni,blue,tcActual,setContSel}){
+  const conts=data.contenedores||[];
+  return(
+    <div>
+      <h2 style={{fontSize:18,fontWeight:500,margin:"0 0 1rem",color:"var(--color-text-primary)"}}>Contenedores</h2>
+      <div style={{display:"grid",gap:10}}>
+        {conts.map(c=>{
+          const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
+          const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+          const costo=c.costoTotal||0;
+          const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;
+          const enG=costo>0&&cobUSD>=costo;
+          const stockCont={};
+          (c.articulos||[]).forEach(art=>{
+            const sd=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
+            if(sd>0)stockCont[art.nombre]=sd;
+          });
+          const totalStockCont=Object.values(stockCont).reduce((a,v)=>a+v,0);
+          const fobTot=(c.articulos||[]).reduce((a,x)=>a+Number(x.precio||0)*Number(x.cantidad),0);
+
+          // Proyección si no está en ganancia
+          let proyeccion=null;
+          if(!enG&&costo>0){
+            let stockRestARS=0;
+            const tc_=Number(c.costos?.tipoCambioFijado||c.costos?.tipoCambio||tcActual);
+            for(const art of(c.articulos||[])){
+              const sd=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
+              if(sd>0){const prom=precioPromedioUltimoMes(c.id,art.nombre,data.ventas);if(prom>0)stockRestARS+=sd*prom;}
+            }
+            const stockRestUSD=stockRestARS/tc_;
+            const ganFutura=Math.max(0,cobUSD+stockRestUSD-costo);
+            proyeccion={stockRestUSD,ganFutura};
+          }
+
+          return(
+            <div key={c.id} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"16px 18px",cursor:"pointer"}}
+              onClick={()=>setContSel(c)}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:15,fontWeight:500,color:"var(--color-text-primary)",marginBottom:2}}>{c.nombre}</div>
+                  <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{(c.articulos||[]).length} artículos · {fmt(totalStockCont)} u en stock</div>
+                </div>
+                <span style={{fontSize:11,padding:"3px 10px",borderRadius:20,
+                  background:enG?"var(--color-background-success)":costo===0?"var(--color-background-secondary)":"var(--color-background-warning)",
+                  color:enG?"var(--color-text-success)":costo===0?"var(--color-text-secondary)":"var(--color-text-warning)",fontWeight:500}}>
+                  {costo===0?"Sin costo":enG?"✓ En ganancia":fmtPct(pct)}
+                </span>
+              </div>
+
+              {costo>0&&(
+                <>
+                  <BarraProgreso pct={pct} enGanancia={enG}/>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginTop:10}}>
+                    {[
+                      {l:"Inversión total",v:fmtUSD(costo)},
+                      {l:"Cobrado",v:fmtUSD(cobUSD),ok:cobUSD>0},
+                      {l:enG?"Ganancia":"Falta cobrar",v:fmtUSD(enG?cobUSD-costo:costo-cobUSD),green:enG,warn:!enG},
+                      {l:"FOB original",v:fmt(fobTot)+" ¥"},
+                    ].map(x=>(
+                      <div key={x.l} style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"8px 10px"}}>
+                        <div style={{fontSize:10,color:"var(--color-text-secondary)",marginBottom:2}}>{x.l}</div>
+                        <div style={{fontSize:13,fontWeight:500,color:x.green?"var(--color-text-success)":x.warn?"var(--color-text-warning)":"var(--color-text-primary)"}}>{x.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {proyeccion&&(
+                    <div style={{marginTop:10,padding:"10px 12px",background:"var(--color-background-info)",borderRadius:"var(--border-radius-md)"}}>
+                      <div style={{fontSize:11,color:"var(--color-text-info)",marginBottom:4,fontWeight:500}}>📊 Proyección si se vende el stock restante</div>
+                      <div style={{display:"flex",gap:16,fontSize:12}}>
+                        <span style={{color:"var(--color-text-info)"}}>Stock restante est.: <strong>{fmtUSD(proyeccion.stockRestUSD)}</strong></span>
+                        <span style={{color:proyeccion.ganFutura>0?"var(--color-text-success)":"var(--color-text-secondary)"}}>Ganancia est.: <strong>{fmtUSD(proyeccion.ganFutura)}</strong></span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
+        {conts.length===0&&<div style={{padding:"2rem",textAlign:"center",color:"var(--color-text-secondary)",fontSize:13}}>Sin contenedores.</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── DETALLE CONTENEDOR ─────────────────────────────────────────────────────
+function ViewContenedorDetalle({cont,data,blue,tcActual,onBack}){
+  const c=data.contenedores.find(x=>x.id===cont.id)||cont;
+  const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
+  const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+  const costo=c.costoTotal||0;
+  const enG=costo>0&&cobUSD>=costo;
+  const ganancia=enG?cobUSD-costo:0;
+  const fobTot=(c.articulos||[]).reduce((a,x)=>a+Number(x.precio||0)*Number(x.cantidad),0);
+  const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;
+  const [tab,setTab]=useState("articulos");
+
+  return(
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:"1rem"}}>
+        <button onClick={onBack} style={{fontSize:13,padding:"6px 12px",borderRadius:"var(--border-radius-md)",
+          cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",
+          background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>← Volver</button>
+        <h2 style={{fontSize:15,fontWeight:500,margin:0,color:"var(--color-text-primary)"}}>{c.nombre}</h2>
+      </div>
+
+      {/* Métricas */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:"1rem"}}>
+        <Metric label="Inversión" value={fmtUSD(costo)}/>
+        <Metric label="Cobrado" value={fmtUSD(cobUSD)} info={cobUSD>0}/>
+        <Metric label={enG?"Ganancia":"Falta cobrar"} value={fmtUSD(enG?ganancia:costo-cobUSD)} green={enG} warn={!enG&&costo>0}/>
+        <Metric label="FOB total" value={fmt(fobTot)+" ¥"}/>
+      </div>
+      {costo>0&&<BarraProgreso pct={pct} enGanancia={enG}/>}
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:4,margin:"1rem 0 0.75rem",background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:4}}>
+        {["articulos","ventas","costos"].map(t=>(
+          <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"7px 4px",border:"none",
+            borderRadius:"var(--border-radius-md)",cursor:"pointer",fontSize:12,
+            background:tab===t?"var(--color-background-primary)":"transparent",
+            color:tab===t?"var(--color-text-primary)":"var(--color-text-secondary)",
+            fontWeight:tab===t?500:400}}>
+            {t==="articulos"?"Artículos":t==="ventas"?"Ventas":"Costos"}
+          </button>
+        ))}
+      </div>
+
+      {tab==="articulos"&&(
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead>
+              <tr style={{background:"var(--color-background-secondary)"}}>
+                {["Artículo","En cont.","Vendido","Stock disp.","Peso/u","% FOB"].map(h=>(
+                  <th key={h} style={{padding:"7px 8px",textAlign:"left",fontWeight:500,fontSize:10,
+                    color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(c.articulos||[]).map(art=>{
+                const vendido=stockDisp(c.id,art.nombre,data.ventas);
+                const disp=Math.max(0,Number(art.cantidad)-vendido);
+                const pr=pesoRollo(art);
+                const tot=Number(art.precio||0)*Number(art.cantidad);
+                const pf=fobTot>0?(tot/fobTot*100):0;
+                const mon=art.moneda==="USD"?"USD ":art.moneda==="RMB"?"¥":"";
+                return(
+                  <tr key={art.id||art.nombre} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                    <td style={{padding:"7px 8px",fontWeight:500,color:"var(--color-text-primary)"}}>{art.nombre}</td>
+                    <td style={{padding:"7px 8px",color:"var(--color-text-secondary)"}}>{fmt(art.cantidad)}</td>
+                    <td style={{padding:"7px 8px",color:"var(--color-text-secondary)"}}>{fmt(vendido)}</td>
+                    <td style={{padding:"7px 8px",fontWeight:500,color:disp>0?"var(--color-text-success)":"var(--color-text-secondary)"}}>{fmt(disp)}</td>
+                    <td style={{padding:"7px 8px",color:"var(--color-text-secondary)"}}>{pr>0?pr.toFixed(2)+" kg":"—"}</td>
+                    <td style={{padding:"7px 8px",color:"var(--color-text-secondary)"}}>{fmtPct(pf)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab==="ventas"&&(
+        <div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:"1rem"}}>
+            <Metric label="Total ventas" value={fmt(ventasCont.length)+" ops"}/>
+            <Metric label="Facturado" value={fmtUSD(ventasCont.reduce((a,v)=>a+Number(v.usd||0),0))} info/>
+            <Metric label="Ganancia" value={fmtUSD(ganancia)} green={enG}/>
+          </div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead>
+                <tr style={{background:"var(--color-background-secondary)"}}>
+                  {["Fecha","Artículo","Cant.","Cliente","USD","Estado"].map(h=>(
+                    <th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...ventasCont].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(v=>(
+                  <tr key={v.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                    <td style={{padding:"6px 8px",color:"var(--color-text-secondary)",fontSize:11}}>{v.fecha}</td>
+                    <td style={{padding:"6px 8px",color:"var(--color-text-primary)"}}>{v.articulo}</td>
+                    <td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{v.cantidad}</td>
+                    <td style={{padding:"6px 8px",color:"var(--color-text-primary)"}}>{v.cliente}</td>
+                    <td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(v.usd||0)}</td>
+                    <td style={{padding:"6px 8px"}}>
+                      <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,
+                        background:v.estado==="Retirado"?"var(--color-background-success)":"var(--color-background-secondary)",
+                        color:v.estado==="Retirado"?"var(--color-text-success)":"var(--color-text-secondary)"}}>
+                        {v.estado||"—"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {ventasCont.length===0&&<tr><td colSpan={6} style={{padding:"24px",textAlign:"center",color:"var(--color-text-secondary)"}}>Sin ventas registradas.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab==="costos"&&(
+        <div>
+          {c.artsCostoDetalle?(
+            <>
+              <div style={{marginBottom:"1rem",padding:"10px 14px",background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",fontSize:12}}>
+                Costo total del contenedor: <strong style={{fontSize:14}}>{fmtUSD(costo)}</strong>
+                {c.costos?.tipoCambioFijado&&<span style={{color:"var(--color-text-secondary)",marginLeft:8}}>TC fijado: ${fmt(c.costos.tipoCambioFijado)}</span>}
+              </div>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                  <thead>
+                    <tr style={{background:"var(--color-background-secondary)"}}>
+                      {["Artículo","% FOB","Costo total USD","Costo/u USD","Costo/u $ARS"].map(h=>(
+                        <th key={h} style={{padding:"7px 8px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {c.artsCostoDetalle.map(a=>{
+                      const ars=a.costoUnitario*(Number(c.costos?.tipoCambioFijado)||tcActual);
+                      return(
+                        <tr key={a.id||a.nombre} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                          <td style={{padding:"7px 8px",fontWeight:500,color:"var(--color-text-primary)"}}>{a.nombre}</td>
+                          <td style={{padding:"7px 8px",color:"var(--color-text-secondary)"}}>{fmtPct(a.pct)}</td>
+                          <td style={{padding:"7px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(a.costoProporcional)}</td>
+                          <td style={{padding:"7px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(a.costoUnitario)}</td>
+                          <td style={{padding:"7px 8px",fontWeight:500,color:"var(--color-text-primary)"}}>{"$"+fmt(ars)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ):(
+            <div style={{padding:"2rem",textAlign:"center",color:"var(--color-text-secondary)",fontSize:13}}>Los costos de este contenedor aún no fueron calculados.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── STOCK UNIFICADO ────────────────────────────────────────────────────────
+function ViewStock({stockUni,data}){
+  const items=Object.entries(stockUni).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const papeles=items.filter(([k])=>!k.includes("TINTA"));
+  const tintas=items.filter(([k])=>k.includes("TINTA"));
+  const totalUnidades=items.reduce((a,[,v])=>a+v,0);
+
+  const Row=([art,cant])=>{
+    const conts=(data.contenedores||[]).filter(c=>(c.articulos||[]).some(a=>a.nombre===art));
+    const detalle=conts.map(c=>{
+      const enCont=(c.articulos||[]).find(a=>a.nombre===art);
+      const disp=enCont?Math.max(0,Number(enCont.cantidad)-stockDisp(c.id,art,data.ventas)):0;
+      return disp>0?c.nombre+" ("+fmt(disp)+")":null;
+    }).filter(Boolean).join(" · ");
+    return(
+      <div key={art} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",
+        borderRadius:"var(--border-radius-lg)",padding:"10px 14px",
+        display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontWeight:500,fontSize:13,color:"var(--color-text-primary)"}}>{art}</div>
+          <div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:2}}>{detalle}</div>
+        </div>
+        <div style={{fontSize:22,fontWeight:500,color:"var(--color-text-success)"}}>{fmt(cant)}</div>
+      </div>
+    );
+  };
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+        <h2 style={{fontSize:18,fontWeight:500,margin:0,color:"var(--color-text-primary)"}}>Stock disponible</h2>
+        <span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{fmt(totalUnidades)} unidades totales</span>
+      </div>
+      {items.length===0
+        ?<div style={{padding:"2rem",textAlign:"center",color:"var(--color-text-secondary)",fontSize:13}}>Sin stock disponible.</div>
+        :(
+          <>
+            {papeles.length>0&&(
+              <>
+                <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>Papeles</div>
+                <div style={{display:"grid",gap:6,marginBottom:"1rem"}}>{papeles.map(Row)}</div>
+              </>
+            )}
+            {tintas.length>0&&(
+              <>
+                <div style={{fontSize:11,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>Tintas</div>
+                <div style={{display:"grid",gap:6}}>{tintas.map(Row)}</div>
+              </>
+            )}
+          </>
+        )
+      }
+    </div>
+  );
+}
+
+// ── COSTOS GLOBALES ────────────────────────────────────────────────────────
+function ViewCostos({data,blue,tcActual}){
+  const [tcManual,setTcManual]=useState(String(Math.round(tcActual)));
+  const tc=Number(tcManual)||tcActual;
+  const conts=(data.contenedores||[]).filter(c=>c.artsCostoDetalle&&c.artsCostoDetalle.length>0);
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem",flexWrap:"wrap",gap:10}}>
+        <h2 style={{fontSize:18,fontWeight:500,margin:0,color:"var(--color-text-primary)"}}>Costos por artículo</h2>
+        <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+          <label style={{color:"var(--color-text-secondary)"}}>TC para ARS:</label>
+          <input type="number" value={tcManual} onChange={e=>setTcManual(e.target.value)}
+            style={{width:90,padding:"5px 8px",fontSize:12,borderRadius:"var(--border-radius-md)",
+              border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",
+              color:"var(--color-text-primary)"}}/>
+          {blue&&<span style={{color:"var(--color-text-secondary)"}}>Blue: ${fmt(blue)}</span>}
+        </div>
+      </div>
+      {conts.length===0
+        ?<div style={{padding:"2rem",textAlign:"center",color:"var(--color-text-secondary)",fontSize:13}}>No hay costos calculados aún.</div>
+        :conts.map(c=>(
+          <div key={c.id} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px",marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <span style={{fontWeight:500,fontSize:14,color:"var(--color-text-primary)"}}>{c.nombre}</span>
+              <span style={{fontSize:11,color:"var(--color-text-secondary)"}}>Costo total: <strong>{fmtUSD(c.costoTotal||0)}</strong></span>
+            </div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                <thead>
+                  <tr style={{background:"var(--color-background-secondary)"}}>
+                    {["Artículo","% FOB","Costo/u USD","Costo/u $ARS"].map(h=>(
+                      <th key={h} style={{padding:"5px 8px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {c.artsCostoDetalle.map(a=>(
+                    <tr key={a.id||a.nombre} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                      <td style={{padding:"6px 8px",fontWeight:500,color:"var(--color-text-primary)"}}>{a.nombre}</td>
+                      <td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtPct(a.pct)}</td>
+                      <td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(a.costoUnitario)}</td>
+                      <td style={{padding:"6px 8px",fontWeight:500,color:"var(--color-text-primary)"}}>{"$"+fmt(a.costoUnitario*tc)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  );
+}
+  </script>
+
+  <script>
+    (function(){
+      if(typeof Babel==="undefined"){showErr("Babel no cargó. Verificá tu conexión.");return;}
+      try{
+        setMsg("Iniciando…");
+        var src=document.getElementById("src").textContent;
+        var compiled=Babel.transform(src,{
+          presets:[["react",{"runtime":"classic","pragma":"React.createElement"}]],
+          filename:"status.jsx"
+        }).code;
+        var run=new Function("React","ReactDOM",compiled+"\nreturn App;");
+        var AppComp=run(React,ReactDOM);
+        var root=ReactDOM.createRoot(document.getElementById("root"));
+        root.render(React.createElement(AppComp));
+        document.getElementById("loading").style.display="none";
+      }catch(e){console.error(e);showErr(e);}
+    })();
+  </script>
+</body>
+</html>
