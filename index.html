@@ -879,12 +879,16 @@ function App(){
   let totalCobUSD=0,totalCostoUSD=0,totalVentaUSD=0;
   for(const c of data.contenedores){
     totalCostoUSD+=c.costoTotal||0;
-    // cobradoUSD = paid portion only (for cash flow)
     totalCobUSD+=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
-    // totalVentaUSD = ALL sales USD (for ganancia/mi30 calculation)
     totalVentaUSD+=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+Number(v.usd||0),0);
   }
-  // Ganancia = based on total sales, not just paid (mi30 accrues on sale, not on payment)
+  // Also include ventas that don't belong to any container (edge case)
+  const contIds=new Set((data.contenedores||[]).map(c=>c.id));
+  const ventasHuerfanas=(data.ventas||[]).filter(v=>v.contId&&!contIds.has(v.contId));
+  totalVentaUSD+=ventasHuerfanas.reduce((a,v)=>a+Number(v.usd||0),0);
+  totalCobUSD+=ventasHuerfanas.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+  // Ganancia = based on total facturado (mi30 accrues on sale, not on payment)
+  // NOTE: if costoTotal=0 (no costs entered yet), ganancia = totalVentaUSD
   const gananciaTotal=Math.max(0,totalVentaUSD-totalCostoUSD);
   const mi30Total=gananciaTotal*0.3;
   const totalRetirado=(data.retiros||[]).reduce((a,r)=>a+Number(r.montoUSD||0),0);
@@ -1437,13 +1441,15 @@ function BHTradeView({data,save,showToast,blue}){
   const [mesActivo,setMesActivo]=useState(new Date().getMonth());
   const [form,setForm]=useState({exp:"",fecha:hoy(),cotiz:blue?String(Math.round(blue)):"",usd:"300"});
   const [showCobro,setShowCobro]=useState(false);
-  const [formCobro,setFormCobro]=useState({monto:"",fecha:hoy(),nota:""});
+  const [formCobro,setFormCobro]=useState({monto:"",moneda:"ARS",fecha:hoy(),nota:""});
   const cobros=data.bh?.cobros||[];
   const cobradoTotal=cobros.reduce((a,c)=>a+Number(c.monto||0),0);
   const guardarCobro=()=>{
     if(!formCobro.monto)return;
-    save({...data,bh:{...data.bh,cobros:[...cobros,{id:Date.now().toString(),mes:mesActivo,...formCobro,monto:Number(formCobro.monto)}]}});
-    setFormCobro({monto:"",fecha:hoy(),nota:""});setShowCobro(false);showToast("Cobro registrado");
+    const montoNum=Number(formCobro.monto);
+    const cobroObj={id:Date.now().toString(),mes:mesActivo,monto:montoNum,moneda:formCobro.moneda||"ARS",fecha:formCobro.fecha,nota:formCobro.nota};
+    save({...data,bh:{...data.bh,cobros:[...cobros,cobroObj]}});
+    setFormCobro({monto:"",moneda:"ARS",fecha:hoy(),nota:""});setShowCobro(false);showToast("Cobro registrado");
   };
   const eliminarCobro=id=>save({...data,bh:{...data.bh,cobros:cobros.filter(c=>c.id!==id)}});
 
@@ -1555,7 +1561,15 @@ function BHTradeView({data,save,showToast,blue}){
         {showCobro&&(
           <div style={{background:"rgba(120,120,128,0.06)",borderRadius:"var(--r-md)",padding:"12px",marginBottom:12,border:"0.5px solid var(--glass-border)"}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-              <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto cobrado ($)</label><input type="number" value={formCobro.monto} onChange={e=>setFormCobro({...formCobro,monto:e.target.value})} placeholder="0"/></div>
+              <div>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto cobrado</label>
+              <div style={{display:"flex",gap:6}}>
+                <select value={formCobro.moneda||"ARS"} onChange={e=>setFormCobro({...formCobro,moneda:e.target.value})} style={{width:72,flexShrink:0}}>
+                  <option value="ARS">$ ARS</option><option value="USD">USD</option>
+                </select>
+                <input type="number" value={formCobro.monto} onChange={e=>setFormCobro({...formCobro,monto:e.target.value})} placeholder="0"/>
+              </div>
+            </div>
               <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label><input type="date" value={formCobro.fecha} onChange={e=>setFormCobro({...formCobro,fecha:e.target.value})}/></div>
               <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota (opcional)</label><input value={formCobro.nota} onChange={e=>setFormCobro({...formCobro,nota:e.target.value})} placeholder="Ej: Sueldo enero, pago parcial..."/></div>
             </div>
@@ -1588,147 +1602,196 @@ function BHTradeView({data,save,showToast,blue}){
 // ══════════════════════════════════════════════════════════════════════════
 // DJ
 // ══════════════════════════════════════════════════════════════════════════
-function DJView({data,save,showToast}){
-  const [form,setForm]=useState({nombre:"",fecha:hoy(),estado:"Confirmado",costo:"",cobro:"",notas:""});
+function DJView({data,save,showToast,blue}){
+  const tc=blue||1450;
+  const initForm={nombre:"",fecha:hoy(),estado:"Confirmado",
+    monedaCobro:"USD",cobro:"",
+    monedaCosto:"ARS",costo:"",
+    sena:"",notas:""};
+  const [form,setForm]=useState(initForm);
   const [editId,setEditId]=useState(null);
 
   const eventos=data.dj?.eventos||[];
   const realizados=eventos.filter(e=>e.estado==="Realizado");
-  const ganTotal=realizados.reduce((a,e)=>a+Number(e.gananciaUSD||e.ganancia||0),0);
-  const cobroTotal=realizados.reduce((a,e)=>a+Number(e.cobroUSD||e.cobro||0),0);
+  const ganTotal=realizados.reduce((a,e)=>a+Number(e.gananciaUSD||0),0);
+  const cobroTotal=realizados.reduce((a,e)=>a+Number(e.cobroUSD||0),0);
   const proximos=eventos.filter(e=>e.estado==="Confirmado"||e.estado==="Señado");
+  const saldoTotal=eventos.filter(e=>e.saldo>0&&e.estado!=="Cancelado").reduce((a,e)=>a+Number(e.saldo||0),0);
+
+  // Compute preview values (plain JS, not inside JSX)
+  const previewCobroUSD = form.monedaCobro==="ARS" ? Number(form.cobro||0)/tc : Number(form.cobro||0);
+  const previewCostoUSD = form.monedaCosto==="ARS" ? Number(form.costo||0)/tc : Number(form.costo||0);
+  const previewGanUSD   = previewCobroUSD - previewCostoUSD;
+  const showPreview     = Number(form.cobro||0)>0 || Number(form.costo||0)>0;
 
   const guardar=()=>{
     if(!form.nombre.trim())return;
-    const tc=blue||1450;
-    // Convert everything to USD for reporting
     const cobroRaw=Number(form.cobro||0);
     const costoRaw=Number(form.costo||0);
-    const senaRaw=Number(form.sena||0);
+    const senaRaw =Number(form.sena||0);
     const cobroUSD=form.monedaCobro==="ARS"?cobroRaw/tc:cobroRaw;
     const costoUSD=form.monedaCosto==="ARS"?costoRaw/tc:costoRaw;
-    const senaUSD=form.monedaCobro==="ARS"?senaRaw/tc:senaRaw;
-    const cobroARS=form.monedaCobro==="ARS"?cobroRaw:cobroRaw*tc;
-    const costoARS=form.monedaCosto==="ARS"?costoRaw:costoRaw*tc;
+    const senaUSD =form.monedaCobro==="ARS"?senaRaw/tc:senaRaw;
     const gananciaUSD=cobroUSD-costoUSD;
     const saldo=Math.max(0,cobroUSD-senaUSD);
     const evento={
-      id:editId||Date.now().toString(),nombre:form.nombre,fecha:form.fecha,estado:form.estado,
-      monedaCobro:form.monedaCobro,cobro:cobroRaw,cobroUSD,cobroARS,
-      monedaCosto:form.monedaCosto,costo:costoRaw,costoUSD,costoARS,
+      id:editId||Date.now().toString(),
+      nombre:form.nombre,fecha:form.fecha,estado:form.estado,
+      monedaCobro:form.monedaCobro,cobro:cobroRaw,cobroUSD,
+      monedaCosto:form.monedaCosto,costo:costoRaw,costoUSD,
       sena:senaRaw,senaUSD,saldo,
-      gananciaUSD,gananciaARS:gananciaUSD*tc,
-      margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
+      gananciaUSD,margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
       notas:form.notas,tcUsado:tc,
     };
     const nuevos=editId?eventos.map(e=>e.id===editId?evento:e):[...eventos,evento];
     save({...data,dj:{...data.dj,eventos:nuevos}});
-    setForm({nombre:"",fecha:hoy(),estado:"Confirmado",monedaCobro:"USD",cobro:"",monedaCosto:"ARS",costo:"",sena:"",notas:""});
-    setEditId(null);showToast(editId?"Evento actualizado":"Evento cargado");
-  };
-  const editar=e=>{setEditId(e.id);setForm({nombre:e.nombre,fecha:e.fecha,estado:e.estado,monedaCobro:e.monedaCobro||"USD",cobro:String(e.cobro||""),monedaCosto:e.monedaCosto||"ARS",costo:String(e.costo||""),sena:String(e.sena||""),notas:e.notas||""});};
-  const eliminar=id=>save({...data,dj:{...data.dj,eventos:eventos.filter(e=>e.id!==id)}});
-  const actualizarEstado=(id,estado)=>{
-    const e=eventos.find(x=>x.id===id);if(!e)return;
-    save({...data,dj:{...data.dj,eventos:eventos.map(x=>x.id===id?{...x,estado}:x)}});
+    setForm(initForm);setEditId(null);
+    showToast(editId?"Evento actualizado":"Evento cargado");
   };
 
-  const stColor={Realizado:"var(--color-text-success)",Confirmado:"var(--color-text-info)",Señado:"var(--color-text-warning)",Cancelado:"var(--color-text-danger)"};
-  const stBg={Realizado:"var(--color-background-success)",Confirmado:"var(--color-background-info)",Señado:"var(--color-background-warning)",Cancelado:"var(--color-background-danger)"};
-  const ganARS=Number(form.cobro||0)-Number(form.costo||0);
+  const editar=e=>{setEditId(e.id);setForm({
+    nombre:e.nombre,fecha:e.fecha,estado:e.estado,
+    monedaCobro:e.monedaCobro||"USD",cobro:String(e.cobro||""),
+    monedaCosto:e.monedaCosto||"ARS",costo:String(e.costo||""),
+    sena:String(e.sena||""),notas:e.notas||"",
+  });};
+  const eliminar=id=>save({...data,dj:{...data.dj,eventos:eventos.filter(e=>e.id!==id)}});
+  const actualizarEstado=(id,estado)=>save({...data,dj:{...data.dj,eventos:eventos.map(x=>x.id===id?{...x,estado}:x)}});
+
+  const stColor={Realizado:"var(--text-success)",Confirmado:"var(--text-info)",Señado:"var(--text-warning)",Cancelado:"var(--text-danger)"};
+  const stBg   ={Realizado:"var(--bg-tint-green)",Confirmado:"var(--bg-tint-blue)",Señado:"var(--bg-tint-amber)",Cancelado:"var(--bg-tint-red)"};
+
+  const MonedaInput=({labelText,monedaKey,montoKey,defaultMoneda})=>(
+    <div>
+      <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>{labelText}</label>
+      <div style={{display:"flex",gap:6}}>
+        <select value={form[monedaKey]} onChange={e=>setForm({...form,[monedaKey]:e.target.value})}
+          style={{width:72,flexShrink:0}}>
+          <option value="USD">USD</option>
+          <option value="ARS">$ ARS</option>
+        </select>
+        <input type="number" value={form[montoKey]} onChange={e=>setForm({...form,[montoKey]:e.target.value})} placeholder="0"/>
+      </div>
+    </div>
+  );
 
   return(
     <div>
       <div style={{marginBottom:"1.5rem"}}>
-        <h2 style={{fontSize:18,fontWeight:500,margin:"0 0 4px"}}>Eliel Mizrahi DJ</h2>
-        <p style={{fontSize:13,color:"var(--color-text-secondary)",margin:0}}>Gestión de eventos y rentabilidad</p>
+        <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:"0 0 4px",color:"var(--text-primary)"}}>DJ</h2>
+        <p style={{fontSize:13,color:"var(--text-secondary)",margin:0}}>Gestión de eventos en USD o ARS</p>
       </div>
 
+      {/* Métricas */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.5rem"}}>
         {[
-          {l:"Eventos realizados",v:realizados.length},
-          {l:"Próximos eventos",v:proximos.length},
-          {l:"Facturación total",v:"$"+fmt(cobroTotal)},
-          {l:"Ganancia neta",v:"$"+fmt(ganTotal),green:ganTotal>0},
+          {l:"Realizados",v:realizados.length},
+          {l:"Próximos",v:proximos.length},
+          {l:"Cobrado USD",v:fmtUSD(cobroTotal),info:true},
+          {l:"Ganancia neta USD",v:fmtUSD(ganTotal),green:ganTotal>0},
+          ...(saldoTotal>0?[{l:"Saldo pendiente",v:fmtUSD(saldoTotal),warn:true}]:[]),
         ].map(x=>(
-          <div key={x.l} style={{background:x.green?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
-            <div style={{fontSize:11,color:x.green?"var(--color-text-success)":"var(--color-text-secondary)",marginBottom:4}}>{x.l}</div>
-            <div style={{fontSize:20,fontWeight:500,color:x.green?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
+          <div key={x.l} style={{
+            background:x.green?"var(--bg-tint-green)":x.warn?"var(--bg-tint-amber)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.10)",
+            border:"0.5px solid "+(x.green?"var(--border-success)":x.warn?"rgba(244,121,32,.3)":x.info?"var(--border-info)":"var(--glass-border)"),
+            borderRadius:"var(--r-lg)",padding:"12px 14px",
+            backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+          }}>
+            <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:x.green?"var(--text-success)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-secondary)",marginBottom:4}}>{x.l}</div>
+            <div style={{fontSize:18,fontWeight:700,letterSpacing:"-.02em",color:x.green?"var(--text-success)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-primary)"}}>{x.v}</div>
           </div>
         ))}
       </div>
 
       {/* Formulario */}
-      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",marginBottom:"1.5rem"}}>
-        <div style={{fontSize:13,fontWeight:500,marginBottom:10}}>{editId?"Editar evento":"Nuevo evento"}</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-          <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Nombre del evento</label><input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Casamiento García — Salón XYZ" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm({...form,fecha:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Estado</label>
-            <select value={form.estado} onChange={e=>setForm({...form,estado:e.target.value})} style={{width:"100%",marginTop:2}}>
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px 18px",marginBottom:"1.5rem",boxShadow:"var(--glass-shadow-sm)"}}>
+        <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:12}}>
+          {editId?"Editar evento":"Nuevo evento"}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nombre del evento</label>
+            <input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Casamiento García — Salón XYZ"/>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label>
+            <input type="date" value={form.fecha} onChange={e=>setForm({...form,fecha:e.target.value})}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Estado</label>
+            <select value={form.estado} onChange={e=>setForm({...form,estado:e.target.value})}>
               {["Confirmado","Señado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}
             </select>
           </div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Costo total ($)</label><input type="number" value={form.costo} onChange={e=>setForm({...form,costo:e.target.value})} placeholder="0" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cobro total ($)</label><input type="number" value={form.cobro} onChange={e=>setForm({...form,cobro:e.target.value})} placeholder="0" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
+          <MonedaInput labelText="Cobro total" monedaKey="monedaCobro" montoKey="cobro"/>
+          <MonedaInput labelText="Costo total" monedaKey="monedaCosto" montoKey="costo"/>
+          <div>
+            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Seña ({form.monedaCobro})</label>
+            <input type="number" value={form.sena} onChange={e=>setForm({...form,sena:e.target.value})} placeholder="0"/>
+          </div>
+          <div style={{display:"flex",alignItems:"flex-end",paddingBottom:1}}>
+            {showPreview&&(
+              <div style={{width:"100%",padding:"9px 11px",background:previewGanUSD>=0?"var(--bg-tint-green)":"var(--bg-tint-red)",border:"0.5px solid "+(previewGanUSD>=0?"var(--border-success)":"var(--border-danger)"),borderRadius:"var(--r-md)",fontSize:12}}>
+                <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:previewGanUSD>=0?"var(--text-success)":"var(--text-danger)",marginBottom:3}}>Ganancia estimada</div>
+                <div style={{fontWeight:700,color:previewGanUSD>=0?"var(--text-success)":"var(--text-danger)"}}>{fmtUSD(previewGanUSD)}</div>
+                <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>≈ ${fmt(previewGanUSD*tc)} ARS</div>
+              </div>
+            )}
+          </div>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Notas</label>
+            <input value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})} placeholder="Rider, detalles, observaciones..."/>
+          </div>
         </div>
-        {(form.costo||form.cobro)&&(()=>{
-          const tc2=blue||1450;
-          const cU2=form.monedaCobro==="ARS"?Number(form.cobro||0)/tc2:Number(form.cobro||0);
-          const kU2=form.monedaCosto==="ARS"?Number(form.costo||0)/tc2:Number(form.costo||0);
-          const gU2=cU2-kU2;
-          return(
-            <div style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--r-md)",padding:"8px 12px",marginBottom:8,fontSize:12,display:"flex",gap:12,flexWrap:"wrap"}}>
-              <span>Ganancia: <strong style={{color:gU2>=0?"var(--text-success)":"var(--text-danger)"}}>{fmtUSD(gU2)}</strong></span>
-              <span style={{color:"var(--text-secondary)"}}>≈ ${fmt(gU2*tc2)}</span>
-              {cU2>0&&<span style={{color:"var(--text-secondary)"}}>Margen: {fmtPct(gU2/cU2*100)}</span>}
-            </div>
-          );
-        })()}
-        <div style={{marginBottom:8}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Notas (opcional)</label><input value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})} placeholder="Detalles, rider, observaciones..." style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
         <div style={{display:"flex",gap:8}}>
-          <button onClick={guardar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-info)",color:"var(--color-background-primary)",fontWeight:500}}>{editId?"Actualizar":"Guardar evento"}</button>
-          {editId&&<button onClick={()=>{setEditId(null);setForm({nombre:"",fecha:hoy(),estado:"Confirmado",monedaCobro:"USD",cobro:"",monedaCosto:"ARS",costo:"",sena:"",notas:""}); }} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"transparent",color:"var(--color-text-secondary)"}}>Cancelar</button>}
+          <button onClick={guardar} style={{fontSize:13,padding:"9px 20px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer",boxShadow:"0 4px 14px rgba(24,95,165,0.35)"}}>
+            {editId?"Actualizar":"Guardar evento"}
+          </button>
+          {editId&&<button onClick={()=>{setEditId(null);setForm(initForm);}} style={{fontSize:13,padding:"9px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>}
         </div>
       </div>
 
-      {/* Lista de eventos */}
-      {eventos.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:14}}>Sin eventos todavía.</p>:(
-        <div style={{display:"grid",gap:8}}>
+      {/* Lista */}
+      {eventos.length===0
+        ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin eventos. Cargá el primero.</div>
+        :<div style={{display:"grid",gap:10}}>
           {[...eventos].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(e=>(
-            <div key={e.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
+            <div key={e.id} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                 <div>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                    <span style={{fontWeight:500,fontSize:14}}>{e.nombre}</span>
-                    <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:stBg[e.estado]||"var(--color-background-secondary)",color:stColor[e.estado]||"var(--color-text-secondary)"}}>{e.estado}</span>
+                    <span style={{fontWeight:600,fontSize:14,color:"var(--text-primary)"}}>{e.nombre}</span>
+                    <span style={{fontSize:10,fontWeight:600,padding:"2px 9px",borderRadius:"var(--r-pill)",background:stBg[e.estado]||"rgba(120,120,128,0.1)",color:stColor[e.estado]||"var(--text-secondary)"}}>{e.estado}</span>
                   </div>
-                  <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>{e.fecha}</div>
+                  <div style={{fontSize:12,color:"var(--text-secondary)"}}>{e.fecha}</div>
                 </div>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <select value={e.estado} onChange={ev=>actualizarEstado(e.id,ev.target.value)} style={{fontSize:11,padding:"3px 6px",borderRadius:4}}>
+                  <select value={e.estado} onChange={ev=>actualizarEstado(e.id,ev.target.value)} style={{fontSize:11,padding:"3px 6px",borderRadius:6,width:"auto"}}>
                     {["Confirmado","Señado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}
                   </select>
-                  <button onClick={()=>editar(e)} style={{border:"none",background:"none",cursor:"pointer",fontSize:13}}>✏️</button>
-                  <button onClick={()=>eliminar(e.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:13}}>✕</button>
+                  <button onClick={()=>editar(e)} style={{border:"none",background:"none",cursor:"pointer",fontSize:14,padding:"2px 4px"}}>✏️</button>
+                  <button onClick={()=>{if(window.confirm("¿Borrar este evento?"))eliminar(e.id);}} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:14,padding:"2px 4px"}}>✕</button>
                 </div>
               </div>
-              <div style={{display:"flex",gap:16,fontSize:13,flexWrap:"wrap"}}>
-                <span>Cobro: <strong>{e.monedaCobro==="USD"?fmtUSD(e.cobro):"$"+fmt(e.cobro)}</strong></span>
-                <span>Costo: <strong>{e.monedaCosto==="ARS"?"$"+fmt(e.costo):fmtUSD(e.costo)}</strong></span>
-                {e.sena>0&&<span style={{color:"var(--text-success)"}}>Seña: <strong>{e.monedaCobro==="USD"?fmtUSD(e.sena):"$"+fmt(e.sena)}</strong></span>}
+              <div style={{display:"flex",gap:12,fontSize:12,flexWrap:"wrap"}}>
+                <span style={{color:"var(--text-secondary)"}}>Cobro: <strong style={{color:"var(--text-primary)"}}>{e.monedaCobro==="ARS"?"$"+fmt(e.cobro):fmtUSD(e.cobro||e.cobroUSD||0)}</strong></span>
+                <span style={{color:"var(--text-secondary)"}}>Costo: <strong style={{color:"var(--text-primary)"}}>{e.monedaCosto==="ARS"?"$"+fmt(e.costo):fmtUSD(e.costo||e.costoUSD||0)}</strong></span>
+                {e.sena>0&&<span style={{color:"var(--text-success)"}}>Seña: <strong>{e.monedaCobro==="ARS"?"$"+fmt(e.sena):fmtUSD(e.sena)}</strong></span>}
                 {e.saldo>0&&<span style={{color:"var(--text-warning)",fontWeight:600}}>Saldo: {fmtUSD(e.saldo)}</span>}
-                <span style={{color:(e.gananciaUSD||e.ganancia||0)>=0?"var(--text-success)":"var(--text-danger)",fontWeight:500}}>Gan: {fmtUSD(e.gananciaUSD||e.ganancia||0)}</span>
+                <span style={{color:(e.gananciaUSD||0)>=0?"var(--text-success)":"var(--text-danger)",fontWeight:600}}>
+                  Gan: {fmtUSD(e.gananciaUSD||0)}
+                </span>
                 {e.cobroUSD>0&&<span style={{color:"var(--text-secondary)"}}>Margen: {fmtPct(e.margen||0)}</span>}
               </div>
-              {e.notas&&<div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:6}}>{e.notas}</div>}
+              {e.notas&&<div style={{fontSize:11,color:"var(--text-secondary)",marginTop:6}}>{e.notas}</div>}
             </div>
           ))}
         </div>
-      )}
+      }
     </div>
   );
 }
+
 
 // ══════════════════════════════════════════════════════════════════════════
 // FINANZAS PERSONALES
@@ -3003,14 +3066,14 @@ function ExtractoView({data}){
 }
 
 function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,blue}){
-  const [form,setForm]=useState({moneda:"USD",monto:"",tcRetiro:blue?String(Math.round(blue)):"1450",nota:"",fecha:hoy()});
+  const [form,setForm]=useState({moneda:"ARS",monto:"",tcRetiro:blue?String(Math.round(blue)):"1450",nota:"",fecha:hoy()});
   const tcActual=blue||1450;
 
   const registrar=()=>{
     if(!form.monto){showToast("Ingresá el monto");return;}
     const montoUSD=form.moneda==="USD"?Number(form.monto):Number(form.monto)/Number(form.tcRetiro||tcActual);
     save({...data,retiros:[...(data.retiros||[]),{id:Date.now().toString(),fecha:form.fecha,nota:form.nota,montoUSD,montoPesos:form.moneda==="ARS"?Number(form.monto):null,moneda:form.moneda,tcRetiro:Number(form.tcRetiro||tcActual)}]});
-    setForm({moneda:"USD",monto:"",tcRetiro:String(Math.round(tcActual)),nota:"",fecha:hoy()});
+    setForm({moneda:"ARS",monto:"",tcRetiro:String(Math.round(tcActual)),nota:"",fecha:hoy()});
     showToast("Retiro registrado");
   };
 
