@@ -894,19 +894,27 @@ function App(){
     return ventaUSD(v,tcBlue)*fraccion;
   }
 
-  let totalCobUSD=0,totalCostoUSD=0,totalVentaUSD=0;
+  let totalCobUSD=0,totalCostoUSD=0,totalVentaUSD=0,mi30Total=0;
   const tcForCalc=blue||1450;
   for(const c of data.contenedores){
-    totalCostoUSD+=c.costoTotal||0;
-    totalCobUSD+=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+ventaCobradoUSD(v,data.pagos,tcForCalc),0);
-    totalVentaUSD+=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+ventaUSD(v,tcForCalc),0);
+    const costo=c.costoTotal||0;
+    const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
+    const facturadoCont=ventasCont.reduce((a,v)=>a+ventaUSD(v,tcForCalc),0);
+    const cobradoCont=ventasCont.reduce((a,v)=>a+ventaCobradoUSD(v,data.pagos,tcForCalc),0);
+    totalCostoUSD+=costo;
+    totalVentaUSD+=facturadoCont;
+    totalCobUSD+=cobradoCont;
+    // Mi30 se calcula POR CONTENEDOR: solo suma si ese cont está en ganancia
+    const gananciaCont=Math.max(0,facturadoCont-costo);
+    mi30Total+=gananciaCont*0.3;
   }
+  // Ventas sin contenedor (edge case)
   const contIds=new Set((data.contenedores||[]).map(c=>c.id));
   const ventasHuerfanas=(data.ventas||[]).filter(v=>!contIds.has(v.contId));
   totalVentaUSD+=ventasHuerfanas.reduce((a,v)=>a+ventaUSD(v,tcForCalc),0);
   totalCobUSD+=ventasHuerfanas.reduce((a,v)=>a+ventaCobradoUSD(v,data.pagos,tcForCalc),0);
+  // gananciaTotal para referencia (no se usa para mi30)
   const gananciaTotal=Math.max(0,totalVentaUSD-totalCostoUSD);
-  const mi30Total=gananciaTotal*0.3;
   const totalRetirado=(data.retiros||[]).reduce((a,r)=>a+Number(r.montoUSD||0),0);
   const pendienteRetiro=Math.max(0,mi30Total-totalRetirado);
   const clienteIdx=buildClienteIndex(data.ventas,data.despachos,data.clientes);
@@ -3254,6 +3262,41 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
           background:"linear-gradient(135deg,#F47920,#5BAD41)",color:"#fff",
           fontWeight:600,cursor:"pointer",boxShadow:"0 4px 14px rgba(244,121,32,0.35)",
         }}>Registrar retiro</button>
+      </div>
+
+      {/* Por contenedor */}
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px 18px",marginBottom:"1.5rem",boxShadow:"var(--glass-shadow-sm)"}}>
+        <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:12}}>Detalle por contenedor</div>
+        {(data.contenedores||[]).map(c=>{
+          const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
+          const facturadoUSD=ventasCont.reduce((a,v)=>a+ventaUSD(v,tcActual),0);
+          const costo=c.costoTotal||0;
+          const ganancia=Math.max(0,facturadoUSD-costo);
+          const mi30c=ganancia*0.3;
+          const pct=costo>0?Math.min(100,facturadoUSD/costo*100):0;
+          return(
+            <div key={c.id} style={{marginBottom:12,paddingBottom:12,borderBottom:"0.5px solid var(--glass-border)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <span style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</span>
+                <span style={{fontSize:12,fontWeight:600,color:ganancia>0?"var(--text-success)":"var(--text-warning)"}}>
+                  Mi 30%: {fmtUSD(mi30c)}
+                </span>
+              </div>
+              <div style={{display:"flex",gap:12,fontSize:11,color:"var(--text-secondary)",flexWrap:"wrap",marginBottom:6}}>
+                <span>Facturado: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(facturadoUSD)}</strong></span>
+                <span>Costo: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(costo)}</strong></span>
+                <span style={{color:ganancia>0?"var(--text-success)":"var(--text-warning)"}}>
+                  {ganancia>0?"Ganancia: "+fmtUSD(ganancia):"Faltan: "+fmtUSD(costo-facturadoUSD)+" para recuperar"}
+                </span>
+              </div>
+              <div style={{height:4,background:"rgba(120,120,128,0.15)",borderRadius:2,overflow:"hidden"}}>
+                <div style={{height:"100%",width:pct+"%",background:pct>=100?"var(--text-success)":"#F47920",borderRadius:2,transition:"width .5s"}}/>
+              </div>
+              <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:3}}>{fmtPct(pct)} de la inversión recuperado</div>
+            </div>
+          );
+        })}
+        {(data.contenedores||[]).length===0&&<div style={{fontSize:12,color:"var(--text-secondary)"}}>Sin contenedores.</div>}
       </div>
 
       {/* Historial */}
