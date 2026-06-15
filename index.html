@@ -876,19 +876,35 @@ function App(){
       stockUni[art.nombre]+=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
     }
   }
+  // Helper: get USD value of a venta, with fallback chain
+  function ventaUSD(v, tcBlue){
+    const u=Number(v.usd||0);
+    if(u>0) return u;
+    // fallback: use tipoCambioUsado stored at sale time
+    const tcUsado=Number(v.tipoCambioUsado||v.tipoCambio||0);
+    if(tcUsado>0 && Number(v.total||0)>0) return Number(v.total)/tcUsado;
+    // last resort: use current blue
+    if(Number(v.total||0)>0 && tcBlue>0) return Number(v.total)/tcBlue;
+    return 0;
+  }
+  function ventaCobradoUSD(v, pagos, tcBlue){
+    const totalARS=Number(v.total||0); if(totalARS===0) return 0;
+    const pagadoARS=pagadoVenta(v,pagos);
+    const fraccion=Math.min(1, pagadoARS/totalARS);
+    return ventaUSD(v,tcBlue)*fraccion;
+  }
+
   let totalCobUSD=0,totalCostoUSD=0,totalVentaUSD=0;
+  const tcForCalc=blue||1450;
   for(const c of data.contenedores){
     totalCostoUSD+=c.costoTotal||0;
-    totalCobUSD+=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
-    totalVentaUSD+=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+Number(v.usd||0),0);
+    totalCobUSD+=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+ventaCobradoUSD(v,data.pagos,tcForCalc),0);
+    totalVentaUSD+=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+ventaUSD(v,tcForCalc),0);
   }
-  // Also include ventas that don't belong to any container (edge case)
   const contIds=new Set((data.contenedores||[]).map(c=>c.id));
-  const ventasHuerfanas=(data.ventas||[]).filter(v=>v.contId&&!contIds.has(v.contId));
-  totalVentaUSD+=ventasHuerfanas.reduce((a,v)=>a+Number(v.usd||0),0);
-  totalCobUSD+=ventasHuerfanas.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
-  // Ganancia = based on total facturado (mi30 accrues on sale, not on payment)
-  // NOTE: if costoTotal=0 (no costs entered yet), ganancia = totalVentaUSD
+  const ventasHuerfanas=(data.ventas||[]).filter(v=>!contIds.has(v.contId));
+  totalVentaUSD+=ventasHuerfanas.reduce((a,v)=>a+ventaUSD(v,tcForCalc),0);
+  totalCobUSD+=ventasHuerfanas.reduce((a,v)=>a+ventaCobradoUSD(v,data.pagos,tcForCalc),0);
   const gananciaTotal=Math.max(0,totalVentaUSD-totalCostoUSD);
   const mi30Total=gananciaTotal*0.3;
   const totalRetirado=(data.retiros||[]).reduce((a,r)=>a+Number(r.montoUSD||0),0);
@@ -2622,7 +2638,8 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:"1rem"}}>
         {(()=>{
           const allV=(data.ventas||[]).filter(v=>v.contId===cont.id);
-          const totalVUSD=allV.reduce((a,v)=>a+Number(v.usd||0),0);
+          const tcD=blue||1450;
+          const totalVUSD=allV.reduce((a,v)=>a+ventaUSD(v,tcD),0);
           const ganBruta=totalVUSD-costo;
           const mi30Dev=Math.max(0,ganBruta)*0.3;
           return[
