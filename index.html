@@ -2534,7 +2534,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
   })():null;
   return(
     <div>
-      <div sdisplay:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:"1rem"}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:"1rem"}}>
         {(()=>{
           const allV=(data.ventas||[]).filter(v=>v.contId===cont.id);
           const totalVUSD=allV.reduce((a,v)=>a+Number(v.usd||0),0);
