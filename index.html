@@ -618,7 +618,7 @@ const CATS_GASTO = ["Vivienda","Alimentación","Transporte","Servicios","Salud",
 const fmt = n => Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
 const fmtUSD = n => "USD "+Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtPct = n => Number(n||0).toFixed(1)+"%";
-const pesoRollo = a => (Number(a.gramaje||0)/1000)*Number(a.ancho||0)*Number(a.largo||0);
+const pesoRollo = a => a.pesoUnitarioOverride!=null ? Number(a.pesoUnitarioOverride) : (Number(a.gramaje||0)/1000)*Number(a.ancho||0)*Number(a.largo||0);
 const hoy = () => new Date().toISOString().split("T")[0];
 const haceUnMes = () => { const d=new Date(); d.setMonth(d.getMonth()-1); return d.toISOString().split("T")[0]; };
 
@@ -876,12 +876,16 @@ function App(){
       stockUni[art.nombre]+=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
     }
   }
-  let totalCobUSD=0,totalCostoUSD=0;
+  let totalCobUSD=0,totalCostoUSD=0,totalVentaUSD=0;
   for(const c of data.contenedores){
     totalCostoUSD+=c.costoTotal||0;
+    // cobradoUSD = paid portion only (for cash flow)
     totalCobUSD+=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+    // totalVentaUSD = ALL sales USD (for ganancia/mi30 calculation)
+    totalVentaUSD+=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+Number(v.usd||0),0);
   }
-  const gananciaTotal=Math.max(0,totalCobUSD-totalCostoUSD);
+  // Ganancia = based on total sales, not just paid (mi30 accrues on sale, not on payment)
+  const gananciaTotal=Math.max(0,totalVentaUSD-totalCostoUSD);
   const mi30Total=gananciaTotal*0.3;
   const totalRetirado=(data.retiros||[]).reduce((a,r)=>a+Number(r.montoUSD||0),0);
   const pendienteRetiro=Math.max(0,mi30Total-totalRetirado);
@@ -896,8 +900,10 @@ function App(){
   // Calculos DJ globales
   const djEventos=data.dj?.eventos||[];
   const djRealizados=djEventos.filter(e=>e.estado==="Realizado");
-  const djGanancia=djRealizados.reduce((a,e)=>a+e.ganancia,0);
-  const djCobrado=djRealizados.reduce((a,e)=>a+e.cobro,0);
+  const djGananciaUSD=djRealizados.reduce((a,e)=>a+Number(e.gananciaUSD||e.ganancia||0),0);
+  const djCobradoUSD=djRealizados.reduce((a,e)=>a+Number(e.cobroUSD||e.cobro||0),0);
+  const djGanancia=djGananciaUSD; // alias for backward compat
+  const djCobrado=djCobradoUSD;
 
   // Calculos Finanzas
   const totalGastos=(data.fin?.gastos||[]).reduce((a,g)=>a+g.monto,0);
@@ -1059,8 +1065,9 @@ function App(){
             data={data} blue={blue}
             mi30Total={mi30Total} pendienteRetiro={pendienteRetiro} totalRetirado={totalRetirado}
             bhTotalAnio={bhTotalAnio} bhSueldo={bhSueldo}
-            djGanancia={djGanancia} djCobrado={djCobrado} djEventos={djEventos}
+            djGanancia={djGanancia} djCobrado={djCobrado} djEventos={djEventos} djGananciaUSD={djGananciaUSD} djCobradoUSD={djCobradoUSD} djRealizados={djRealizados}
             totalGastos={totalGastos} totalIngresos={totalIngresos}
+            totalVentaUSD={totalVentaUSD} totalCobUSD={totalCobUSD}
             stockUni={stockUni}
             goModulo={goModulo}
           />
@@ -1300,7 +1307,7 @@ function SearchModal({data,onClose,goModulo,setView}){
 // ══════════════════════════════════════════════════════════════════════════
 // DASHBOARD CENTRAL
 // ══════════════════════════════════════════════════════════════════════════
-function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,djGanancia,djCobrado,djEventos,totalGastos,totalIngresos,stockUni,goModulo}){
+function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,djGanancia,djCobrado,djEventos,djGananciaUSD,djCobradoUSD,djRealizados,totalGastos,totalIngresos,totalVentaUSD,totalCobUSD,stockUni,goModulo}){
   const tcActual=blue||1450;
   const balance=totalIngresos-totalGastos;
   const Card=({label,value,sub,color,onClick})=>(
@@ -1341,14 +1348,34 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
         <p style={{fontSize:13,color:"var(--color-text-secondary)",margin:0}}>{new Date().toLocaleDateString("es-AR",{weekday:"long",year:"numeric",month:"long",day:"numeric"})}</p>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:"1.5rem"}}>
-        <Card label="Ingresos totales" value={"$"+fmt(totalIngresos)} sub="3 fuentes 2026"/>
-        <Card label="Gastos personales" value={"$"+fmt(totalGastos)} color={totalGastos>0?"var(--color-text-danger)":undefined}/>
-        <Card label="Balance" value={"$"+fmt(balance)} color={balance>=0?"var(--color-text-success)":"var(--color-text-danger)"}/>
-        <Card label="BH Trade — mes" value={"$"+fmt(bhSueldo)} sub="a cobrar este mes" onClick={()=>goModulo("bhtrade")}/>
-        <Card label="Mi 30% SC pendiente" value={fmtUSD(pendienteRetiro)} sub={"~$"+fmt(pendienteRetiro*(blue||1450))} onClick={()=>goModulo("supercoating")} color={pendienteRetiro>0?"var(--color-text-success)":undefined}/>
-        <Card label="DJ — ganancia neta" value={"$"+fmt(djGanancia)} sub={djEventos.filter(e=>e.estado==="Realizado").length+" eventos realizados"} onClick={()=>goModulo("dj")}/>
-      </div>
+      {/* Dual currency: ARS flow + USD wealth */}
+      {(()=>{
+        const tc=blue||1450;
+        const ingresoARS=totalIngresos;
+        const gastoARS=totalGastos;
+        const balanceARS=ingresoARS-gastoARS;
+        const ahorroUSD=pendienteRetiro+djGananciaUSD+(djCobradoUSD-(djRealizados||[]).reduce((a,e)=>a+Number(e.costoUSD||0),0));
+        return(
+          <>
+            {/* ARS daily flow */}
+            <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Flujo mensual (pesos)</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1.25rem"}}>
+              <Card label="Ingresos totales" value={"$"+fmt(ingresoARS)} sub="3 fuentes 2026"/>
+              <Card label="Gastos personales" value={"$"+fmt(gastoARS)} color={gastoARS>0?"var(--text-danger)":undefined}/>
+              <Card label="Balance ARS" value={"$"+fmt(balanceARS)} color={balanceARS>=0?"var(--text-success)":"var(--text-danger)"}/>
+              <Card label="BH Trade — mes" value={"$"+fmt(bhSueldo)} sub="a cobrar este mes" onClick={()=>goModulo("bhtrade")}/>
+            </div>
+            {/* USD wealth */}
+            <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Ahorro / patrimonio (USD)</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1.5rem"}}>
+              <Card label="Mi 30% SC pendiente" value={fmtUSD(pendienteRetiro)} sub={"≈$"+fmt(pendienteRetiro*tc)+" ARS"} color={pendienteRetiro>0?"var(--text-success)":undefined} onClick={()=>goModulo("supercoating")}/>
+              <Card label="DJ ganancia USD" value={fmtUSD(djGananciaUSD)} sub={djEventos.filter(e=>e.estado==="Realizado").length+" eventos"} color={djGananciaUSD>0?"var(--text-success)":undefined} onClick={()=>goModulo("dj")}/>
+              <Card label="SC facturado USD" value={fmtUSD(totalVentaUSD||0)} sub="total ventas"/>
+              <Card label="SC cobrado USD" value={fmtUSD(totalCobUSD||0)} sub="efectivamente cobrado"/>
+            </div>
+          </>
+        );
+      })()}
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:"1rem"}}>
         <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
@@ -1567,20 +1594,39 @@ function DJView({data,save,showToast}){
 
   const eventos=data.dj?.eventos||[];
   const realizados=eventos.filter(e=>e.estado==="Realizado");
-  const ganTotal=realizados.reduce((a,e)=>a+e.ganancia,0);
-  const cobroTotal=realizados.reduce((a,e)=>a+e.cobro,0);
+  const ganTotal=realizados.reduce((a,e)=>a+Number(e.gananciaUSD||e.ganancia||0),0);
+  const cobroTotal=realizados.reduce((a,e)=>a+Number(e.cobroUSD||e.cobro||0),0);
   const proximos=eventos.filter(e=>e.estado==="Confirmado"||e.estado==="Señado");
 
   const guardar=()=>{
     if(!form.nombre.trim())return;
-    const cobro=Number(form.cobro||0),costo=Number(form.costo||0),sena=Number(form.sena||0);
-    const evento={id:editId||Date.now().toString(),nombre:form.nombre,fecha:form.fecha,estado:form.estado,costo,cobro,sena,saldo:Math.max(0,cobro-sena),ganancia:cobro-costo,margen:cobro>0?((cobro-costo)/cobro*100):0,notas:form.notas};
+    const tc=blue||1450;
+    // Convert everything to USD for reporting
+    const cobroRaw=Number(form.cobro||0);
+    const costoRaw=Number(form.costo||0);
+    const senaRaw=Number(form.sena||0);
+    const cobroUSD=form.monedaCobro==="ARS"?cobroRaw/tc:cobroRaw;
+    const costoUSD=form.monedaCosto==="ARS"?costoRaw/tc:costoRaw;
+    const senaUSD=form.monedaCobro==="ARS"?senaRaw/tc:senaRaw;
+    const cobroARS=form.monedaCobro==="ARS"?cobroRaw:cobroRaw*tc;
+    const costoARS=form.monedaCosto==="ARS"?costoRaw:costoRaw*tc;
+    const gananciaUSD=cobroUSD-costoUSD;
+    const saldo=Math.max(0,cobroUSD-senaUSD);
+    const evento={
+      id:editId||Date.now().toString(),nombre:form.nombre,fecha:form.fecha,estado:form.estado,
+      monedaCobro:form.monedaCobro,cobro:cobroRaw,cobroUSD,cobroARS,
+      monedaCosto:form.monedaCosto,costo:costoRaw,costoUSD,costoARS,
+      sena:senaRaw,senaUSD,saldo,
+      gananciaUSD,gananciaARS:gananciaUSD*tc,
+      margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
+      notas:form.notas,tcUsado:tc,
+    };
     const nuevos=editId?eventos.map(e=>e.id===editId?evento:e):[...eventos,evento];
     save({...data,dj:{...data.dj,eventos:nuevos}});
-    setForm({nombre:"",fecha:hoy(),estado:"Confirmado",costo:"",cobro:"",sena:"",notas:""});
+    setForm({nombre:"",fecha:hoy(),estado:"Confirmado",monedaCobro:"USD",cobro:"",monedaCosto:"ARS",costo:"",sena:"",notas:""});
     setEditId(null);showToast(editId?"Evento actualizado":"Evento cargado");
   };
-  const editar=e=>{setEditId(e.id);setForm({nombre:e.nombre,fecha:e.fecha,estado:e.estado,costo:String(e.costo),cobro:String(e.cobro),sena:String(e.sena||0),notas:e.notas||""});};
+  const editar=e=>{setEditId(e.id);setForm({nombre:e.nombre,fecha:e.fecha,estado:e.estado,monedaCobro:e.monedaCobro||"USD",cobro:String(e.cobro||""),monedaCosto:e.monedaCosto||"ARS",costo:String(e.costo||""),sena:String(e.sena||""),notas:e.notas||""});};
   const eliminar=id=>save({...data,dj:{...data.dj,eventos:eventos.filter(e=>e.id!==id)}});
   const actualizarEstado=(id,estado)=>{
     const e=eventos.find(x=>x.id===id);if(!e)return;
@@ -1626,16 +1672,23 @@ function DJView({data,save,showToast}){
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Costo total ($)</label><input type="number" value={form.costo} onChange={e=>setForm({...form,costo:e.target.value})} placeholder="0" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cobro total ($)</label><input type="number" value={form.cobro} onChange={e=>setForm({...form,cobro:e.target.value})} placeholder="0" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
         </div>
-        {(form.costo||form.cobro)&&(
-          <div style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:8,fontSize:12,display:"flex",gap:16}}>
-            <span>Ganancia: <strong style={{color:ganARS>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>${fmt(ganARS)}</strong></span>
-            {Number(form.cobro)>0&&<span>Margen: <strong>{fmtPct(ganARS/Number(form.cobro)*100)}</strong></span>}
-          </div>
-        )}
+        {(form.costo||form.cobro)&&(()=>{
+          const tc2=blue||1450;
+          const cU2=form.monedaCobro==="ARS"?Number(form.cobro||0)/tc2:Number(form.cobro||0);
+          const kU2=form.monedaCosto==="ARS"?Number(form.costo||0)/tc2:Number(form.costo||0);
+          const gU2=cU2-kU2;
+          return(
+            <div style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--r-md)",padding:"8px 12px",marginBottom:8,fontSize:12,display:"flex",gap:12,flexWrap:"wrap"}}>
+              <span>Ganancia: <strong style={{color:gU2>=0?"var(--text-success)":"var(--text-danger)"}}>{fmtUSD(gU2)}</strong></span>
+              <span style={{color:"var(--text-secondary)"}}>≈ ${fmt(gU2*tc2)}</span>
+              {cU2>0&&<span style={{color:"var(--text-secondary)"}}>Margen: {fmtPct(gU2/cU2*100)}</span>}
+            </div>
+          );
+        })()}
         <div style={{marginBottom:8}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Notas (opcional)</label><input value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})} placeholder="Detalles, rider, observaciones..." style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
         <div style={{display:"flex",gap:8}}>
           <button onClick={guardar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-info)",color:"var(--color-background-primary)",fontWeight:500}}>{editId?"Actualizar":"Guardar evento"}</button>
-          {editId&&<button onClick={()=>{setEditId(null);setForm({nombre:"",fecha:hoy(),estado:"Confirmado",costo:"",cobro:"",sena:"",notas:""}); }} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"transparent",color:"var(--color-text-secondary)"}}>Cancelar</button>}
+          {editId&&<button onClick={()=>{setEditId(null);setForm({nombre:"",fecha:hoy(),estado:"Confirmado",monedaCobro:"USD",cobro:"",monedaCosto:"ARS",costo:"",sena:"",notas:""}); }} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"transparent",color:"var(--color-text-secondary)"}}>Cancelar</button>}
         </div>
       </div>
 
@@ -1661,12 +1714,12 @@ function DJView({data,save,showToast}){
                 </div>
               </div>
               <div style={{display:"flex",gap:16,fontSize:13,flexWrap:"wrap"}}>
-                <span>Costo: <strong>${fmt(e.costo)}</strong></span>
-                <span>Cobro: <strong>${fmt(e.cobro)}</strong></span>
-                {e.sena>0&&<span style={{color:"var(--text-success)"}}>Seña: <strong>${fmt(e.sena)}</strong></span>}
-                {e.saldo>0&&<span style={{color:"var(--text-warning)",fontWeight:600}}>Saldo: ${fmt(e.saldo)}</span>}
-                <span style={{color:e.ganancia>=0?"var(--text-success)":"var(--text-danger)",fontWeight:500}}>Ganancia: ${fmt(e.ganancia)}</span>
-                {e.cobro>0&&<span style={{color:"var(--text-secondary)"}}>Margen: {fmtPct(e.margen||0)}</span>}
+                <span>Cobro: <strong>{e.monedaCobro==="USD"?fmtUSD(e.cobro):"$"+fmt(e.cobro)}</strong></span>
+                <span>Costo: <strong>{e.monedaCosto==="ARS"?"$"+fmt(e.costo):fmtUSD(e.costo)}</strong></span>
+                {e.sena>0&&<span style={{color:"var(--text-success)"}}>Seña: <strong>{e.monedaCobro==="USD"?fmtUSD(e.sena):"$"+fmt(e.sena)}</strong></span>}
+                {e.saldo>0&&<span style={{color:"var(--text-warning)",fontWeight:600}}>Saldo: {fmtUSD(e.saldo)}</span>}
+                <span style={{color:(e.gananciaUSD||e.ganancia||0)>=0?"var(--text-success)":"var(--text-danger)",fontWeight:500}}>Gan: {fmtUSD(e.gananciaUSD||e.ganancia||0)}</span>
+                {e.cobroUSD>0&&<span style={{color:"var(--text-secondary)"}}>Margen: {fmtPct(e.margen||0)}</span>}
               </div>
               {e.notas&&<div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:6}}>{e.notas}</div>}
             </div>
@@ -2281,15 +2334,71 @@ function ContenedorDetail({cont,data,save,tab,setTab,onBack,showToast,blue}){
   );
 }
 
+const GRAMAJES_PRESET=["29","30","33","35","42","52","61","80","90","100","120"];
+const ANCHOS_PRESET=["1.10","1.60","1.80","2.00","2.50","3.20"];
+const LARGOS_PRESET=["100","150","200","300","400","500","600","700","800","1000"];
+const PESO_TINTA_KG=1; // cada unidad de tinta pesa 1kg
+
+function ComboInput({value,onChange,options,placeholder,type,storageKey}){
+  // Combo: preset dropdown + free text, saves custom values to localStorage
+  const [custom,setCustom]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("eliel_custom_"+storageKey)||"[]");}catch{return [];}
+  });
+  const [showCustom,setShowCustom]=useState(false);
+  const [newVal,setNewVal]=useState("");
+  const all=[...options,...custom.filter(c=>!options.includes(c))];
+  
+  const saveCustom=(val)=>{
+    if(!val||options.includes(val)||custom.includes(val))return;
+    const next=[...custom,val];
+    setCustom(next);
+    try{localStorage.setItem("eliel_custom_"+storageKey,JSON.stringify(next));}catch{}
+  };
+
+  return(
+    <div>
+      <div style={{display:"flex",gap:4}}>
+        <select value={all.includes(value)?value:"custom"}
+          onChange={e=>{
+            if(e.target.value==="custom"){setShowCustom(true);}
+            else{onChange(e.target.value);setShowCustom(false);}
+          }}
+          style={{flex:1}}>
+          {all.map(o=><option key={o} value={o}>{o}</option>)}
+          <option value="custom">+ Otro...</option>
+        </select>
+      </div>
+      {(!all.includes(value)&&value)||showCustom?(
+        <div style={{display:"flex",gap:4,marginTop:4}}>
+          <input type={type||"text"} value={showCustom?newVal:value}
+            onChange={e=>showCustom?setNewVal(e.target.value):onChange(e.target.value)}
+            placeholder={placeholder}
+            style={{flex:1}}
+            autoFocus={showCustom}/>
+          {showCustom&&<button onClick={()=>{
+            if(newVal){onChange(newVal);saveCustom(newVal);}
+            setShowCustom(false);setNewVal("");
+          }} style={{padding:"0 10px",borderRadius:"var(--r-md)",border:"none",background:"var(--sc-orange)",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:600}}>OK</button>}
+        </div>
+      ):null}
+    </div>
+  );
+}
+
 function TabArmado({cont,updateCont,showToast}){
-  const [form,setForm]=useState({nombre:ARTS[0],gramaje:"",ancho:"1.6",largo:"600",cantidad:"",precio:"",moneda:"RMB"});
+  const [form,setForm]=useState({nombre:ARTS[0],gramaje:"30",ancho:"1.60",largo:"600",cantidad:"",precio:"",moneda:"RMB"});
   const [editId,setEditId]=useState(null);
   const LIMITE=25500;
   const esTinta=n=>n.includes("TINTA");
   const submit=()=>{
     if(!form.cantidad||!form.precio){showToast("Completá cantidad y precio");return;}
     const isT=esTinta(form.nombre);
-    const artData={...form,id:editId||Date.now().toString(),cantidad:Number(form.cantidad),precio:Number(form.precio),gramaje:isT?0:Number(form.gramaje),ancho:isT?0:Number(form.ancho),largo:isT?0:Number(form.largo)};
+    // Tintas: peso fijo 1kg por unidad
+    const artData={...form,id:editId||Date.now().toString(),cantidad:Number(form.cantidad),precio:Number(form.precio),
+      gramaje:isT?1000:Number(form.gramaje),
+      ancho:isT?1:Number(form.ancho),
+      largo:isT?1:Number(form.largo),
+      pesoUnitarioOverride:isT?PESO_TINTA_KG:null};
     const arts=editId?(cont.articulos||[]).map(a=>a.id===editId?artData:a):[...(cont.articulos||[]),artData];
     const pt=arts.reduce((a,x)=>a+pesoRollo(x)*Number(x.cantidad),0);
     if(pt>LIMITE){showToast("⚠️ Excede 25.500 kg");return;}
@@ -2321,12 +2430,17 @@ function TabArmado({cont,updateCont,showToast}){
         <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>{editId?"Editar artículo":"Agregar artículo"}</p>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} style={{width:"100%",marginTop:2}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
-          {!isT&&(<><div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Gramaje</label><input type="number" value={form.gramaje} onChange={e=>setForm({...form,gramaje:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div><div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Ancho (m)</label><input type="number" value={form.ancho} onChange={e=>setForm({...form,ancho:e.target.value})} step="0.1" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div><div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Largo (m)</label><input type="number" value={form.largo} onChange={e=>setForm({...form,largo:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div></>)}
+          {!isT&&(<>
+            <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Gramaje (g/m²)</label><div style={{marginTop:2}}><ComboInput value={form.gramaje} onChange={v=>setForm({...form,gramaje:v})} options={GRAMAJES_PRESET} placeholder="ej: 45" storageKey="gramaje"/></div></div>
+            <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Ancho (m)</label><div style={{marginTop:2}}><ComboInput value={form.ancho} onChange={v=>setForm({...form,ancho:v})} options={ANCHOS_PRESET} placeholder="ej: 1.60" storageKey="ancho"/></div></div>
+            <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Largo (m)</label><div style={{marginTop:2}}><ComboInput value={form.largo} onChange={v=>setForm({...form,largo:v})} options={LARGOS_PRESET} placeholder="ej: 600" storageKey="largo"/></div></div>
+          </>)}
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cantidad</label><input type="number" value={form.cantidad} onChange={e=>setForm({...form,cantidad:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Precio unitario</label><input type="number" value={form.precio} onChange={e=>setForm({...form,precio:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Moneda</label><select value={form.moneda} onChange={e=>setForm({...form,moneda:e.target.value})} style={{width:"100%",marginTop:2}}><option value="RMB">RMB (¥)</option><option value="USD">USD</option></select></div>
         </div>
-        {!isT&&form.gramaje&&form.ancho&&form.largo&&<p style={{fontSize:11,color:"var(--color-text-secondary)",margin:"0 0 8px"}}>{"Peso/u: "+((Number(form.gramaje)/1000)*Number(form.ancho)*Number(form.largo)).toFixed(2)+" kg"+(form.cantidad?" · Total: "+((Number(form.gramaje)/1000)*Number(form.ancho)*Number(form.largo)*Number(form.cantidad)).toFixed(0)+" kg":"")}</p>}
+        {isT&&form.cantidad&&<p style={{fontSize:11,color:"var(--text-secondary)",margin:"0 0 8px"}}>🖨 Tinta: {PESO_TINTA_KG} kg/u · Total: {(PESO_TINTA_KG*Number(form.cantidad)).toFixed(0)} kg</p>}
+        {!isT&&form.gramaje&&form.ancho&&form.largo&&<p style={{fontSize:11,color:"var(--text-secondary)",margin:"0 0 8px"}}>Peso/u: {((Number(form.gramaje)/1000)*Number(form.ancho)*Number(form.largo)).toFixed(2)} kg{form.cantidad?" · Total: "+((Number(form.gramaje)/1000)*Number(form.ancho)*Number(form.largo)*Number(form.cantidad)).toFixed(0)+" kg":""}</p>}
         <div style={{display:"flex",gap:8}}>
           <button onClick={submit} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>{editId?"Guardar":"Agregar"}</button>
           {editId&&<button onClick={()=>{setEditId(null);setForm({nombre:ARTS[0],gramaje:"",ancho:"1.6",largo:"600",cantidad:"",precio:"",moneda:"RMB"});}} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"transparent",color:"var(--color-text-secondary)"}}>Cancelar</button>}
@@ -2350,7 +2464,7 @@ function TabArmado({cont,updateCont,showToast}){
 
 function TabCostos({cont,updateCont,showToast,blue}){
   const tcDef=blue?String(Math.round(blue)):(cont.costos?.tipoCambio||"1450");
-  const [form,setForm]=useState({tipoCambio:tcDef,costoChina:"",costoMoneda:"ARS",despacho:"",naviera:"",despachante:"",losPrincipes:"",deposito:"",terminal:"",otros:"",...cont.costos});
+  const [form,setForm]=useState({tipoCambio:tcDef,costoChina:"",costoMoneda:"USD",despacho:"",naviera:"",despachante:"",losPrincipes:"",deposito:"",terminal:"",otros:"",...cont.costos});
   const [tcPesos,setTcPesos]=useState(tcDef);
   const tc=Number(form.tipoCambio)||1450;
   const toUSD=p=>Number(p||0)/tc;
@@ -2420,15 +2534,31 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
   })():null;
   return(
     <div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:"1rem"}}>
-        {[{l:"Cobrado",v:fmtUSD(cobUSD)},{l:"Costo",v:costo>0?fmtUSD(costo):"—"},{l:"Mi 30%",v:fmtUSD(Math.max(0,cobUSD-costo)*0.3),g:enG}].map(x=>(
-          <div key={x.l} style={{background:x.g?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.6rem"}}>
-            <div style={{fontSize:11,color:x.g?"var(--color-text-success)":"var(--color-text-secondary)"}}>{x.l}</div>
-            <div style={{fontSize:13,fontWeight:500,color:x.g?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
-          </div>
-        ))}
-      </div>
-      {!enG&&costo>0&&<div style={{background:"var(--color-background-warning)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:"1rem",fontSize:12,color:"var(--color-text-warning)"}}>Faltan {fmtUSD(costo-cobUSD)} cobrados para recuperar</div>}
+      <div sdisplay:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:"1rem"}}>
+        {(()=>{
+          const allV=(data.ventas||[]).filter(v=>v.contId===cont.id);
+          const totalVUSD=allV.reduce((a,v)=>a+Number(v.usd||0),0);
+          const ganBruta=totalVUSD-costo;
+          const mi30Dev=Math.max(0,ganBruta)*0.3;
+          return[
+            {l:"Facturado",v:fmtUSD(totalVUSD),info:true},
+            {l:"Cobrado",v:fmtUSD(cobUSD)},
+            {l:ganBruta>=0?"Ganancia":"Pérdida",v:fmtUSD(Math.abs(ganBruta)),g:ganBruta>0,danger:ganBruta<0&&costo>0},
+            {l:"Mi 30%",v:fmtUSD(mi30Dev),g:mi30Dev>0},
+            {l:"Costo",v:costo>0?fmtUSD(costo):"—"},
+            {l:"Por cobrar",v:fmtUSD(Math.max(0,totalVUSD-cobUSD)),warn:totalVUSD>cobUSD},
+          ].map(x=>(
+            <div key={x.l} style={{
+              background:x.g?"var(--bg-tint-green)":x.danger?"var(--bg-tint-red)":x.warn?"var(--bg-tint-amber)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.08)",
+              borderRadius:"var(--r-md)",padding:"9px 11px",
+              border:"0.5px solid "+(x.g?"var(--border-success)":x.danger?"var(--border-danger)":"var(--glass-border)"),
+            }}>
+              <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:x.g?"var(--text-success)":x.danger?"var(--text-danger)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-secondary)",marginBottom:3}}>{x.l}</div>
+              <div style={{fontSize:12,fontWeight:600,color:x.g?"var(--text-success)":x.danger?"var(--text-danger)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-primary)"}}>{x.v}</div>
+            </div>
+          ));
+        })()}
+      </div>      {!enG&&costo>0&&<div style={{background:"var(--color-background-warning)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:"1rem",fontSize:12,color:"var(--color-text-warning)"}}>Faltan {fmtUSD(costo-cobUSD)} cobrados para recuperar</div>}
       {estimacion&&(
         <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px",marginBottom:"1rem"}}>
           <p style={{fontSize:12,fontWeight:500,margin:"0 0 8px",color:"var(--color-text-secondary)"}}>📊 Proyección si se vende el stock restante (precio promedio último mes)</p>
