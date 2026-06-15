@@ -11,7 +11,7 @@
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body,#root{height:100%;min-height:100%}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f5f3;color:#1a1a1a;-webkit-font-smoothing:antialiased}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--color-background-tertiary);color:var(--color-text-primary);-webkit-font-smoothing:antialiased}
     :root{
       --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
       --color-background-primary:#ffffff;--color-background-secondary:#f5f5f3;
@@ -39,6 +39,29 @@
       --color-border-secondary:rgba(255,255,255,0.20);
       --color-border-primary:rgba(255,255,255,0.32);
     }}
+    [data-theme="dark"]{
+      --color-background-primary:#1e1e1c;--color-background-secondary:#2a2a28;
+      --color-background-tertiary:#141412;--color-background-info:#0c2a4a;
+      --color-background-success:#082e22;--color-background-warning:#2e1c04;
+      --color-background-danger:#2e0e0e;--color-text-primary:#f0efeb;
+      --color-text-secondary:#9b9b9b;--color-tertiary:#6b6b6b;
+      --color-text-info:#85b7eb;--color-text-success:#5dcaa5;
+      --color-text-warning:#ef9f27;--color-text-danger:#f09595;
+      --color-border-tertiary:rgba(255,255,255,0.10);
+      --color-border-secondary:rgba(255,255,255,0.20);
+      --color-border-primary:rgba(255,255,255,0.32);
+    }
+    [data-theme="light"]{
+      --color-background-primary:#ffffff;--color-background-secondary:#f5f5f3;
+      --color-background-tertiary:#eeede9;--color-background-info:#e6f1fb;
+      --color-background-success:#e1f5ee;--color-background-warning:#faeeda;
+      --color-background-danger:#fcebeb;--color-text-primary:#1a1a1a;
+      --color-text-secondary:#6b6b6b;--color-text-tertiary:#9b9b9b;
+      --color-text-info:#185fa5;--color-text-success:#0f6e56;
+      --color-text-warning:#854f0b;--color-text-danger:#a32d2d;
+      --color-border-tertiary:rgba(0,0,0,0.12);--color-border-secondary:rgba(0,0,0,0.22);
+      --color-border-primary:rgba(0,0,0,0.35);
+    }
     input,select,textarea{font-family:inherit;font-size:14px;padding:8px 10px;
       border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);
       background:var(--color-background-primary);color:var(--color-text-primary);
@@ -117,7 +140,6 @@
 
   <!-- Codigo JSX de la app (tipo text/raw para que el browser no lo ejecute) -->
   <script id="src" type="text/raw">
-
 // ── CONSTANTES ────────────────────────────────────────────────────────────
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
 const ESTADOS = ["A despachar","Despachado","A retirar Ezeiza","A retirar Once","Retirado"];
@@ -305,6 +327,13 @@ function App(){
   const [toastMsg,setToastMsg]=useState(null);
   const [blue,setBlue]=useState(null);
   const [showPedido,setShowPedido]=useState(false);
+  const [theme,setTheme]=useState(()=>localStorage.getItem("eliel_theme")||"light");
+  const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("eliel_theme",n);return n;});
+  useEffect(()=>{
+    const root=document.documentElement;
+    if(theme==="dark"){root.setAttribute("data-theme","dark");}
+    else{root.removeAttribute("data-theme");}
+  },[theme]);
 
   const [fbReady, setFbReady] = useState(false);
   const dbRef = useRef(null);
@@ -416,7 +445,7 @@ function App(){
   return(
     <div style={{fontFamily:"var(--font-sans)",minHeight:"100vh",background:"var(--color-background-tertiary)"}}>
       {toastMsg&&(
-        <div style={{background:"#0F6E56",color:"#fff",padding:"10px 18px",fontSize:13,fontWeight:500,textAlign:"center",borderBottom:"none",letterSpacing:"0.01em"}}>{toastMsg}</div>
+        <div style={{background:"var(--color-text-success)",color:"var(--color-background-primary)",padding:"10px 18px",fontSize:13,fontWeight:500,textAlign:"center",borderBottom:"none",letterSpacing:"0.01em"}}>{toastMsg}</div>
       )}
       {showPedido&&<PedidoModal data={data} save={save} blue={blue} onClose={()=>setShowPedido(false)} showToast={showToast} clienteIdx={clienteIdx}/>}
 
@@ -428,8 +457,8 @@ function App(){
             <span style={{marginRight:5}}>{m.icon}</span>{m.label}
           </button>
         ))}
-        {blue&&<div style={{marginLeft:"auto",flexShrink:0,fontSize:11,padding:"0 6px",color:"#1D9E75",whiteSpace:"nowrap",fontWeight:500}}>💵 ${fmt(blue)}</div>}
-        <div style={{flexShrink:0,fontSize:10,padding:"0 6px",whiteSpace:"nowrap",color:fbReady?"#1D9E75":"#854F0B"}}>
+        {blue&&<div style={{marginLeft:"auto",flexShrink:0,fontSize:11,padding:"0 6px",color:"var(--color-text-success)",whiteSpace:"nowrap",fontWeight:500}}>💵 ${fmt(blue)}</div>}
+        <div style={{flexShrink:0,fontSize:10,padding:"0 6px",whiteSpace:"nowrap",color:fbReady?"var(--color-text-success)":"var(--color-text-warning)"}}>
           {fbReady?"☁ sync":"⚠ local"}
         </div>
       </div>
@@ -442,7 +471,7 @@ function App(){
               {n.label}
             </button>
           ))}
-          <button onClick={()=>setShowPedido(true)} style={{marginLeft:"auto",flexShrink:0,fontSize:11,padding:"5px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"#1D9E75",color:"#fff",whiteSpace:"nowrap",fontWeight:500}}>+ Pedido</button>
+          <button onClick={()=>setShowPedido(true)} style={{marginLeft:"auto",flexShrink:0,fontSize:11,padding:"5px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-success)",color:"var(--color-background-primary)",whiteSpace:"nowrap",fontWeight:500}}>+ Pedido</button>
         </div>
       )}
 
@@ -512,16 +541,16 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
 
   // movimientos recientes de los 3 módulos
   const recientes=[
-    ...(data.bh?.despachos||[]).map(d=>({fecha:d.fecha,desc:"Despacho "+d.exp,monto:d.total,modulo:"BH Trade",color:"#185FA5"})),
-    ...(data.dj?.eventos||[]).filter(e=>e.estado==="Realizado").map(e=>({fecha:e.fecha,desc:e.nombre,monto:e.cobro,modulo:"DJ",color:"#854F0B"})),
-    ...(data.retiros||[]).map(r=>({fecha:r.fecha,desc:"Retiro SC",monto:r.montoPesos||r.montoUSD*tcActual,modulo:"Super Coating",color:"#0F6E56"})),
-    ...(data.fin?.gastos||[]).map(g=>({fecha:g.fecha,desc:g.desc,monto:-g.monto,modulo:"Gasto",color:"#A32D2D"})),
+    ...(data.bh?.despachos||[]).map(d=>({fecha:d.fecha,desc:"Despacho "+d.exp,monto:d.total,modulo:"BH Trade",color:"var(--color-text-info)"})),
+    ...(data.dj?.eventos||[]).filter(e=>e.estado==="Realizado").map(e=>({fecha:e.fecha,desc:e.nombre,monto:e.cobro,modulo:"DJ",color:"var(--color-text-warning)"})),
+    ...(data.retiros||[]).map(r=>({fecha:r.fecha,desc:"Retiro SC",monto:r.montoPesos||r.montoUSD*tcActual,modulo:"Super Coating",color:"var(--color-text-success)"})),
+    ...(data.fin?.gastos||[]).map(g=>({fecha:g.fecha,desc:g.desc,monto:-g.monto,modulo:"Gasto",color:"var(--color-text-danger)"})),
   ].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,8);
 
   const fuentes=[
-    {n:"Super Coating",v:totalRetirado*(blue||1450),c:"#0F6E56"},
-    {n:"BH Trade",v:bhTotalAnio,c:"#185FA5"},
-    {n:"DJ",v:djCobrado,c:"#854F0B"},
+    {n:"Super Coating",v:totalRetirado*(blue||1450),c:"var(--color-text-success)"},
+    {n:"BH Trade",v:bhTotalAnio,c:"var(--color-text-info)"},
+    {n:"DJ",v:djCobrado,c:"var(--color-text-warning)"},
   ];
   const maxBar=Math.max(...fuentes.map(f=>f.v),1);
 
@@ -634,10 +663,10 @@ function BHTradeView({data,save,showToast,blue}){
           {l:"Total pesos "+MESES[mesActivo],v:"$"+fmt(s.total)},
           {l:"A cobrar "+MESES[mesActivo]+(s.aguinaldo?" ✦":""),v:"$"+fmt(s.sueldo),sub:s.aguinaldo?"Con aguinaldo ×1.5":"Total + $"+fmt(s.base),green:true},
         ].map(x=>(
-          <div key={x.l} style={{background:x.green?"#E1F5EE":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
-            <div style={{fontSize:11,color:x.green?"#0F6E56":"var(--color-text-secondary)",marginBottom:4}}>{x.l}</div>
-            <div style={{fontSize:18,fontWeight:500,color:x.green?"#0F6E56":"var(--color-text-primary)"}}>{x.v}</div>
-            {x.sub&&<div style={{fontSize:11,color:x.green?"#0F6E56":"var(--color-text-secondary)",marginTop:2}}>{x.sub}</div>}
+          <div key={x.l} style={{background:x.green?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
+            <div style={{fontSize:11,color:x.green?"var(--color-text-success)":"var(--color-text-secondary)",marginBottom:4}}>{x.l}</div>
+            <div style={{fontSize:18,fontWeight:500,color:x.green?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
+            {x.sub&&<div style={{fontSize:11,color:x.green?"var(--color-text-success)":"var(--color-text-secondary)",marginTop:2}}>{x.sub}</div>}
           </div>
         ))}
       </div>
@@ -661,12 +690,15 @@ function BHTradeView({data,save,showToast,blue}){
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>USD</label><input type="number" value={form.usd} onChange={e=>setForm({...form,usd:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
         </div>
         {form.cotiz&&<div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:8}}>Total: <strong style={{color:"var(--color-text-primary)"}}>{"$"+fmt(calcTotal())}</strong></div>}
-        <button onClick={guardar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"#185FA5",color:"#fff",fontWeight:500}}>Guardar despacho</button>
+        <button onClick={guardar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-info)",color:"var(--color-background-primary)",fontWeight:500}}>Guardar despacho</button>
       </div>
 
       {/* Tabla */}
       <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"14px 16px"}}>
-        <div style={{fontSize:13,fontWeight:500,marginBottom:10}}>Despachos — {MESES[mesActivo]}</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontSize:13,fontWeight:500}}>Despachos — {MESES[mesActivo]}</div>
+        {despMes.length>0&&<button onClick={()=>{if(confirm("¿Borrar todos los despachos de "+MESES[mesActivo]+"?"))save({...data,bh:{...data.bh,despachos:despachos.filter(d=>d.mes!==mesActivo)}});}} style={{fontSize:11,padding:"4px 10px",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-danger)",background:"var(--color-background-danger)",color:"var(--color-text-danger)"}}>Borrar mes</button>}
+      </div>
         {despMes.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:13}}>Sin despachos en {MESES[mesActivo]}.</p>:(
           <>
             <div style={{overflowX:"auto"}}>
@@ -687,8 +719,8 @@ function BHTradeView({data,save,showToast,blue}){
             <div style={{marginTop:12,padding:"10px 12px",background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",fontSize:13}}>
               <span>Subtotal despachos: <strong>${fmt(s.total)}</strong></span>
               <span style={{marginLeft:16}}>+ Base fija: <strong>${fmt(s.base)}</strong></span>
-              {s.aguinaldo&&<span style={{marginLeft:16,color:"#854F0B"}}>× 1.5 aguinaldo ✦</span>}
-              <span style={{marginLeft:16,color:"#0F6E56",fontWeight:600}}> = A cobrar: ${fmt(s.sueldo)}</span>
+              {s.aguinaldo&&<span style={{marginLeft:16,color:"var(--color-text-warning)"}}>× 1.5 aguinaldo ✦</span>}
+              <span style={{marginLeft:16,color:"var(--color-text-success)",fontWeight:600}}> = A cobrar: ${fmt(s.sueldo)}</span>
             </div>
           </>
         )}
@@ -726,8 +758,8 @@ function DJView({data,save,showToast}){
     save({...data,dj:{...data.dj,eventos:eventos.map(x=>x.id===id?{...x,estado}:x)}});
   };
 
-  const stColor={Realizado:"#0F6E56",Confirmado:"#185FA5",Señado:"#854F0B",Cancelado:"#A32D2D"};
-  const stBg={Realizado:"#E1F5EE",Confirmado:"#E6F1FB",Señado:"#FAEEDA",Cancelado:"#FCEBEB"};
+  const stColor={Realizado:"var(--color-text-success)",Confirmado:"var(--color-text-info)",Señado:"var(--color-text-warning)",Cancelado:"var(--color-text-danger)"};
+  const stBg={Realizado:"var(--color-background-success)",Confirmado:"var(--color-background-info)",Señado:"var(--color-background-warning)",Cancelado:"var(--color-background-danger)"};
   const ganARS=Number(form.cobro||0)-Number(form.costo||0);
 
   return(
@@ -744,9 +776,9 @@ function DJView({data,save,showToast}){
           {l:"Facturación total",v:"$"+fmt(cobroTotal)},
           {l:"Ganancia neta",v:"$"+fmt(ganTotal),green:ganTotal>0},
         ].map(x=>(
-          <div key={x.l} style={{background:x.green?"#E1F5EE":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
-            <div style={{fontSize:11,color:x.green?"#0F6E56":"var(--color-text-secondary)",marginBottom:4}}>{x.l}</div>
-            <div style={{fontSize:20,fontWeight:500,color:x.green?"#0F6E56":"var(--color-text-primary)"}}>{x.v}</div>
+          <div key={x.l} style={{background:x.green?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
+            <div style={{fontSize:11,color:x.green?"var(--color-text-success)":"var(--color-text-secondary)",marginBottom:4}}>{x.l}</div>
+            <div style={{fontSize:20,fontWeight:500,color:x.green?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
           </div>
         ))}
       </div>
@@ -767,13 +799,13 @@ function DJView({data,save,showToast}){
         </div>
         {(form.costo||form.cobro)&&(
           <div style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:8,fontSize:12,display:"flex",gap:16}}>
-            <span>Ganancia: <strong style={{color:ganARS>=0?"#0F6E56":"#A32D2D"}}>${fmt(ganARS)}</strong></span>
+            <span>Ganancia: <strong style={{color:ganARS>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>${fmt(ganARS)}</strong></span>
             {Number(form.cobro)>0&&<span>Margen: <strong>{fmtPct(ganARS/Number(form.cobro)*100)}</strong></span>}
           </div>
         )}
         <div style={{marginBottom:8}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Notas (opcional)</label><input value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})} placeholder="Detalles, rider, observaciones..." style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
         <div style={{display:"flex",gap:8}}>
-          <button onClick={guardar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"#185FA5",color:"#fff",fontWeight:500}}>{editId?"Actualizar":"Guardar evento"}</button>
+          <button onClick={guardar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-info)",color:"var(--color-background-primary)",fontWeight:500}}>{editId?"Actualizar":"Guardar evento"}</button>
           {editId&&<button onClick={()=>{setEditId(null);setForm({nombre:"",fecha:hoy(),estado:"Confirmado",costo:"",cobro:"",notas:""}); }} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"transparent",color:"var(--color-text-secondary)"}}>Cancelar</button>}
         </div>
       </div>
@@ -787,7 +819,7 @@ function DJView({data,save,showToast}){
                 <div>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
                     <span style={{fontWeight:500,fontSize:14}}>{e.nombre}</span>
-                    <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:stBg[e.estado]||"#f0f0f0",color:stColor[e.estado]||"#555"}}>{e.estado}</span>
+                    <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:stBg[e.estado]||"var(--color-background-secondary)",color:stColor[e.estado]||"var(--color-text-secondary)"}}>{e.estado}</span>
                   </div>
                   <div style={{fontSize:12,color:"var(--color-text-secondary)"}}>{e.fecha}</div>
                 </div>
@@ -802,7 +834,7 @@ function DJView({data,save,showToast}){
               <div style={{display:"flex",gap:16,fontSize:13,flexWrap:"wrap"}}>
                 <span>Costo: <strong>${fmt(e.costo)}</strong></span>
                 <span>Cobro: <strong>${fmt(e.cobro)}</strong></span>
-                <span style={{color:e.ganancia>=0?"#0F6E56":"#A32D2D",fontWeight:500}}>Ganancia: ${fmt(e.ganancia)}</span>
+                <span style={{color:e.ganancia>=0?"var(--color-text-success)":"var(--color-text-danger)",fontWeight:500}}>Ganancia: ${fmt(e.ganancia)}</span>
                 {e.cobro>0&&<span style={{color:"var(--color-text-secondary)"}}>Margen: {fmtPct(e.margen||0)}</span>}
               </div>
               {e.notas&&<div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:6}}>{e.notas}</div>}
@@ -853,19 +885,19 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
   gastos.forEach(g=>{porCat[g.cat]=(porCat[g.cat]||0)+g.monto;});
   const catArr=Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
   const maxCat=Math.max(...catArr.map(c=>c[1]),1);
-  const catColors=["#185FA5","#0F6E56","#854F0B","#A32D2D","#533AB7","#1D9E75","#BA7517","#888780"];
+  const catColors=["var(--color-text-info)","var(--color-text-success)","var(--color-text-warning)","var(--color-text-danger)","#533AB7","var(--color-text-success)","var(--color-border-warning)","var(--color-text-secondary)"];
 
   // Por fuente
   const fuentes=[
-    {n:"Super Coating",v:totalRetSCPesos,c:"#0F6E56"},
-    {n:"BH Trade",v:bhTotalAnio,c:"#185FA5"},
-    {n:"DJ",v:djCobrado,c:"#854F0B"},
+    {n:"Super Coating",v:totalRetSCPesos,c:"var(--color-text-success)"},
+    {n:"BH Trade",v:bhTotalAnio,c:"var(--color-text-info)"},
+    {n:"DJ",v:djCobrado,c:"var(--color-text-warning)"},
   ];
   const maxFuente=Math.max(...fuentes.map(f=>f.v),1);
 
   const monedaBtn=(mon)=>(
     <button onClick={()=>setForm(f=>({...f,moneda:mon}))}
-      style={{flex:1,padding:"7px",fontSize:12,fontWeight:500,border:"0.5px solid "+(form.moneda===mon?"#185FA5":"var(--color-border-secondary)"),borderRadius:"var(--border-radius-md)",cursor:"pointer",background:form.moneda===mon?"#E6F1FB":"var(--color-background-primary)",color:form.moneda===mon?"#185FA5":"var(--color-text-secondary)"}}>
+      style={{flex:1,padding:"7px",fontSize:12,fontWeight:500,border:"0.5px solid "+(form.moneda===mon?"var(--color-text-info)":"var(--color-border-secondary)"),borderRadius:"var(--border-radius-md)",cursor:"pointer",background:form.moneda===mon?"var(--color-background-info)":"var(--color-background-primary)",color:form.moneda===mon?"var(--color-text-info)":"var(--color-text-secondary)"}}>
       {mon==="ARS"?"$ Pesos":"USD Dólares"}
     </button>
   );
@@ -885,9 +917,9 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
           {l:"Balance",v:"$"+fmt(balance),green:balance>=0,danger:balance<0},
           {l:"N° de gastos",v:gastos.length},
         ].map(x=>(
-          <div key={x.l} style={{background:x.green?"#E1F5EE":x.danger&&typeof x.v==="string"?"#FEF3F2":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
-            <div style={{fontSize:11,color:x.green?"#0F6E56":x.danger&&typeof x.v==="string"?"#A32D2D":"var(--color-text-secondary)",marginBottom:4}}>{x.l}</div>
-            <div style={{fontSize:18,fontWeight:500,color:x.green?"#0F6E56":x.danger&&typeof x.v==="string"?"#A32D2D":"var(--color-text-primary)"}}>{x.v}</div>
+          <div key={x.l} style={{background:x.green?"var(--color-background-success)":x.danger&&typeof x.v==="string"?"var(--color-background-danger)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
+            <div style={{fontSize:11,color:x.green?"var(--color-text-success)":x.danger&&typeof x.v==="string"?"var(--color-text-danger)":"var(--color-text-secondary)",marginBottom:4}}>{x.l}</div>
+            <div style={{fontSize:18,fontWeight:500,color:x.green?"var(--color-text-success)":x.danger&&typeof x.v==="string"?"var(--color-text-danger)":"var(--color-text-primary)"}}>{x.v}</div>
           </div>
         ))}
       </div>
@@ -946,12 +978,12 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
 
         {/* Preview conversión */}
         {form.monto>0&&form.moneda==="USD"&&(
-          <div style={{background:"#F0F7FF",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:10,fontSize:12,color:"#185FA5"}}>
+          <div style={{background:"var(--color-background-info)",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:10,fontSize:12,color:"var(--color-text-info)"}}>
             {fmtUSD(form.monto)} × ${fmt(form.cotiz||tcBlue)} = <strong>${fmt(montoARS)}</strong> ARS
           </div>
         )}
 
-        <button onClick={guardar} style={{fontSize:13,padding:"8px 16px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"#A32D2D",color:"#fff",fontWeight:500,marginTop:2}}>
+        <button onClick={guardar} style={{fontSize:13,padding:"8px 16px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-danger)",color:"var(--color-background-primary)",fontWeight:500,marginTop:2}}>
           Cargar gasto
         </button>
       </div>
@@ -989,7 +1021,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
             </div>
           ))}
           {totalIngresos>0&&(
-            <div style={{marginTop:14,padding:"8px 10px",background:totalGastos/totalIngresos>0.7?"#FEF3F2":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",fontSize:12,color:totalGastos/totalIngresos>0.7?"#A32D2D":"var(--color-text-secondary)"}}>
+            <div style={{marginTop:14,padding:"8px 10px",background:totalGastos/totalIngresos>0.7?"var(--color-background-danger)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",fontSize:12,color:totalGastos/totalIngresos>0.7?"var(--color-text-danger)":"var(--color-text-secondary)"}}>
               Gastado: <strong>{fmtPct(totalGastos/totalIngresos*100)}</strong> de los ingresos
             </div>
           )}
@@ -1006,12 +1038,12 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
                 <div style={{fontSize:13,color:"var(--color-text-primary)",fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.desc}</div>
                 <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>
                   {g.fecha} · {g.cat} · {g.fuente}
-                  {g.moneda==="USD"&&g.cotiz&&<span style={{color:"#185FA5"}}> · {fmtUSD(g.montoOriginal||0)} @ ${fmt(g.cotiz)}</span>}
+                  {g.moneda==="USD"&&g.cotiz&&<span style={{color:"var(--color-text-info)"}}> · {fmtUSD(g.montoOriginal||0)} @ ${fmt(g.cotiz)}</span>}
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0,marginLeft:12}}>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,fontWeight:500,color:"#A32D2D"}}>-${fmt(g.monto)}</div>
+                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-danger)"}}>-${fmt(g.monto)}</div>
                   {g.moneda==="USD"&&<div style={{fontSize:10,color:"var(--color-text-secondary)"}}>{fmtUSD(g.montoOriginal||0)}</div>}
                 </div>
                 <button onClick={()=>eliminar(g.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:14,padding:"2px 4px",borderRadius:4,lineHeight:1}}>✕</button>
@@ -1086,13 +1118,13 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
 
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",overflowY:"auto",padding:"1rem"}}>
-      <div style={{background:"#ffffff",borderRadius:16,width:"100%",maxWidth:600,padding:"1.75rem",margin:"auto",boxShadow:"0 8px 40px rgba(0,0,0,0.35)"}}>
+      <div style={{background:"var(--color-background-primary)",borderRadius:16,width:"100%",maxWidth:600,padding:"1.75rem",margin:"auto",boxShadow:"0 8px 40px rgba(0,0,0,0.35)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.5rem",borderBottom:"1px solid #e8e8e8",paddingBottom:"1rem"}}>
           <div>
-            <h2 style={{fontSize:20,fontWeight:600,margin:0,color:"#111"}}>Nuevo pedido</h2>
-            <p style={{fontSize:13,color:"#777",margin:"3px 0 0"}}>Completá los datos y el sistema distribuye automáticamente</p>
+            <h2 style={{fontSize:20,fontWeight:600,margin:0,color:"var(--color-text-primary)"}}>Nuevo pedido</h2>
+            <p style={{fontSize:13,color:"var(--color-text-secondary)",margin:"3px 0 0"}}>Completá los datos y el sistema distribuye automáticamente</p>
           </div>
-          <button onClick={onClose} style={{border:"1px solid #ddd",background:"#f5f5f5",cursor:"pointer",fontSize:15,color:"#555",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          <button onClick={onClose} style={{border:"1px solid #ddd",background:"var(--color-background-secondary)",cursor:"pointer",fontSize:15,color:"var(--color-text-secondary)",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:"1rem"}}>
@@ -1106,28 +1138,28 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
           <div><label style={{fontSize:12,color:"var(--color-text-secondary)"}}>{blue?"Blue · $"+fmt(blue):"Blue ($/USD)"}</label><input type="number" value={tc} onChange={e=>setTc(e.target.value)} style={{width:"100%",marginTop:3,boxSizing:"border-box"}}/></div>
         </div>
 
-        <div style={{background:"#f8f8f8",borderRadius:10,padding:"12px",marginBottom:"1rem"}}>
-          <p style={{fontSize:13,fontWeight:500,margin:"0 0 10px",color:"#111"}}>Artículos</p>
+        <div style={{background:"var(--color-background-secondary)",borderRadius:10,padding:"12px",marginBottom:"1rem"}}>
+          <p style={{fontSize:13,fontWeight:500,margin:"0 0 10px",color:"var(--color-text-primary)"}}>Artículos</p>
           {items.map((it,i)=>(
-            <div key={i} style={{background:"#fff",borderRadius:8,padding:"10px",marginBottom:8,border:"1px solid #eee"}}>
+            <div key={i} style={{background:"var(--color-background-primary)",borderRadius:8,padding:"10px",marginBottom:8,border:"1px solid #eee"}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                <span style={{fontSize:11,color:"#888",fontWeight:500}}>Artículo {i+1}</span>
-                {items.length>1&&<button onClick={()=>remItem(i)} style={{border:"none",background:"none",cursor:"pointer",color:"#c0392b",fontSize:12}}>✕</button>}
+                <span style={{fontSize:11,color:"var(--color-text-secondary)",fontWeight:500}}>Artículo {i+1}</span>
+                {items.length>1&&<button onClick={()=>remItem(i)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:12}}>✕</button>}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 70px",gap:6}}>
-                <div><label style={{fontSize:11,color:"#888"}}>Artículo</label><select value={it.nombre} onChange={e=>updItem(i,"nombre",e.target.value)} style={{width:"100%",marginTop:2,fontSize:12}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
-                <div><label style={{fontSize:11,color:"#888"}}>Cant.</label><input type="number" value={it.cantidad} onChange={e=>updItem(i,"cantidad",e.target.value)} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-                <div><label style={{fontSize:11,color:"#888"}}>Precio</label><input type="number" value={it.precioUnitario} onChange={e=>updItem(i,"precioUnitario",e.target.value)} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-                <div><label style={{fontSize:11,color:"#888"}}>Moneda</label><select value={it.moneda} onChange={e=>updItem(i,"moneda",e.target.value)} style={{width:"100%",marginTop:2,fontSize:12}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div>
+                <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={it.nombre} onChange={e=>updItem(i,"nombre",e.target.value)} style={{width:"100%",marginTop:2,fontSize:12}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
+                <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cant.</label><input type="number" value={it.cantidad} onChange={e=>updItem(i,"cantidad",e.target.value)} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
+                <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Precio</label><input type="number" value={it.precioUnitario} onChange={e=>updItem(i,"precioUnitario",e.target.value)} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
+                <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Moneda</label><select value={it.moneda} onChange={e=>updItem(i,"moneda",e.target.value)} style={{width:"100%",marginTop:2,fontSize:12}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div>
               </div>
-              {it.cantidad&&it.precioUnitario&&<div style={{fontSize:11,color:"#888",marginTop:5}}>Subtotal: ${fmt(calcARS(it)*Number(it.cantidad))} · {fmtUSD(calcARS(it)*Number(it.cantidad)/Number(tc||1450))}</div>}
+              {it.cantidad&&it.precioUnitario&&<div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:5}}>Subtotal: ${fmt(calcARS(it)*Number(it.cantidad))} · {fmtUSD(calcARS(it)*Number(it.cantidad)/Number(tc||1450))}</div>}
             </div>
           ))}
-          <button onClick={addItem} style={{fontSize:12,padding:"5px 10px",borderRadius:6,cursor:"pointer",border:"1px solid #ddd",background:"transparent",color:"#888"}}>+ Artículo</button>
+          <button onClick={addItem} style={{fontSize:12,padding:"5px 10px",borderRadius:6,cursor:"pointer",border:"1px solid #ddd",background:"transparent",color:"var(--color-text-secondary)"}}>+ Artículo</button>
         </div>
 
-        {totalPedido>0&&<div style={{background:"#f0f0f0",borderRadius:8,padding:"10px 12px",marginBottom:"1rem",display:"flex",justifyContent:"space-between"}}>
-          <span style={{fontSize:13,color:"#666"}}>Total del pedido</span>
+        {totalPedido>0&&<div style={{background:"var(--color-background-secondary)",borderRadius:8,padding:"10px 12px",marginBottom:"1rem",display:"flex",justifyContent:"space-between"}}>
+          <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>Total del pedido</span>
           <span style={{fontWeight:500,fontSize:15}}>${fmt(totalPedido)} · {fmtUSD(totalPedido/Number(tc||1450))}</span>
         </div>}
 
@@ -1135,7 +1167,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
           <label style={{fontSize:12,color:"var(--color-text-secondary)"}}>Pago recibido ($ARS)</label>
           <div style={{display:"flex",gap:8,alignItems:"center",marginTop:3}}>
             <input type="number" value={pagoTotal} onChange={e=>{setPagoTotal(e.target.value);setPagoCompleto(false);}} style={{flex:1,boxSizing:"border-box"}} placeholder="0"/>
-            <button onClick={()=>setPagoCompleto(p=>!p)} style={{whiteSpace:"nowrap",fontSize:12,padding:"7px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"1px solid #ddd",background:pagoCompleto?"#1D9E75":"#fff",color:pagoCompleto?"#fff":"#555",fontWeight:pagoCompleto?500:400}}>
+            <button onClick={()=>setPagoCompleto(p=>!p)} style={{whiteSpace:"nowrap",fontSize:12,padding:"7px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"1px solid #ddd",background:pagoCompleto?"var(--color-text-success)":"var(--color-background-primary)",color:pagoCompleto?"var(--color-background-primary)":"var(--color-text-secondary)",fontWeight:pagoCompleto?500:400}}>
               {pagoCompleto?"✓ Pago total":"Pago total"}
             </button>
           </div>
@@ -1145,7 +1177,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
           <label style={{fontSize:12,color:"var(--color-text-secondary)"}}>Tipo de entrega</label>
           <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
             {["Expreso","Retira Ezeiza","Retira Once"].map(e=>(
-              <button key={e} onClick={()=>setEntrega(e)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"1px solid "+(entrega===e?"#378ADD":"#ddd"),background:entrega===e?"#E6F1FB":"#fff",color:entrega===e?"#185FA5":"#888",fontWeight:entrega===e?500:400}}>
+              <button key={e} onClick={()=>setEntrega(e)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"1px solid "+(entrega===e?"var(--color-border-info)":"var(--color-border-tertiary)"),background:entrega===e?"var(--color-background-info)":"var(--color-background-primary)",color:entrega===e?"var(--color-text-info)":"var(--color-text-secondary)",fontWeight:entrega===e?500:400}}>
                 {e==="Expreso"?"🚚 Expreso":e==="Retira Ezeiza"?"📍 Ezeiza":"📍 Once"}
               </button>
             ))}
@@ -1153,12 +1185,12 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
         </div>
 
         {entrega==="Expreso"&&(
-          <div style={{background:"#f0f7ff",borderRadius:10,padding:"12px",marginBottom:"1rem"}}>
-            <p style={{fontSize:12,fontWeight:500,margin:"0 0 8px",color:"#185FA5"}}>Datos para expreso</p>
+          <div style={{background:"var(--color-background-info)",borderRadius:10,padding:"12px",marginBottom:"1rem"}}>
+            <p style={{fontSize:12,fontWeight:500,margin:"0 0 8px",color:"var(--color-text-info)"}}>Datos para expreso</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               {[{k:"nombre",l:"Nombre completo",full:true},{k:"dni",l:"DNI"},{k:"expreso",l:"Expreso"},{k:"direccion",l:"Dirección",full:true},{k:"localidad",l:"Localidad"},{k:"provincia",l:"Provincia"}].map(f=>(
                 <div key={f.k} style={f.full?{gridColumn:"1/-1"}:{}}>
-                  <label style={{fontSize:11,color:"#888"}}>{f.l}</label>
+                  <label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{f.l}</label>
                   <input value={datosExp[f.k]} onChange={e=>setDatosExp({...datosExp,[f.k]:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/>
                 </div>
               ))}
@@ -1167,32 +1199,32 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
         )}
 
         {errores.length>0&&(
-          <div style={{background:"#ffe5e5",border:"1px solid #f5c6c6",borderRadius:10,padding:"10px 14px",marginBottom:"1rem"}}>
-            <p style={{fontSize:13,fontWeight:700,margin:"0 0 4px",color:"#c0392b"}}>⚠️ Stock insuficiente</p>
-            {errores.map((e,i)=><p key={i} style={{fontSize:12,margin:"2px 0",color:"#c0392b"}}>{e}</p>)}
+          <div style={{background:"var(--color-background-danger)",border:"1px solid #f5c6c6",borderRadius:10,padding:"10px 14px",marginBottom:"1rem"}}>
+            <p style={{fontSize:13,fontWeight:700,margin:"0 0 4px",color:"var(--color-text-danger)"}}>⚠️ Stock insuficiente</p>
+            {errores.map((e,i)=><p key={i} style={{fontSize:12,margin:"2px 0",color:"var(--color-text-danger)"}}>{e}</p>)}
           </div>
         )}
 
         {preview&&(
-          <div style={{background:"#f0fff8",border:"1px solid #9fe0c5",borderRadius:10,padding:"12px 14px",marginBottom:"1rem"}}>
-            <p style={{fontSize:13,fontWeight:700,margin:"0 0 10px",color:"#0F6E56"}}>✓ Distribución del pedido</p>
+          <div style={{background:"var(--color-background-success)",border:"1px solid #9fe0c5",borderRadius:10,padding:"12px 14px",marginBottom:"1rem"}}>
+            <p style={{fontSize:13,fontWeight:700,margin:"0 0 10px",color:"var(--color-text-success)"}}>✓ Distribución del pedido</p>
             {preview.resultado.map((r,i)=>(
               <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #c8f0e0"}}>
-                <div><span style={{fontSize:13,color:"#111",fontWeight:600}}>{r.artNombre}</span><span style={{fontSize:12,color:"#555"}}>{" × "+r.cantidad}</span></div>
-                <div style={{textAlign:"right"}}><div style={{fontSize:11,color:"#888"}}>{r.contNombre}</div><div style={{fontSize:13,color:"#0F6E56",fontWeight:700}}>${fmt(r.subtotal)}</div></div>
+                <div><span style={{fontSize:13,color:"var(--color-text-primary)",fontWeight:600}}>{r.artNombre}</span><span style={{fontSize:12,color:"var(--color-text-secondary)"}}>{" × "+r.cantidad}</span></div>
+                <div style={{textAlign:"right"}}><div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{r.contNombre}</div><div style={{fontSize:13,color:"var(--color-text-success)",fontWeight:700}}>${fmt(r.subtotal)}</div></div>
               </div>
             ))}
-            {pagoTotal&&Number(pagoTotal)>0&&<div style={{marginTop:8,fontSize:12,color:"#0F6E56"}}>💰 Pago ${fmt(pagoTotal)} distribuido proporcionalmente</div>}
+            {pagoTotal&&Number(pagoTotal)>0&&<div style={{marginTop:8,fontSize:12,color:"var(--color-text-success)"}}>💰 Pago ${fmt(pagoTotal)} distribuido proporcionalmente</div>}
           </div>
         )}
 
         <div style={{display:"flex",gap:8}}>
           {!preview?(
-            <button onClick={generarPreview} style={{flex:1,fontSize:14,padding:"12px",borderRadius:10,cursor:"pointer",border:"none",background:"#378ADD",color:"#fff",fontWeight:700}}>Ver distribución →</button>
+            <button onClick={generarPreview} style={{flex:1,fontSize:14,padding:"12px",borderRadius:10,cursor:"pointer",border:"none",background:"var(--color-border-info)",color:"var(--color-background-primary)",fontWeight:700}}>Ver distribución →</button>
           ):(
             <>
-              <button onClick={()=>{setPreview(null);setErrores([]);}} style={{fontSize:13,padding:"12px 18px",borderRadius:10,cursor:"pointer",border:"1px solid #ddd",background:"#fff",color:"#555"}}>← Editar</button>
-              <button onClick={confirmar} style={{flex:1,fontSize:14,padding:"12px",borderRadius:10,cursor:"pointer",border:"none",background:"#1D9E75",color:"#fff",fontWeight:700}}>Confirmar pedido ✓</button>
+              <button onClick={()=>{setPreview(null);setErrores([]);}} style={{fontSize:13,padding:"12px 18px",borderRadius:10,cursor:"pointer",border:"1px solid #ddd",background:"var(--color-background-primary)",color:"var(--color-text-secondary)"}}>← Editar</button>
+              <button onClick={confirmar} style={{flex:1,fontSize:14,padding:"12px",borderRadius:10,cursor:"pointer",border:"none",background:"var(--color-text-success)",color:"var(--color-background-primary)",fontWeight:700}}>Confirmar pedido ✓</button>
             </>
           )}
         </div>
@@ -1211,7 +1243,7 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro}){
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
         <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Super Coating — Resumen</h2>
-        {blue&&<span style={{fontSize:12,background:"#E1F5EE",color:"#0F6E56",padding:"3px 10px",borderRadius:"var(--border-radius-md)",fontWeight:500}}>💵 Blue ${fmt(blue)}</span>}
+        {blue&&<span style={{fontSize:12,background:"var(--color-background-success)",color:"var(--color-text-success)",padding:"3px 10px",borderRadius:"var(--border-radius-md)",fontWeight:500}}>💵 Blue ${fmt(blue)}</span>}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:"1.5rem"}}>
         {[
@@ -1221,9 +1253,9 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro}){
           {l:"Mi 30% disponible",v:fmtUSD(pendienteRetiro),green:pendienteRetiro>0},
           {l:"Stock total",v:fmt(Object.values(stockUni).reduce((a,v)=>a+v,0))},
         ].map(x=>(
-          <div key={x.l} style={{background:x.green?"#E1F5EE":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.75rem"}}>
-            <div style={{fontSize:11,color:x.green?"#0F6E56":"var(--color-text-secondary)",marginBottom:2}}>{x.l}</div>
-            <div style={{fontSize:15,fontWeight:500,color:x.green?"#0F6E56":"var(--color-text-primary)"}}>{x.v}</div>
+          <div key={x.l} style={{background:x.green?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.75rem"}}>
+            <div style={{fontSize:11,color:x.green?"var(--color-text-success)":"var(--color-text-secondary)",marginBottom:2}}>{x.l}</div>
+            <div style={{fontSize:15,fontWeight:500,color:x.green?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
           </div>
         ))}
       </div>
@@ -1240,15 +1272,15 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro}){
               <div key={c.id} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 1rem"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?6:0}}>
                   <span style={{fontWeight:500,fontSize:13}}>{c.nombre}</span>
-                  <span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:enG?"#E1F5EE":costo===0?"var(--color-background-secondary)":"#FAEEDA",color:enG?"#0F6E56":costo===0?"var(--color-text-secondary)":"#854F0B"}}>
+                  <span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:enG?"var(--color-background-success)":costo===0?"var(--color-background-secondary)":"var(--color-background-warning)",color:enG?"var(--color-text-success)":costo===0?"var(--color-text-secondary)":"var(--color-text-warning)"}}>
                     {costo===0?"Sin costo":enG?"✓ Mi 30%: "+fmtUSD((cobUSD-costo)*0.3):fmtPct(pct)+" cobrado"}
                   </span>
                 </div>
                 {costo>0&&(<>
-                  <div style={{height:5,background:"var(--color-background-secondary)",borderRadius:3,overflow:"hidden",marginBottom:5}}><div style={{height:"100%",width:pct+"%",background:enG?"#1D9E75":"#378ADD",borderRadius:3}}/></div>
+                  <div style={{height:5,background:"var(--color-background-secondary)",borderRadius:3,overflow:"hidden",marginBottom:5}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:3}}/></div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}>
                     <span>Cobrado: {fmtUSD(cobUSD)}</span><span>Costo: {fmtUSD(costo)}</span>
-                    {!enG&&<span style={{color:"#854F0B"}}>Faltan: {fmtUSD(costo-cobUSD)}</span>}
+                    {!enG&&<span style={{color:"var(--color-text-warning)"}}>Faltan: {fmtUSD(costo-cobUSD)}</span>}
                   </div>
                 </>)}
               </div>
@@ -1288,9 +1320,12 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
           return(<div key={c.id} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 1rem",cursor:"pointer"}} onClick={()=>{setContSel(c);setContTab("armado");}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?6:0}}>
               <div><div style={{fontWeight:500,fontSize:14}}>{c.nombre}</div><div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:1}}>{(c.articulos||[]).length+" artículos"}</div></div>
-              <span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:enG?"#E1F5EE":costo===0?"var(--color-background-secondary)":"#FAEEDA",color:enG?"#0F6E56":costo===0?"var(--color-text-secondary)":"#854F0B"}}>{costo===0?"Sin costo":enG?"✓ Ganancia":fmtPct(pct)}</span>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:enG?"var(--color-background-success)":costo===0?"var(--color-background-secondary)":"var(--color-background-warning)",color:enG?"var(--color-text-success)":costo===0?"var(--color-text-secondary)":"var(--color-text-warning)"}}>{costo===0?"Sin costo":enG?"✓ Ganancia":fmtPct(pct)}</span>
+                <button onClick={e=>{e.stopPropagation();if(window.confirm("¿Borrar '"+c.nombre+"'? Se eliminarán también sus ventas.")){save({...data,contenedores:data.contenedores.filter(x=>x.id!==c.id),ventas:(data.ventas||[]).filter(v=>v.contId!==c.id)});showToast("Contenedor eliminado");}}} style={{fontSize:11,padding:"3px 8px",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-danger)",background:"var(--color-background-danger)",color:"var(--color-text-danger)",flexShrink:0}}>Borrar</button>
+              </div>
             </div>
-            {costo>0&&(<><div style={{height:4,background:"var(--color-background-secondary)",borderRadius:2,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",width:pct+"%",background:enG?"#1D9E75":"#378ADD",borderRadius:2}}/></div><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}><span>{fmtPct(pct)+" cobrado"}</span>{!enG&&<span style={{color:"#854F0B",fontWeight:500}}>{"Faltan "+fmtUSD(costo-cobUSD)}</span>}</div></>)}
+            {costo>0&&(<><div style={{height:4,background:"var(--color-background-secondary)",borderRadius:2,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:2}}/></div><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}><span>{fmtPct(pct)+" cobrado"}</span>{!enG&&<span style={{color:"var(--color-text-warning)",fontWeight:500}}>{"Faltan "+fmtUSD(costo-cobUSD)}</span>}</div></>)}
           </div>);
         })}
       </div>
@@ -1356,7 +1391,7 @@ function TabArmado({cont,updateCont,showToast}){
       </div>
       <div style={{marginBottom:"1rem"}}>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)",marginBottom:3}}><span>Uso del contenedor</span><span>{fmtPct(pctPeso)}</span></div>
-        <div style={{height:6,background:"var(--color-background-secondary)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:pctPeso+"%",background:pctPeso>95?"#E24B4A":"#378ADD",borderRadius:3}}/></div>
+        <div style={{height:6,background:"var(--color-background-secondary)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:pctPeso+"%",background:pctPeso>95?"var(--color-border-danger)":"var(--color-border-info)",borderRadius:3}}/></div>
       </div>
       <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>{editId?"Editar artículo":"Agregar artículo"}</p>
@@ -1406,7 +1441,7 @@ function TabCostos({cont,updateCont,showToast,blue}){
   const campos=[{k:"despacho",l:"Despacho ($ARS)"},{k:"naviera",l:"Naviera ($ARS)"},{k:"despachante",l:"Despachante (USD)"},{k:"losPrincipes",l:"Los Príncipes ($ARS)"},{k:"deposito",l:"Depósito ($ARS)"},{k:"terminal",l:"Terminal ($ARS)"},{k:"otros",l:"Otros (USD)"}];
   return(
     <div>
-      {blue&&<div style={{background:"#E1F5EE",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:"1rem",fontSize:12,color:"#0F6E56"}}>💵 Blue en tiempo real: ${fmt(blue)}</div>}
+      {blue&&<div style={{background:"var(--color-background-success)",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:"1rem",fontSize:12,color:"var(--color-text-success)"}}>💵 Blue en tiempo real: ${fmt(blue)}</div>}
       <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Tipo de cambio Blue ($/USD)</label><input type="number" value={form.tipoCambio} onChange={e=>setForm({...form,tipoCambio:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
@@ -1463,21 +1498,21 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
     <div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:"1rem"}}>
         {[{l:"Cobrado",v:fmtUSD(cobUSD)},{l:"Costo",v:costo>0?fmtUSD(costo):"—"},{l:"Mi 30%",v:fmtUSD(Math.max(0,cobUSD-costo)*0.3),g:enG}].map(x=>(
-          <div key={x.l} style={{background:x.g?"#E1F5EE":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.6rem"}}>
-            <div style={{fontSize:11,color:x.g?"#0F6E56":"var(--color-text-secondary)"}}>{x.l}</div>
-            <div style={{fontSize:13,fontWeight:500,color:x.g?"#0F6E56":"var(--color-text-primary)"}}>{x.v}</div>
+          <div key={x.l} style={{background:x.g?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.6rem"}}>
+            <div style={{fontSize:11,color:x.g?"var(--color-text-success)":"var(--color-text-secondary)"}}>{x.l}</div>
+            <div style={{fontSize:13,fontWeight:500,color:x.g?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
           </div>
         ))}
       </div>
-      {!enG&&costo>0&&<div style={{background:"#FAEEDA",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:"1rem",fontSize:12,color:"#854F0B"}}>Faltan {fmtUSD(costo-cobUSD)} cobrados para recuperar</div>}
+      {!enG&&costo>0&&<div style={{background:"var(--color-background-warning)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:"1rem",fontSize:12,color:"var(--color-text-warning)"}}>Faltan {fmtUSD(costo-cobUSD)} cobrados para recuperar</div>}
       {estimacion&&(
         <div style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px",marginBottom:"1rem"}}>
           <p style={{fontSize:12,fontWeight:500,margin:"0 0 8px",color:"var(--color-text-secondary)"}}>📊 Proyección si se vende el stock restante (precio promedio último mes)</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
             {[{l:"Stock restante est.",v:fmtUSD(estimacion.stockRestUSD)},{l:"Ganancia estimada",v:fmtUSD(estimacion.ganFutura)},{l:"Mi 30% estimado",v:fmtUSD(estimacion.mi30Fut),g:true}].map(x=>(
-              <div key={x.l} style={{background:x.g?"#E1F5EE":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.5rem"}}>
-                <div style={{fontSize:10,color:x.g?"#0F6E56":"var(--color-text-secondary)"}}>{x.l}</div>
-                <div style={{fontSize:12,fontWeight:500,color:x.g?"#0F6E56":"var(--color-text-primary)"}}>{x.v}</div>
+              <div key={x.l} style={{background:x.g?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.5rem"}}>
+                <div style={{fontSize:10,color:x.g?"var(--color-text-success)":"var(--color-text-secondary)"}}>{x.l}</div>
+                <div style={{fontSize:12,fontWeight:500,color:x.g?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
               </div>
             ))}
           </div>
@@ -1509,7 +1544,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
                 <td style={{padding:"5px 7px"}}>{v.articulo}</td><td style={{padding:"5px 7px"}}>{v.cantidad}</td>
                 <td style={{padding:"5px 7px"}}>{v.cliente}</td>
                 <td style={{padding:"5px 7px",color:"var(--color-text-secondary)"}}>${fmt(v.total)}</td>
-                <td style={{padding:"5px 7px",color:saldo>0?"#854F0B":saldo<0?"#185FA5":"#0F6E56",fontSize:10,whiteSpace:"nowrap"}}>{saldo>0?"Debe $"+fmt(saldo):saldo<0?"Favor $"+fmt(Math.abs(saldo)):"✓"}</td>
+                <td style={{padding:"5px 7px",color:saldo>0?"var(--color-text-warning)":saldo<0?"var(--color-text-info)":"var(--color-text-success)",fontSize:10,whiteSpace:"nowrap"}}>{saldo>0?"Debe $"+fmt(saldo):saldo<0?"Favor $"+fmt(Math.abs(saldo)):"✓"}</td>
                 <td style={{padding:"5px 7px"}}><select value={v.estado||"Retirado"} onChange={e=>actualizarEstado(v.id,e.target.value)} style={{fontSize:10,padding:"2px 4px",borderRadius:4}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select></td>
                 <td style={{padding:"5px 7px"}}><button onClick={()=>eliminar(v.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:12}}>✕</button></td>
               </tr>);
@@ -1598,7 +1633,7 @@ function CuentasView({data,save,showToast}){
         <label style={{fontSize:12,color:"var(--color-text-secondary)"}}>Monto recibido ($)</label>
         <input type="number" value={monto} onChange={e=>setMonto(e.target.value)} autoFocus style={{width:"100%",marginTop:4,marginBottom:12,boxSizing:"border-box"}}/>
         <div style={{display:"flex",gap:8}}>
-          <button onClick={registrar} style={{flex:1,fontSize:13,padding:"8px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"#1D9E75",color:"#fff",fontWeight:500}}>Registrar</button>
+          <button onClick={registrar} style={{flex:1,fontSize:13,padding:"8px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-success)",color:"var(--color-background-primary)",fontWeight:500}}>Registrar</button>
           <button onClick={()=>{setModal(null);setMonto("");}} style={{fontSize:13,padding:"8px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"transparent",color:"var(--color-text-secondary)"}}>Cancelar</button>
         </div>
       </div>
@@ -1610,15 +1645,15 @@ function CuentasView({data,save,showToast}){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
               <span style={{fontWeight:500,fontSize:14}}>{cliente}</span>
               <div style={{display:"flex",gap:6}}>
-                {info.debe>0&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:"#FCEBEB",color:"#A32D2D"}}>Debe ${fmt(info.debe)}</span>}
-                {info.favor>0&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:"#E6F1FB",color:"#185FA5"}}>Favor ${fmt(info.favor)}</span>}
+                {info.debe>0&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:"var(--color-background-danger)",color:"var(--color-text-danger)"}}>Debe ${fmt(info.debe)}</span>}
+                {info.favor>0&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:"var(--color-background-info)",color:"var(--color-text-info)"}}>Favor ${fmt(info.favor)}</span>}
               </div>
             </div>
             {info.ventas.filter(v=>v.saldo!==0).map(v=>(
               <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderTop:"0.5px solid var(--color-border-tertiary)",fontSize:12}}>
                 <span style={{color:"var(--color-text-secondary)"}}>{v.fecha+" · "+v.articulo+" ×"+v.cantidad}</span>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{color:v.saldo>0?"#A32D2D":"#185FA5",fontWeight:500,fontSize:11}}>{v.saldo>0?"Debe $"+fmt(v.saldo):"Favor $"+fmt(Math.abs(v.saldo))}</span>
+                  <span style={{color:v.saldo>0?"var(--color-text-danger)":"var(--color-text-info)",fontWeight:500,fontSize:11}}>{v.saldo>0?"Debe $"+fmt(v.saldo):"Favor $"+fmt(Math.abs(v.saldo))}</span>
                   {v.saldo>0&&<button onClick={()=>setModal({ventaId:v.id,cliente})} style={{fontSize:10,padding:"3px 8px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>+ Pago</button>}
                 </div>
               </div>
@@ -1648,7 +1683,7 @@ function ExtractoView({data}){
       <div style={{display:"grid",gap:6}}>
         {filtrados.map((m,i)=>{
           const cont=m.contId?(data.contenedores||[]).find(c=>c.id===m.contId):null;
-          const color=m.tipo==="Retiro 30%"?"#854F0B":m.tipo==="Pago posterior"?"#185FA5":"#0F6E56";
+          const color=m.tipo==="Retiro 30%"?"var(--color-text-warning)":m.tipo==="Pago posterior"?"var(--color-text-info)":"var(--color-text-success)";
           return(<div key={i} style={{background:"var(--color-background-primary)",border:"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"10px 1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
               <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
@@ -1659,8 +1694,8 @@ function ExtractoView({data}){
               <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{m.detalle+(cont?" · "+cont.nombre:"")}</div>
             </div>
             <div style={{textAlign:"right"}}>
-              {m.monto>0&&<div style={{fontSize:15,fontWeight:500,color:"#0F6E56"}}>${fmt(m.monto)}</div>}
-              {m.montoUSD>0&&<div style={{fontSize:13,color:"#854F0B",fontWeight:500}}>{fmtUSD(m.montoUSD)}</div>}
+              {m.monto>0&&<div style={{fontSize:15,fontWeight:500,color:"var(--color-text-success)"}}>${fmt(m.monto)}</div>}
+              {m.montoUSD>0&&<div style={{fontSize:13,color:"var(--color-text-warning)",fontWeight:500}}>{fmtUSD(m.montoUSD)}</div>}
             </div>
           </div>);
         })}
@@ -1690,9 +1725,9 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
         {l:"Disponible (USD)",v:fmtUSD(pendienteRetiro),g:pendienteRetiro>0},
         {l:"Disponible ($ARS)",v:"$"+fmt(pendienteRetiro*tcActual),g:pendienteRetiro>0},
       ].map(x=>(
-        <div key={x.l} style={{background:x.g?"#E1F5EE":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.75rem"}}>
-          <div style={{fontSize:11,color:x.g?"#0F6E56":"var(--color-text-secondary)",marginBottom:2}}>{x.l}</div>
-          <div style={{fontSize:15,fontWeight:500,color:x.g?"#0F6E56":"var(--color-text-primary)"}}>{x.v}</div>
+        <div key={x.l} style={{background:x.g?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.75rem"}}>
+          <div style={{fontSize:11,color:x.g?"var(--color-text-success)":"var(--color-text-secondary)",marginBottom:2}}>{x.l}</div>
+          <div style={{fontSize:15,fontWeight:500,color:x.g?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
         </div>
       ))}
     </div>
@@ -1706,7 +1741,7 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
         <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Nota (opcional)</label><input value={form.nota} onChange={e=>setForm({...form,nota:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
       </div>
       {form.monto>0&&<div style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"8px 10px",marginBottom:10,fontSize:12,color:"var(--color-text-secondary)"}}>{form.moneda==="ARS"?"Equivale a "+fmtUSD(montoEnUSD)+" al TC $"+fmt(form.tcRetiro||tcActual):"Equivale a $"+fmt(montoEnUSD*tcActual)+" ARS al blue $"+fmt(tcActual)}</div>}
-      <button onClick={registrar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"#1D9E75",color:"#fff",fontWeight:500}}>Registrar retiro</button>
+      <button onClick={registrar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-success)",color:"var(--color-background-primary)",fontWeight:500}}>Registrar retiro</button>
     </div>
     {retiros.length>0&&(<div>
       <p style={{fontSize:13,fontWeight:500,marginBottom:8}}>Historial de retiros</p>
@@ -1717,7 +1752,10 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
               <div style={{fontSize:13,fontWeight:500}}>{fmtUSD(r.montoUSD)}{r.montoPesos?" ($"+fmt(r.montoPesos)+" ARS)":""}</div>
               <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{r.fecha+(r.nota?" · "+r.nota:"")+(r.tcRetiro?" · TC $"+fmt(r.tcRetiro):"")}</div>
             </div>
-            <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>${fmt(r.montoUSD*tcActual)} ARS</div>
+            <div style={{display:"flex",gap:10,alignItems:"center"}}>
+              <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>${fmt(r.montoUSD*tcActual)} ARS</div>
+              <button onClick={()=>{if(confirm("¿Borrar este retiro?"))save({...data,retiros:data.retiros.filter(x=>x.id!==r.id)});}} style={{fontSize:12,border:"none",background:"none",color:"var(--color-text-danger)",cursor:"pointer"}}>✕</button>
+            </div>
           </div>
         ))}
       </div>
@@ -1750,7 +1788,7 @@ function DespachosView({data,save,showToast}){
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
       <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Despachos</h2>
       <div style={{display:"flex",gap:6}}>
-        {pendientes.length>0&&<button onClick={imprimirTodosPendientes} style={{fontSize:11,padding:"6px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"#378ADD",color:"#fff",fontWeight:500}}>🖨️ Imprimir {pendientes.length} pendientes</button>}
+        {pendientes.length>0&&<button onClick={imprimirTodosPendientes} style={{fontSize:11,padding:"6px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-border-info)",color:"var(--color-background-primary)",fontWeight:500}}>🖨️ Imprimir {pendientes.length} pendientes</button>}
         <button onClick={()=>setManual(true)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>+ Manual</button>
       </div>
     </div>
@@ -1766,7 +1804,7 @@ function DespachosView({data,save,showToast}){
         <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículos</label><input value={form.articulos} onChange={e=>setForm({...form,articulos:e.target.value})} placeholder="Ej: 30GR x5, 61GR x2" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
       </div>
       <div style={{display:"flex",gap:8}}>
-        <button onClick={agregarManual} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"#1D9E75",color:"#fff",fontWeight:500}}>Agregar</button>
+        <button onClick={agregarManual} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-success)",color:"var(--color-background-primary)",fontWeight:500}}>Agregar</button>
         <button onClick={()=>setManual(false)} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"transparent",color:"var(--color-text-secondary)"}}>Cancelar</button>
       </div>
     </div>)}
@@ -1792,7 +1830,6 @@ function DespachosView({data,save,showToast}){
     )}
   </div>);
 }
-
   </script>
 
   <!-- Compilar y montar -->
