@@ -203,8 +203,13 @@
       const val = input.value.trim();
       const target = CREDS[val];
       if(target){
-        // Set session token
-        sessionStorage.setItem(SESSION_KEY, TOKENS[target]);
+        // Set auth token with 24h expiry
+        const authData = JSON.stringify({token: TOKENS[target], exp: Date.now() + 86400000});
+        localStorage.setItem(SESSION_KEY, authData);
+        // If logging in as main system, also grant status access
+        if(target === "index.html"){
+          localStorage.setItem("eliel_status_session", JSON.stringify({token:"ELstat_4nTwJvKs", exp: Date.now() + 86400000}));
+        }
         showSuccess(target);
       } else {
         showError();
