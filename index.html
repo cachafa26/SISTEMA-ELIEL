@@ -180,13 +180,56 @@
     }
     [data-theme="light"]{
       --bg-base:#F0F2F5;
+      --bg-elevated:rgba(255,255,255,0.72);
       --bg-card:rgba(255,255,255,0.65);
+      --bg-card-hover:rgba(255,255,255,0.85);
+      --bg-input:rgba(255,255,255,0.8);
+      --bg-nav:rgba(255,255,255,0.78);
+      --bg-modal:rgba(255,255,255,0.92);
+      --bg-tint-green:rgba(91,173,65,0.12);
+      --bg-tint-orange:rgba(244,121,32,0.12);
+      --bg-tint-blue:rgba(46,134,193,0.12);
+      --bg-tint-red:rgba(220,53,69,0.10);
+      --bg-tint-amber:rgba(255,149,0,0.12);
+      --glass-border:rgba(255,255,255,0.55);
+      --glass-shadow:0 8px 32px rgba(0,0,0,0.10),0 1.5px 0 rgba(255,255,255,0.7) inset;
+      --glass-shadow-sm:0 2px 12px rgba(0,0,0,0.07),0 1px 0 rgba(255,255,255,0.6) inset;
+      --glass-shadow-lg:0 20px 60px rgba(0,0,0,0.14),0 1.5px 0 rgba(255,255,255,0.65) inset;
       --text-primary:#1C1C1E;
       --text-secondary:#636366;
+      --text-tertiary:#AEAEB2;
+      --text-success:#1A7F3C;
+      --text-warning:#B25000;
+      --text-danger:#C0392B;
+      --text-info:#1A5FA5;
+      --border-sm:0.5px solid rgba(0,0,0,0.10);
+      --border-md:0.5px solid rgba(0,0,0,0.16);
+      --border-card:0.5px solid rgba(255,255,255,0.8);
+      --border-input:0.5px solid rgba(0,0,0,0.18);
+      --border-focus:rgba(46,134,193,0.6);
+      --border-success:rgba(91,173,65,0.4);
+      --border-danger:rgba(192,57,43,0.3);
       --color-background-primary:rgba(255,255,255,0.65);
       --color-background-secondary:rgba(240,242,245,0.8);
+      --color-background-tertiary:#F0F2F5;
+      --color-background-success:rgba(91,173,65,0.12);
+      --color-background-warning:rgba(255,149,0,0.12);
+      --color-background-danger:rgba(220,53,69,0.10);
+      --color-background-info:rgba(46,134,193,0.12);
       --color-text-primary:#1C1C1E;
       --color-text-secondary:#636366;
+      --color-text-tertiary:#AEAEB2;
+      --color-text-success:#1A7F3C;
+      --color-text-warning:#B25000;
+      --color-text-danger:#C0392B;
+      --color-text-info:#1A5FA5;
+      --color-border-tertiary:rgba(0,0,0,0.08);
+      --color-border-secondary:rgba(0,0,0,0.14);
+      --color-border-primary:rgba(0,0,0,0.28);
+      --color-border-success:rgba(91,173,65,0.4);
+      --color-border-danger:rgba(192,57,43,0.3);
+      --color-border-info:rgba(46,134,193,0.4);
+      --color-border-warning:rgba(178,80,0,0.3);
     }
 
     /* ── GLOBAL AMBIENT BACKGROUND ──────────────────────────────────── */
@@ -457,6 +500,8 @@
     onerror="showErr('No se pudo cargar Firestore.')"></script>
 
   <script>
+    // Set theme immediately to prevent flash
+    (function(){var t=localStorage.getItem("eliel_theme")||"light";document.documentElement.setAttribute("data-theme",t);})();
     setMsg("Conectando a Firebase…");
     try{
       firebase.initializeApp({
@@ -668,11 +713,9 @@ function App(){
   const [blue,setBlue]=useState(null);
   const [showPedido,setShowPedido]=useState(false);
   const [theme,setTheme]=useState(()=>localStorage.getItem("eliel_theme")||"light");
-  const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("eliel_theme",n);return n;});
+  const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("eliel_theme",n);document.documentElement.setAttribute("data-theme",n);return n;});
   useEffect(()=>{
-    const root=document.documentElement;
-    if(theme==="dark"){root.setAttribute("data-theme","dark");}
-    else{root.removeAttribute("data-theme");}
+    document.documentElement.setAttribute("data-theme",theme);
   },[theme]);
 
   const [fbReady, setFbReady] = useState(false);
