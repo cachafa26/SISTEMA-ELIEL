@@ -497,6 +497,17 @@
 </style>
 </head>
 <body>
+  <!-- Session guard -->
+  <script>
+    (function(){
+      var SESSION_KEY = "eliel_session";
+      var VALID_TOKENS = ["ELsys_7x9k2mQpR","ELstat_4nTwJvKs"];
+      var tok = sessionStorage.getItem(SESSION_KEY);
+      if(!tok || !VALID_TOKENS.includes(tok)){
+        window.location.replace("login.html");
+      }
+    })();
+  </script>
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Status Super Coating</div>
