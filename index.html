@@ -1262,8 +1262,8 @@ function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady,logou
           <span style={{fontSize:8,fontWeight:700,color:fbReady?"var(--text-success)":"var(--text-warning)"}}>{fbReady?"●":"⚠"}</span>
           <span style={{fontSize:9,color:"var(--text-secondary)"}}>{fbReady?"sync":"local"}</span>
         </div>
-        <button onClick={logout} style={{display:"flex",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",padding:"3px 8px",borderRadius:8,color:"var(--text-secondary)"}}>
-          <span style={{fontSize:14}}>⏻</span><span style={{fontSize:9,fontWeight:500,color:"var(--text-secondary)"}}>Salir</span>
+        <button onClick={logout} style={{display:"flex",alignItems:"center",gap:4,background:"var(--bg-tint-red)",border:"0.5px solid var(--border-danger)",cursor:"pointer",padding:"3px 10px",borderRadius:20,color:"var(--text-danger)"}}>
+          <span style={{fontSize:12}}>↩</span><span style={{fontSize:9,fontWeight:600,color:"var(--text-danger)"}}>Salir</span>
         </button>
       </div>
     </div>
@@ -1649,6 +1649,17 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
       });
 
       const result = await response.json();
+      console.log("API response status:", response.status, "body:", JSON.stringify(result).slice(0,200));
+      if(result.error){
+        const errMsg = result.error.message||JSON.stringify(result.error);
+        // Check if it's an auth error (no key configured)
+        if(result.error.type==="authentication_error"||response.status===401){
+          setMsgs(m=>[...m,{role:"assistant",content:"⚠ API key inválida o no configurada. Abrí el chat 🤖, tocá el engranaje ⚙ para ingresar tu key de Anthropic."}]);
+          setLoading(false); return;
+        }
+        setMsgs(m=>[...m,{role:"assistant",content:"Error de API: "+errMsg}]);
+        setLoading(false); return;
+      }
       const reply = result.content?.[0]?.text||"Sin respuesta";
 
       // Try to extract JSON action from reply
@@ -1689,6 +1700,11 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
           <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)",letterSpacing:"-.01em"}}>Asistente IA</div>
           <div style={{fontSize:11,color:ANTHROPIC_KEY?"var(--text-success)":"var(--text-warning)",fontWeight:500}}>{ANTHROPIC_KEY?"● Conectado · Claude Sonnet":"⚠ Sin API key configurada"}</div>
         </div>
+        <button onClick={()=>{
+          const k=window.prompt("Ingresá tu API key de Anthropic:","");
+          if(k&&k.startsWith("sk-ant-")){localStorage.setItem("eliel_ai_key",k);window.location.reload();}
+          else if(k){alert("Key inválida. Debe empezar con sk-ant-");}
+        }} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",color:"var(--text-secondary)",marginRight:4}} title="Cambiar API key">⚙</button>
         <button onClick={onClose} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",color:"var(--text-secondary)"}}>✕</button>
       </div>
 
