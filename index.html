@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.0.2 · 2026-06-16 -->
+  <!-- v2.1.0 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.0.2</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.1.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1024,7 +1024,7 @@ function abrirPDF(htmlContent){
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.0.2";
+const APP_VERSION = "v2.1.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1732,6 +1732,9 @@ Para cargar un PEDIDO:
 Para cargar EVENTO DJ:
 {"action":"CARGAR_EVENTO_DJ","data":{"nombre":"nombre evento","fecha":"YYYY-MM-DD","estado":"Confirmado","monedaCobro":"USD","cobro":N,"monedaCosto":"ARS","costo":N,"sena":0,"notas":""}}
 
+Para PAGO de evento DJ (cuando el cliente paga):
+{"action":"REGISTRAR_PAGO_DJ","data":{"cliente":"nombre","monto":N,"moneda":"USD","concepto":"Seña","fecha":"YYYY-MM-DD","nota":""}}
+
 Para RETIRO Mi30:
 {"action":"CARGAR_RETIRO","data":{"moneda":"ARS","monto":N,"tcRetiro":TC,"nota":"","fecha":"YYYY-MM-DD"}}
 
@@ -1843,6 +1846,22 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         showToast("✓ Evento DJ cargado");
         setPendingAction(null);
       }
+      else if(action.action==="REGISTRAR_PAGO_DJ"){
+        const d=action.data;
+        const tc2=blue||1450;
+        const ev=eventos.find(e=>e.cliente?.toLowerCase().includes((d.cliente||'').toLowerCase())||e.nombre?.toLowerCase().includes((d.cliente||'').toLowerCase()));
+        if(!ev){showToast("No encontré el evento de "+d.cliente);setPendingAction(null);return;}
+        const montoN=Number(d.monto||0);
+        const montoUSD=d.moneda==="ARS"?montoN/tc2:montoN;
+        const pagos=[...(ev.pagos||[]),{id:Date.now().toString(),fecha:d.fecha||hoy(),concepto:d.concepto||"Pago",monto:montoN,moneda:d.moneda||"USD",montoUSD,nota:d.nota||""}];
+        const totalPagadoUSD=pagos.reduce((a,p)=>a+p.montoUSD,0);
+        const nuevoSaldo=Math.max(0,Number(ev.cobroUSD||0)-totalPagadoUSD);
+        const nuevoEstado=nuevoSaldo<=0?"Realizado":totalPagadoUSD>0?"Señado":ev.estado;
+        const nuevosEventos=eventos.map(e=>e.id===ev.id?{...e,pagos,saldo:nuevoSaldo,senaUSD:totalPagadoUSD,estado:nuevoEstado}:e);
+        save({...data,dj:{...data.dj,eventos:nuevosEventos}});
+        showToast("✓ Pago registrado en "+ev.nombre);
+        setPendingAction(null);
+      }
       else if(action.action==="CARGAR_RETIRO"){
         const montoN = Number(d.monto||0);
         const tcR = Number(d.tcRetiro||tc);
@@ -1929,37 +1948,113 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           creadoEn:new Date().toISOString(),
           pdfData:null, // will be set after generation
         };
-        // Generate PDF locally
-        const serviciosParaHTML = nuevoPres.conTecnica
-          ? window.obtenerServiciosPaquete(nuevoPres.paquete)
-          : [
-              ["Realización de timing","Planificación y armado del cronograma del evento"],
-              ["Servicio de DJ","Musicalización completa y dirección artística"],
-              ["Coordinación general","Conducción integral del flujo del evento"],
-              ["Comunicación por handies UHF","Canal interno exclusivo para el equipo de trabajo"],
-              ["Reunión técnica previa","Encuentro de planificación y alineación de detalles"],
-            ];
-        const pdfData = {
-          cliente: d.cliente, tipoEvento: d.tipoEvento, fecha: d.fecha,
-          salon: d.salon, invitados: d.invitados||null,
-          servicios: serviciosParaHTML,
-          seccionTecnicaDesde: nuevoPres.conTecnica?5:null,
-          precio: d.precio_str||String(d.precio),
-          notaPrecio: nuevoPres.conTecnica?null:"* Sin técnica incluida",
-          opcionales: d.opcionales||[],
-          descuentoPagoTotal: "10%",
-          numeroDoc: numDoc,
-        };
-        let pdfHtml = "";
-        try{
-          pdfHtml = window.generarPresupuestoHTML(pdfData, blue);
-        }catch(pdfErr){
-          console.error("PDF gen failed:",pdfErr);
-          showToast("Error generando PDF: "+pdfErr.message);
-        }
+        // Generate PDF inline - no external function dependency
+        const _meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        const _hoy=new Date();
+        const _fmtD=dt=>dt.getDate()+' de '+_meses[dt.getMonth()]+' de '+dt.getFullYear();
+        const _venc=new Date(_hoy); _venc.setDate(_venc.getDate()+15);
+        const _precio=d.precio_str||String(d.precio);
+        const _conTec=d.conTecnica||false;
+        const _svcs=_conTec?[
+          ["Dirección artística y servicio de DJ","Musicalización completa, selección musical personalizada y conducción artística del evento"],
+          ["Coordinación general","Conducción integral del flujo del evento y gestión del equipo en piso"],
+          ["Realización de timing","Planificación, armado y seguimiento del cronograma del evento"],
+          ["Reunión técnica previa","Encuentro de planificación y alineación de detalles logísticos y artísticos"],
+          ["Comunicación por handies UHF","Canal interno exclusivo para coordinación del equipo de trabajo"],
+          ["Confección de plano técnico","Relevamiento y diseño del plano técnico del salón"],
+          ["Flete, armado, desarmado y seguros","Traslado integral del equipamiento, montaje y desmontaje completo"],
+          ["Sistema de sonido Line Array Hi-Fi","Sistema de sonido principal de alta fidelidad con cobertura Line Array"],
+          ["Refuerzo de sonido perimetral","Sistemas de audio perimetrales para cobertura uniforme"],
+          ["Sonido en área de recepción","Sistema de audio independiente para la recepción de invitados"],
+          ["Monitoreo de DJ","Sistema de monitoreo profesional en cabina"],
+          ["Iluminación perimetral de salón","Iluminación arquitectónica perimetral en salón principal"],
+          ["Iluminación perimetral en recepción","Iluminación ambiental perimetral en área de recepción"],
+          [(d.paquete==="basica_icon"?"20":"10")+" cabezales robóticos móviles","Cabezales de movimiento robotizados para efectos dinámicos"],
+          ["18 bolas espejadas","Esfera de espejos con iluminación puntual para efecto visual en pista"],
+          ["Máquina de humo","Generador de humo de baja densidad para complemento de efectos lumínicos"],
+          ["Pista de baile de acero pulido "+(d.paquete==="basica_icon"?"9,6×9,6":"8×8")+" m","Pista de baile premium en acero pulido"],
+          ["Cabina con pantalla LED "+(d.paquete==="basica_icon"?"5×3":"4×2")+" m","Cabina de DJ con pantalla LED central y panel frontal LED"],
+          ["Pines direccionales de mesas","Señalización lumínica direccional para identificación de mesas"],
+          ["Operador de sonido y VJ","Operador técnico de sonido en vivo y videojockey"],
+        ]:[
+          ["Realización de timing","Planificación y armado del cronograma del evento"],
+          ["Servicio de DJ","Musicalización completa y dirección artística"],
+          ["Coordinación general","Conducción integral del flujo del evento"],
+          ["Comunicación por handies UHF","Canal interno exclusivo para el equipo de trabajo"],
+          ["Reunión técnica previa","Encuentro de planificación y alineación de detalles"],
+        ];
+        let _svcsRows="";
+        _svcs.forEach((s,i)=>{
+          if(_conTec&&i===5) _svcsRows+='<tr><td colspan="2"><div style="font-size:7.5px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin:14px 0 8px">EQUIPAMIENTO TÉCNICO</div></td></tr>';
+          _svcsRows+='<tr style="border-bottom:0.5px solid rgba(255,255,255,0.06)"><td style="width:22px;padding:7px 10px 7px 0;vertical-align:top"><div style="width:15px;height:15px;background:linear-gradient(135deg,#C9A84C,#9A7028);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#080810;font-weight:900">✓</div></td><td style="padding:7px 0;vertical-align:top"><div style="font-size:9.5px;font-weight:700;color:#fff">'+s[0]+'</div><div style="font-size:8px;color:#9090A8;margin-top:2px">'+s[1]+'</div></td></tr>';
+        });
+        let _optsHtml="";
+        (d.opcionales||[]).forEach(opt=>{
+          const n=opt[0]||opt.nombre||"",desc=opt[1]||opt.descripcion||"",p=opt[2]||opt.precio||"";
+          _optsHtml+='<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 13px;background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.14);border-radius:7px;margin-bottom:6px"><div style="display:flex;gap:9px;align-items:flex-start;flex:1"><div style="width:5px;height:5px;background:#C9A84C;border-radius:50%;margin-top:4px;flex-shrink:0"></div><div><div style="font-size:10px;font-weight:700;color:#fff;margin-bottom:2px">'+n+'</div><div style="font-size:8px;color:#9090A8">'+desc+'</div></div></div><div style="font-size:10px;font-weight:700;color:#C9A84C;white-space:nowrap;margin-left:12px">'+p+'</div></div>';
+        });
+        const _invRow=d.invitados?'<tr><td style="font-size:8px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;padding:10px 16px;width:160px">Invitados</td><td style="font-size:11px;font-weight:700;color:#fff;padding:10px 16px">'+d.invitados+'</td></tr>':"";
+        const _notaP=_conTec?"":'<div style="font-size:8px;color:#9090A8;font-style:italic;margin-top:8px">* Sin técnica incluida</div>';
+        const _descP='<div style="padding:11px 15px;border-radius:7px;margin-bottom:7px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07)"><div style="font-size:6.5px;font-weight:700;color:#C9A84C;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px">OPCIÓN 2 · Descuento 10%</div><div style="font-size:10px;font-weight:700;color:#fff;margin-bottom:3px">Pago total anticipado</div><div style="font-size:8.5px;color:#9090A8;line-height:1.5">Abono del total antes del '+_fmtD(_venc)+'. Incluye un 10% de descuento sobre el precio total.</div></div>';
+        const pdfHtml='<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Presupuesto '+numDoc+'</title>'
+          +'<style>@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');'
+          +'*{margin:0;padding:0;box-sizing:border-box}body{background:#080810;color:#fff;font-family:Montserrat,Arial,sans-serif;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+          +'.page{width:794px;min-height:1123px;margin:0 auto;background:#080810}.hl{position:fixed;left:0;right:0;height:1px;background:#C9A84C}'
+          +'table{border-collapse:collapse}@media print{body{background:#080810!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}</style></head><body>'
+          +'<div class="hl" style="top:0"></div><div class="hl" style="bottom:0"></div>'
+          +'<div class="page">'
+          +'<div style="background:linear-gradient(180deg,#0C0C20,#080810);padding:30px 44px 22px;border-bottom:1px solid rgba(201,168,76,0.18)">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+          +'<div><div style="font-size:7px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px">Fecha de emisión</div><div style="font-size:9px;font-weight:700;color:#fff">'+_fmtD(_hoy)+'</div></div>'
+          +'<div style="text-align:center"><svg width="64" height="44" viewBox="0 0 64 44" xmlns="http://www.w3.org/2000/svg"><polygon points="0,44 21,0 32,20 16,44" fill="#C9A84C"/><polygon points="32,20 43,0 64,44 48,44" fill="#E8C97A" opacity="0.9"/></svg>'
+          +'<div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:3px;text-transform:uppercase">ELIEL MIZRAHI <span style="color:#C9A84C">DJ</span></div>'
+          +'<div style="font-size:7px;font-weight:500;color:rgba(201,168,76,0.7);letter-spacing:4px;text-transform:uppercase;margin-top:4px">Buenos Aires, Argentina</div></div>'
+          +'<div style="text-align:right"><div style="font-size:7px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px">Válido hasta</div><div style="font-size:9px;font-weight:700;color:#fff">'+_fmtD(_venc)+'</div></div>'
+          +'</div></div>'
+          +'<div style="background:linear-gradient(135deg,#C9A84C,#E8C97A 38%,#C9A84C 62%,#9A7028);padding:11px 44px;display:flex;justify-content:space-between;align-items:center">'
+          +'<div style="font-size:8.5px;font-weight:700;color:rgba(8,8,16,0.6);letter-spacing:3px;text-transform:uppercase">Presupuesto</div>'
+          +'<div style="font-size:13px;font-weight:800;color:#080810;letter-spacing:2px">'+numDoc+'</div>'
+          +'<div style="font-size:8.5px;font-weight:700;color:rgba(8,8,16,0.6);letter-spacing:3px;text-transform:uppercase">ELIEL MIZRAHI DJ</div>'
+          +'</div>'
+          +'<div style="padding:26px 44px 20px">'
+          +'<div style="font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:7px;border-bottom:0.5px solid rgba(201,168,76,0.22)">Datos del evento</div>'
+          +'<table style="width:100%;margin-bottom:22px;background:rgba(201,168,76,0.03);border:1px solid rgba(201,168,76,0.12);border-radius:8px;overflow:hidden">'
+          +'<tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="font-size:8px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;padding:10px 16px;width:160px">Cliente</td><td style="font-size:11px;font-weight:700;color:#C9A84C;padding:10px 16px">'+d.cliente+'</td></tr>'
+          +'<tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="font-size:8px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;padding:10px 16px">Tipo de evento</td><td style="font-size:11px;font-weight:700;color:#fff;padding:10px 16px">'+d.tipoEvento+'</td></tr>'
+          +'<tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><td style="font-size:8px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;padding:10px 16px">Fecha del evento</td><td style="font-size:11px;font-weight:700;color:#fff;padding:10px 16px">'+d.fecha+'</td></tr>'
+          +'<tr style="border-bottom:'+(_invRow?"1px solid rgba(255,255,255,0.06)":"none")+'"><td style="font-size:8px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;padding:10px 16px">Salón / Venue</td><td style="font-size:11px;font-weight:700;color:#fff;padding:10px 16px">'+d.salon+'</td></tr>'
+          +_invRow
+          +'</table>'
+          +'<div style="font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:7px;border-bottom:0.5px solid rgba(201,168,76,0.22)">Servicios incluidos</div>'
+          +'<table style="width:100%;border-collapse:collapse;margin-bottom:4px">'+_svcsRows+'</table>'
+          +(_optsHtml?'<div style="font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin:18px 0 10px;padding-bottom:7px;border-bottom:0.5px solid rgba(201,168,76,0.22)">Servicios opcionales</div>'+_optsHtml:"")
+          +'<div style="display:flex;justify-content:flex-end;margin:18px 0 22px">'
+          +'<div style="text-align:right;background:linear-gradient(135deg,rgba(201,168,76,0.1),rgba(201,168,76,0.04));border:1px solid rgba(201,168,76,0.32);border-radius:10px;padding:18px 24px 14px;position:relative;min-width:200px">'
+          +'<div style="position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,#C9A84C,transparent)"></div>'
+          +'<div style="font-size:7px;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px">Valor</div>'
+          +'<div style="font-size:12px;font-weight:600;color:#C9A84C">USD</div>'
+          +'<div style="font-size:36px;font-weight:800;color:#E8C97A;line-height:1;letter-spacing:-1px">'+_precio+'</div>'
+          +_notaP+'</div></div>'
+          +'<div style="font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:7px;border-bottom:0.5px solid rgba(201,168,76,0.22)">Condiciones de pago</div>'
+          +'<div style="padding:11px 15px;border-radius:7px;margin-bottom:7px;background:rgba(201,168,76,0.07);border:1px solid rgba(201,168,76,0.22)">'
+          +'<div style="font-size:6.5px;font-weight:700;color:#C9A84C;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px">OPCIÓN 1</div>'
+          +'<div style="font-size:10px;font-weight:700;color:#fff;margin-bottom:3px">Pago en dos cuotas</div>'
+          +'<div style="font-size:8.5px;color:#9090A8;line-height:1.5">50% dentro de los 15 días de recibido el presupuesto. El 50% restante hasta 30 días antes del evento.</div>'
+          +'</div>'+_descP
+          +'<div style="font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin:14px 0 10px;padding-bottom:7px;border-bottom:0.5px solid rgba(201,168,76,0.22)">Términos y condiciones</div>'
+          +'<div style="display:flex;gap:8px;margin-bottom:7px"><div style="font-size:8px;font-weight:700;color:#C9A84C;flex-shrink:0;margin-top:1px">—</div><div style="font-size:8px;color:#9090A8;line-height:1.5">Los precios son válidos hasta el '+_fmtD(_venc)+'. Transcurrida esa fecha podrán actualizarse.</div></div>'
+          +'<div style="display:flex;gap:8px;margin-bottom:7px"><div style="font-size:8px;font-weight:700;color:#C9A84C;flex-shrink:0;margin-top:1px">—</div><div style="font-size:8px;color:#9090A8;line-height:1.5">Las señas abonadas no son reembolsables. En caso de cancelación, el cliente podrá reprogramar la fecha del evento, sujeto a disponibilidad.</div></div>'
+          +'</div>'
+          +'<div style="border-top:0.5px solid rgba(201,168,76,0.18);padding:13px 44px;text-align:center"><div style="font-size:8.5px;color:#9090A8">@ElielMizrahi &nbsp;·&nbsp; <strong style="color:#fff">ELIEL MIZRAHI DJ</strong> &nbsp;·&nbsp; 1153488044 (Eliel)</div></div>'
+          +'</div>'
+          +'<div style="position:fixed;bottom:10px;right:30px;font-size:7px;color:#9090A8">01 / 01</div>'
+          +'</body></html>';
         nuevoPres.pdfHtml = pdfHtml;
-        // Open PDF immediately (before state changes to avoid popup blocker)
-        if(pdfHtml){ window.abrirPDF(pdfHtml); }
+        if(pdfHtml.length > 100){
+          const _w=window.open("","_blank");
+          if(_w){_w.document.open();_w.document.write(pdfHtml);_w.document.close();setTimeout(()=>{try{_w.print();}catch(e){}},1200);}
+          else{showToast("Permitir ventanas emergentes para el PDF");}
+        }
         const nuevosPresupuestos=[...(data.dj?.presupuestos||[]),nuevoPres];
         save({...data,dj:{...data.dj,presupuestos:nuevosPresupuestos}});
         showToast("✓ Presupuesto guardado");
@@ -2858,6 +2953,8 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 
   // Confirmar desde presupuesto: crea evento confirmado
   const [modalConfirmar,setModalConfirmar]=useState(null);
+  const [modalPago,setModalPago]=useState(null);
+  const [formPago,setFormPago]=useState({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:""});
   const [costoConfirmar,setCostoConfirmar]=useState("");
   const [monedaCostoConf,setMonedaCostoConf]=useState("ARS");
 
@@ -2892,6 +2989,22 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     save({...data,dj:{...data.dj,eventos:nuevosEventos,presupuestos:nuevosPresupuestos}});
     showToast("✓ Evento confirmado");
     setModalConfirmar(null);setTab("confirmados");
+  };
+
+  const registrarPago=(evento)=>{
+    if(!formPago.monto){showToast("Ingresá el monto");return;}
+    const tc2=blue||1450;
+    const montoNum=Number(formPago.monto);
+    const montoUSD=formPago.moneda==="ARS"?montoNum/tc2:montoNum;
+    const pagos=[...(evento.pagos||[]),{id:Date.now().toString(),fecha:formPago.fecha,concepto:formPago.concepto,monto:montoNum,moneda:formPago.moneda,montoUSD,nota:formPago.nota}];
+    const totalPagadoUSD=pagos.reduce((a,p)=>a+p.montoUSD,0);
+    const nuevoSaldo=Math.max(0,Number(evento.cobroUSD||0)-totalPagadoUSD);
+    const nuevoEstado=nuevoSaldo<=0?"Realizado":totalPagadoUSD>0?"Señado":evento.estado;
+    const nuevosEventos=eventos.map(e=>e.id===evento.id?{...e,pagos,saldo:nuevoSaldo,senaUSD:totalPagadoUSD,estado:nuevoEstado}:e);
+    save({...data,dj:{...data.dj,eventos:nuevosEventos}});
+    showToast("✓ Pago registrado");
+    setModalPago(null);
+    setFormPago({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:""});
   };
 
   const rechazarPresupuesto=(id)=>{
@@ -2943,6 +3056,71 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
           </div>
         ))}
       </div>
+
+      {/* Pago modal */}
+      {modalPago&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+          <div style={{background:"var(--bg-modal,#13132A)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:360,boxShadow:"0 24px 60px rgba(0,0,0,0.5)"}}>
+            <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Registrar pago</h3>
+            <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 14px"}}>{modalPago.nombre}</p>
+            <div style={{background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)",padding:"8px 12px",marginBottom:14,fontSize:12}}>
+              <span style={{color:"var(--text-secondary)"}}>Cobro total: </span>
+              <strong style={{color:"var(--text-info)"}}>{fmtUSD(modalPago.cobroUSD||0)}</strong>
+              <span style={{color:"var(--text-secondary)",marginLeft:12}}>Saldo: </span>
+              <strong style={{color:"var(--text-warning)"}}>{fmtUSD(modalPago.saldo||modalPago.cobroUSD||0)}</strong>
+            </div>
+            {/* Historial de pagos */}
+            {(modalPago.pagos||[]).length>0&&(
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:6}}>Pagos anteriores</div>
+                {(modalPago.pagos||[]).map(p=>(
+                  <div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"4px 0",borderBottom:"0.5px solid var(--glass-border)"}}>
+                    <span style={{color:"var(--text-secondary)"}}>{p.concepto} · {p.fecha}</span>
+                    <span style={{fontWeight:600,color:"var(--text-success)"}}>{p.moneda==="ARS"?"$"+fmt(p.monto):"USD "+fmt(p.montoUSD)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+              <div>
+                <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto</label>
+                <div style={{display:"flex",gap:4}}>
+                  <select value={formPago.moneda} onChange={e=>setFormPago(f=>({...f,moneda:e.target.value}))} style={{width:60,flexShrink:0}}>
+                    <option value="USD">USD</option><option value="ARS">ARS</option>
+                  </select>
+                  <input type="number" value={formPago.monto} onChange={e=>setFormPago(f=>({...f,monto:e.target.value}))} placeholder="0" inputMode="decimal" autoFocus/>
+                </div>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Concepto</label>
+                <select value={formPago.concepto} onChange={e=>setFormPago(f=>({...f,concepto:e.target.value}))}>
+                  {["Seña","1ra cuota","2da cuota","Anticipo","Pago total","Pago parcial"].map(c=><option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label>
+                <input type="date" value={formPago.fecha} onChange={e=>setFormPago(f=>({...f,fecha:e.target.value}))}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota</label>
+                <input value={formPago.nota} onChange={e=>setFormPago(f=>({...f,nota:e.target.value}))} placeholder="Opcional"/>
+              </div>
+            </div>
+            {formPago.monto&&Number(formPago.monto)>0&&(
+              <div style={{padding:"8px 12px",background:"var(--bg-tint-green)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-md)",marginBottom:12,fontSize:12,color:"var(--text-success)"}}>
+                {formPago.moneda==="ARS"
+                  ?<>= <strong>{fmtUSD(Number(formPago.monto)/(blue||1450))}</strong> al TC ${fmt(blue||1450)}</>
+                  :<>= <strong>${fmt(Number(formPago.monto)*(blue||1450))}</strong> ARS</>
+                }
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>registrarPago(modalPago)} style={{flex:1,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:14}}>Registrar pago</button>
+              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:""}); }} style={{padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirm presupuesto modal */}
       {modalConfirmar&&(
@@ -3064,7 +3242,8 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
                   </div>
                   <div style={{fontSize:11,color:"var(--text-secondary)"}}>{e.fecha}</div>
                 </div>
-                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                  <button onClick={()=>setModalPago(e)} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",cursor:"pointer",fontWeight:600}}>+ Pago</button>
                   <select value={e.estado} onChange={ev=>actualizarEstado(e.id,ev.target.value)} style={{fontSize:11,padding:"3px 6px",borderRadius:6,width:"auto"}}>
                     {["Confirmado","Señado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}
                   </select>
@@ -3072,13 +3251,18 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
                   <button onClick={()=>{if(window.confirm("¿Eliminar?"))eliminarEvento(e.id);}} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:14}}>✕</button>
                 </div>
               </div>
-              <div style={{display:"flex",gap:12,fontSize:12,flexWrap:"wrap"}}>
-                <span style={{color:"var(--text-secondary)"}}>Cobro: <strong style={{color:"var(--text-primary)"}}>{e.monedaCobro==="ARS"?"$"+fmt(e.cobro):fmtUSD(e.cobro||e.cobroUSD||0)}</strong></span>
+              <div style={{display:"flex",gap:10,fontSize:12,flexWrap:"wrap",marginBottom:(e.pagos||[]).length>0?6:0}}>
+                <span style={{color:"var(--text-secondary)"}}>Cobro: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(e.cobroUSD||e.cobro||0)}</strong></span>
                 {e.costo>0&&<span style={{color:"var(--text-secondary)"}}>Costo: <strong>{e.monedaCosto==="ARS"?"$"+fmt(e.costo):fmtUSD(e.costo)}</strong></span>}
-                {e.sena>0&&<span style={{color:"var(--text-success)"}}>Seña: <strong>{e.monedaCobro==="ARS"?"$"+fmt(e.sena):fmtUSD(e.sena)}</strong></span>}
-                {e.saldo>0&&<span style={{color:"var(--text-warning)",fontWeight:700}}>Saldo: {fmtUSD(e.saldo)}</span>}
+                <span style={{color:"var(--text-success)",fontWeight:600}}>Cobrado: {fmtUSD((e.pagos||[]).reduce((a,p)=>a+p.montoUSD,0)||e.senaUSD||0)}</span>
+                {(e.saldo??e.cobroUSD)>0&&<span style={{color:"var(--text-warning)",fontWeight:700}}>Saldo: {fmtUSD(e.saldo??e.cobroUSD)}</span>}
                 <span style={{color:(e.gananciaUSD||0)>=0?"var(--text-success)":"var(--text-danger)",fontWeight:600}}>Gan: {fmtUSD(e.gananciaUSD||0)}</span>
               </div>
+              {(e.pagos||[]).length>0&&(
+                <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>
+                  {(e.pagos||[]).map(p=><span key={p.id} style={{marginRight:10}}>{p.concepto}: <strong style={{color:"var(--text-success)"}}>{p.moneda==="ARS"?"$"+fmt(p.monto):"USD "+fmt(p.montoUSD)}</strong></span>)}
+                </div>
+              )}
               {e.notas&&<div style={{fontSize:11,color:"var(--text-secondary)",marginTop:6,fontStyle:"italic"}}>{e.notas}</div>}
             </div>
           ))}
