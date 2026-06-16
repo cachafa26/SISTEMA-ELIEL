@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.5.2";
+const APP_VERSION = "v2.5.3";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1774,8 +1774,19 @@ Para cargar EVENTO DJ:
 Para PAGO de evento DJ (cuando el cliente paga):
 {"action":"REGISTRAR_PAGO_DJ","data":{"cliente":"nombre","monto":N,"moneda":"USD","concepto":"Seña","fecha":"YYYY-MM-DD","nota":""}}
 
-Para RETIRO Mi30:
+Para RETIRO / COBRO - REGLAS IMPORTANTES:
+- Los datos de pendiente de cobro están en RETIROS PENDIENTES arriba.
+- Si el usuario dice "retiré X" sin especificar de dónde, y tiene pendiente en ambos (SC y BH), preguntá de cuál es o repartí automáticamente cubriendo primero SC, luego BH.
+- Si el monto cubre ambas fuentes, usá RETIRO_COMBINADO con montoSC y montoBH.
+
+Para RETIRO de Mi 30% SC:
 {"action":"CARGAR_RETIRO","data":{"moneda":"ARS","monto":N,"tcRetiro":TC,"nota":"","fecha":"YYYY-MM-DD"}}
+
+Para COBRO de BH Trade:
+{"action":"COBRO_BH","data":{"moneda":"ARS","monto":N,"nota":"","fecha":"YYYY-MM-DD"}}
+
+Para RETIRO que cubre AMBAS fuentes (SC + BH):
+{"action":"RETIRO_COMBINADO","data":{"montoSC":N,"monedaSC":"ARS","montoBH":N,"monedaBH":"ARS","tcRetiro":TC,"nota":"","fecha":"YYYY-MM-DD"}}
 
 Para GASTO personal:
 {"action":"CARGAR_GASTO","data":{"desc":"descripción","monto":N,"cat":"Alimentación","fecha":"YYYY-MM-DD","moneda":"ARS"}}
@@ -1946,6 +1957,47 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         };
         save({...data,retiros:[...(data.retiros||[]),retiro]});
         showToast("✓ Retiro registrado");
+        setPendingAction(null);
+      }
+      else if(action.action==="COBRO_BH"){
+        // Registrar cobro de BH Trade
+        const montoN = Number(d.monto||0);
+        const cobro = {
+          id: Date.now().toString(),
+          fecha: d.fecha||new Date().toISOString().split("T")[0],
+          monto: montoN, moneda: d.moneda||"ARS",
+          nota: d.nota||""
+        };
+        save({...data, bh:{...data.bh, cobros:[...(data.bh?.cobros||[]),cobro]}});
+        showToast("✓ Cobro BH registrado");
+        setPendingAction(null);
+      }
+      else if(action.action==="RETIRO_COMBINADO"){
+        // Registrar retiro de SC + cobro de BH en una sola operación
+        const newData = {...data};
+        if(Number(d.montoSC||0)>0){
+          const tcR = Number(d.tcRetiro||tc);
+          const montoUSD = d.monedaSC==="ARS"?Number(d.montoSC)/tcR:Number(d.montoSC);
+          const retiro = {
+            id: Date.now().toString(),
+            fecha: d.fecha||new Date().toISOString().split("T")[0],
+            nota: d.nota||"Retiro combinado", montoUSD,
+            montoPesos: d.monedaSC==="ARS"?Number(d.montoSC):null,
+            moneda: d.monedaSC||"ARS", tcRetiro: tcR
+          };
+          newData.retiros = [...(data.retiros||[]), retiro];
+        }
+        if(Number(d.montoBH||0)>0){
+          const cobro = {
+            id: Date.now().toString(),
+            fecha: d.fecha||new Date().toISOString().split("T")[0],
+            monto: Number(d.montoBH), moneda: d.monedaBH||"ARS",
+            nota: d.nota||"Retiro combinado"
+          };
+          newData.bh = {...(data.bh||{}), cobros:[...(data.bh?.cobros||[]),cobro]};
+        }
+        save(newData);
+        showToast("✓ Retiro combinado registrado");
         setPendingAction(null);
       }
       else if(action.action==="CARGAR_GASTO"){
