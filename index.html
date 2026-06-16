@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v1.5.0 · 2026-06-16 -->
+  <!-- v1.6.0 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v1.5.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v1.6.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -649,7 +649,7 @@
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v1.5.0";
+const APP_VERSION = "v1.6.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1279,6 +1279,393 @@ function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady,logou
 }
 
 
+// ── PDF TEMPLATES ─────────────────────────────────────────────────────────
+const PRESUPUESTO_TEMPLATE = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Presupuesto ELIEL MIZRAHI DJ</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#080810;color:#fff;font-family:'Montserrat',sans-serif;font-size:12px;line-height:1.5;}
+.page{max-width:794px;margin:0 auto;background:#080810;min-height:1123px;position:relative;padding:0;}
+/* Hairlines */
+.page::before{content:'';position:fixed;top:0;left:0;right:0;height:1px;background:#C9A84C;}
+.page::after{content:'';position:fixed;bottom:0;left:0;right:0;height:1px;background:#C9A84C;}
+/* HEADER */
+.header{padding:32px 48px 24px;border-bottom:1px solid rgba(201,168,76,0.2);background:linear-gradient(180deg,#0C0C20 0%,#080810 100%);}
+.header-inner{display:flex;justify-content:space-between;align-items:flex-start;}
+.dates-row{display:flex;justify-content:space-between;margin-bottom:20px;}
+.date-block .lbl{font-size:7px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
+.date-block .val{font-size:9px;font-weight:700;color:#fff;}
+.logo-area{text-align:center;flex:1;}
+.logo-triangles{display:inline-block;position:relative;width:60px;height:40px;margin-bottom:6px;}
+.logo-triangles svg{width:60px;height:40px;}
+.brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:4px;text-transform:uppercase;}
+.brand-sub{font-size:7px;font-weight:500;color:rgba(201,168,76,0.7);letter-spacing:4px;text-transform:uppercase;margin-top:3px;}
+/* GOLD BAND */
+.gold-band{background:linear-gradient(135deg,#C9A84C 0%,#E8C97A 40%,#C9A84C 60%,#a07830 100%);padding:12px 48px;display:flex;justify-content:space-between;align-items:center;}
+.gold-band .doc-id{font-size:13px;font-weight:800;color:#080810;letter-spacing:2px;}
+.gold-band .doc-type{font-size:9px;font-weight:700;color:rgba(8,8,16,0.65);letter-spacing:3px;text-transform:uppercase;}
+/* CONTENT */
+.content{padding:28px 48px;}
+/* SECTION */
+.section-eyebrow{font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:0.5px solid rgba(201,168,76,0.25);}
+/* EVENTO DATA */
+.evento-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.12);border-radius:8px;padding:18px 20px;position:relative;}
+.evento-grid::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,#C9A84C,#a07830);border-radius:3px 0 0 3px;}
+.dato-lbl{font-size:7.5px;font-weight:600;color:rgba(201,168,76,0.6);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:3px;}
+.dato-val{font-size:11px;font-weight:600;color:#fff;}
+.dato-val.gold{color:#C9A84C;}
+/* SERVICIOS */
+.servicios-table{width:100%;border-collapse:collapse;margin-bottom:8px;}
+.servicios-table tr{border-bottom:0.5px solid rgba(255,255,255,0.06);}
+.servicios-table td{padding:7px 6px;vertical-align:top;}
+.svc-check{width:16px;height:16px;background:linear-gradient(135deg,#C9A84C,#a07830);border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#080810;font-weight:900;flex-shrink:0;}
+.svc-name{font-size:9.5px;font-weight:700;color:#fff;line-height:1.3;}
+.svc-desc{font-size:8px;color:#9090A8;margin-top:2px;line-height:1.3;}
+/* SUBSECTION TITLE (tecnica) */
+.sub-eyebrow{font-size:7px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin:14px 0 8px;opacity:.75;}
+/* PRECIO */
+.precio-block{display:flex;justify-content:flex-end;align-items:flex-end;margin:18px 0 24px;padding:20px 24px;background:linear-gradient(135deg,rgba(201,168,76,0.1),rgba(201,168,76,0.04));border:1px solid rgba(201,168,76,0.3);border-radius:10px;position:relative;}
+.precio-block::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);}
+.precio-lbl{font-size:7px;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
+.precio-cur{font-size:12px;font-weight:600;color:#C9A84C;line-height:1.2;}
+.precio-num{font-size:36px;font-weight:800;color:#E8C97A;line-height:1;letter-spacing:-1px;}
+.precio-nota{font-size:8px;color:#9090A8;font-style:italic;margin-top:6px;text-align:right;}
+.precio-left{flex:1;}
+.precio-right{text-align:right;}
+/* OPCIONALES */
+.opt-item{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 14px;background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.15);border-radius:7px;margin-bottom:6px;}
+.opt-dot{width:5px;height:5px;background:#C9A84C;border-radius:50%;margin-top:4px;flex-shrink:0;margin-right:10px;}
+.opt-name{font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;}
+.opt-desc{font-size:8px;color:#9090A8;line-height:1.3;}
+.opt-price{font-size:10px;font-weight:700;color:#C9A84C;white-space:nowrap;margin-left:12px;}
+/* CONDICIONES PAGO */
+.pago-block{margin-bottom:18px;}
+.pago-option{padding:12px 16px;border-radius:7px;margin-bottom:8px;}
+.pago-option.primary{background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);}
+.pago-option.secondary{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);}
+.pago-tag{font-size:6.5px;font-weight:700;color:#C9A84C;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px;}
+.pago-title{font-size:10px;font-weight:700;color:#fff;margin-bottom:4px;}
+.pago-body{font-size:8.5px;color:#9090A8;line-height:1.5;}
+/* TERMINOS */
+.terms-item{display:flex;gap:8px;margin-bottom:8px;}
+.terms-dash{font-size:8px;font-weight:700;color:#C9A84C;flex-shrink:0;margin-top:1px;}
+.terms-text{font-size:8px;color:#9090A8;line-height:1.5;}
+/* FOOTER */
+.footer{border-top:0.5px solid rgba(201,168,76,0.2);padding:16px 48px;text-align:center;}
+.footer-text{font-size:8.5px;color:#9090A8;}
+.footer-text strong{color:#fff;}
+@media print{
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .page{max-width:100%;}
+  .page::before,.page::after{position:fixed;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="dates-row">
+      <div class="date-block">
+        <div class="lbl">Fecha de emisión</div>
+        <div class="val">{{FECHA_EMISION}}</div>
+      </div>
+      <div class="logo-area">
+        <svg viewBox="0 0 60 42" width="60" height="42" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="0,42 20,0 30,18 15,42" fill="#C9A84C" opacity="0.9"/>
+          <polygon points="30,18 40,0 60,42 45,42" fill="#E8C97A" opacity="0.85"/>
+        </svg>
+        <div class="brand-name">ELIEL MIZRAHI <span style="color:#C9A84C">DJ</span></div>
+        <div class="brand-sub">BUENOS AIRES, ARGENTINA</div>
+      </div>
+      <div class="date-block" style="text-align:right">
+        <div class="lbl">Válido hasta</div>
+        <div class="val">{{FECHA_VENCIMIENTO}}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GOLD BAND -->
+  <div class="gold-band">
+    <div class="doc-id">{{NUMERO_DOC}}</div>
+    <div class="doc-type">Presupuesto</div>
+    <div class="doc-type">ELIEL MIZRAHI DJ</div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <!-- DATOS DEL EVENTO -->
+    <div class="section-eyebrow">Datos del evento</div>
+    <div class="evento-grid">
+      <div><div class="dato-lbl">Cliente</div><div class="dato-val gold">{{CLIENTE}}</div></div>
+      <div><div class="dato-lbl">Tipo de evento</div><div class="dato-val">{{TIPO_EVENTO}}</div></div>
+      <div><div class="dato-lbl">Fecha del evento</div><div class="dato-val">{{FECHA_EVENTO}}</div></div>
+      <div><div class="dato-lbl">Salón / Venue</div><div class="dato-val">{{SALON}}</div></div>
+      {{INVITADOS_ROW}}
+    </div>
+
+    <!-- SERVICIOS -->
+    <div class="section-eyebrow">Servicios incluidos</div>
+    <table class="servicios-table">{{SERVICIOS_ROWS}}</table>
+
+    {{OPCIONALES_SECTION}}
+
+    <!-- PRECIO -->
+    <div class="precio-block">
+      <div class="precio-left">{{NOTA_PRECIO}}</div>
+      <div class="precio-right">
+        <div class="precio-lbl">Valor</div>
+        <div class="precio-cur">USD</div>
+        <div class="precio-num">{{PRECIO}}</div>
+      </div>
+    </div>
+
+    <!-- CONDICIONES DE PAGO -->
+    <div class="section-eyebrow">Condiciones de pago</div>
+    <div class="pago-block">
+      <div class="pago-option primary">
+        <div class="pago-tag">Opción 1</div>
+        <div class="pago-title">Pago en dos cuotas</div>
+        <div class="pago-body">50% dentro de los 15 días de recibido el presupuesto. El 50% restante hasta 30 días antes del evento.</div>
+      </div>
+      {{OPCION_DESCUENTO}}
+    </div>
+
+    <!-- TÉRMINOS -->
+    <div class="section-eyebrow" style="margin-top:16px">Términos y condiciones</div>
+    <div class="terms-item"><div class="terms-dash">—</div><div class="terms-text">Los precios son válidos hasta el {{FECHA_VENCIMIENTO}}. Transcurrida esa fecha podrán actualizarse, aplicándose el ajuste al saldo pendiente al momento del pago.</div></div>
+    <div class="terms-item"><div class="terms-dash">—</div><div class="terms-text">Las señas abonadas no son reembolsables. En caso de cancelación, el cliente podrá reprogramar la fecha del evento, sujeto a disponibilidad y a diferencia de precio si la hubiere.</div></div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-text">@ElielMizrahi &nbsp;·&nbsp; <strong>ELIEL MIZRAHI DJ</strong> &nbsp;·&nbsp; 1153488044 (Eliel)</div>
+  </div>
+</div>
+</body>
+</html>
+`;
+const RECIBO_TEMPLATE = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>Recibo ELIEL MIZRAHI DJ</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#080810;color:#fff;font-family:'Montserrat',sans-serif;font-size:12px;}
+.page{max-width:794px;margin:0 auto;background:#080810;min-height:1123px;}
+.header{padding:32px 48px 24px;border-bottom:1px solid rgba(201,168,76,0.2);background:linear-gradient(180deg,#0C0C20,#080810);}
+.dates-row{display:flex;justify-content:space-between;margin-bottom:20px;}
+.date-block .lbl{font-size:7px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
+.date-block .val{font-size:9px;font-weight:700;color:#fff;}
+.logo-area{text-align:center;flex:1;}
+.brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:4px;text-transform:uppercase;}
+.brand-sub{font-size:7px;font-weight:500;color:rgba(201,168,76,0.7);letter-spacing:4px;margin-top:3px;}
+.gold-band{background:linear-gradient(135deg,#C9A84C,#E8C97A 40%,#C9A84C 60%,#a07830);padding:12px 48px;display:flex;justify-content:space-between;align-items:center;}
+.gold-band .doc-id{font-size:13px;font-weight:800;color:#080810;letter-spacing:2px;}
+.gold-band .doc-type{font-size:9px;font-weight:700;color:rgba(8,8,16,0.65);letter-spacing:3px;text-transform:uppercase;}
+.content{padding:28px 48px;}
+.eyebrow{font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:0.5px solid rgba(201,168,76,0.25);}
+.datos-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.12);border-radius:8px;padding:18px 20px;position:relative;}
+.datos-grid::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,#C9A84C,#a07830);border-radius:3px 0 0 3px;}
+.lbl{font-size:7.5px;font-weight:600;color:rgba(201,168,76,0.6);letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;}
+.val{font-size:11px;font-weight:600;color:#fff;}
+.pago-hero{background:linear-gradient(135deg,rgba(201,168,76,0.12),rgba(201,168,76,0.04));border:1px solid rgba(201,168,76,0.3);border-radius:10px;padding:24px 28px;margin:20px 0;position:relative;}
+.pago-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);}
+.concepto-lbl{font-size:7px;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+.concepto-val{font-size:16px;font-weight:700;color:#fff;margin-bottom:14px;}
+.monto-lbl{font-size:7px;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
+.monto-cur{font-size:12px;font-weight:600;color:#C9A84C;}
+.monto-num{font-size:36px;font-weight:800;color:#E8C97A;letter-spacing:-1px;}
+.resumen-table{width:100%;border-collapse:collapse;margin:16px 0;}
+.resumen-table tr{border-bottom:0.5px solid rgba(255,255,255,0.08);}
+.resumen-table td{padding:9px 4px;font-size:10px;}
+.resumen-table .r-lbl{color:#9090A8;}
+.resumen-table .r-val{text-align:right;font-weight:600;color:#fff;}
+.resumen-table .r-val.saldo{color:#C9A84C;}
+.footer{border-top:0.5px solid rgba(201,168,76,0.2);padding:16px 48px;text-align:center;}
+.footer-text{font-size:8.5px;color:#9090A8;}
+.footer-text strong{color:#fff;}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+</style></head><body><div class="page">
+<div class="header">
+  <div class="dates-row">
+    <div class="date-block"><div class="lbl">Fecha de emisión</div><div class="val">{{FECHA_EMISION}}</div></div>
+    <div class="logo-area">
+      <svg viewBox="0 0 60 42" width="60" height="42" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="0,42 20,0 30,18 15,42" fill="#C9A84C" opacity="0.9"/>
+        <polygon points="30,18 40,0 60,42 45,42" fill="#E8C97A" opacity="0.85"/>
+      </svg>
+      <div class="brand-name">ELIEL MIZRAHI <span style="color:#C9A84C">DJ</span></div>
+      <div class="brand-sub">BUENOS AIRES, ARGENTINA</div>
+    </div>
+    <div class="date-block" style="text-align:right"><div class="lbl">Número</div><div class="val">{{NUMERO_DOC}}</div></div>
+  </div>
+</div>
+<div class="gold-band">
+  <div class="doc-id">RECIBO DE PAGO · {{CLIENTE}}</div>
+  <div class="doc-type">{{NUMERO_DOC}}</div>
+</div>
+<div class="content">
+  <div class="eyebrow">Datos del pago</div>
+  <div class="datos-grid">
+    <div><div class="lbl">Cliente</div><div class="val" style="color:#C9A84C">{{CLIENTE}}</div></div>
+    <div><div class="lbl">Evento</div><div class="val">{{TIPO_EVENTO}}</div></div>
+    {{FECHA_ROW}}
+    {{SALON_ROW}}
+    {{MEDIO_ROW}}
+  </div>
+  <div class="pago-hero">
+    <div class="concepto-lbl">Concepto</div>
+    <div class="concepto-val">{{CONCEPTO}}</div>
+    <div class="monto-lbl">Monto abonado</div>
+    <div class="monto-cur">USD</div>
+    <div class="monto-num">{{MONTO_ABONADO}}</div>
+  </div>
+  <div class="eyebrow">Resumen financiero</div>
+  <table class="resumen-table">
+    <tr><td class="r-lbl">Total del evento</td><td class="r-val">USD {{MONTO_TOTAL}}</td></tr>
+    <tr><td class="r-lbl">Monto abonado</td><td class="r-val">USD {{MONTO_ABONADO}}</td></tr>
+    <tr><td class="r-lbl" style="font-weight:600;color:#fff">Saldo pendiente</td><td class="r-val saldo">{{SALDO}}</td></tr>
+  </table>
+  {{OBS_SECTION}}
+</div>
+<div class="footer"><div class="footer-text">@ElielMizrahi &nbsp;·&nbsp; <strong>ELIEL MIZRAHI DJ</strong> &nbsp;·&nbsp; 1153488044 (Eliel)</div></div>
+</div></body></html>`;
+
+function obtenerServiciosPaquete(paquete){
+  const BASE_INTER = [
+    ["Dirección artística y servicio de DJ","Musicalización completa, selección musical personalizada y conducción artística del evento"],
+    ["Coordinación general","Conducción integral del flujo del evento y gestión del equipo en piso"],
+    ["Realización de timing","Planificación, armado y seguimiento del cronograma del evento"],
+    ["Reunión técnica previa","Encuentro de planificación y alineación de detalles logísticos y artísticos"],
+    ["Comunicación por handies UHF","Canal interno exclusivo para coordinación del equipo de trabajo"],
+    ["Confección de plano técnico","Relevamiento y diseño del plano técnico del salón para optimización del montaje"],
+    ["Flete, armado, desarmado y seguros","Traslado integral del equipamiento, montaje y desmontaje completo, con cobertura de seguros"],
+    ["Sistema de sonido Line Array Hi-Fi","Sistema de sonido principal de alta fidelidad con cobertura Line Array para salón principal"],
+    ["Refuerzo de sonido perimetral","Sistemas de audio perimetrales para cobertura uniforme en salón principal"],
+    ["Sonido en área de recepción","Sistema de audio independiente para la recepción de invitados"],
+    ["Monitoreo de DJ","Sistema de monitoreo profesional en cabina"],
+    ["Iluminación perimetral de salón","Iluminación arquitectónica perimetral en salón principal"],
+    ["Iluminación perimetral en recepción","Iluminación ambiental perimetral en área de recepción"],
+    ["10 cabezales robóticos móviles","Cabezales de movimiento robotizados para efectos dinámicos de iluminación"],
+    ["18 bolas espejadas","Esfera de espejos con iluminación puntual para efecto visual en pista"],
+    ["Máquina de humo","Generador de humo de baja densidad para complemento de efectos lumínicos"],
+    ["Pista de baile de acero pulido 8×8 m","Pista de baile premium en acero pulido de 8 × 8 metros"],
+    ["Cabina con pantalla LED 4×2 m y frente 4×1 m","Cabina de DJ con pantalla LED central de 4 × 2 m y panel frontal LED de 4 × 1 m"],
+    ["Pines direccionales de mesas","Señalización lumínica direccional para identificación de mesas"],
+    ["Operador de sonido y VJ","Operador técnico de sonido en vivo y videojockey para gestión de contenidos visuales"],
+  ];
+  if(!paquete||paquete==="basica_inter") return BASE_INTER;
+  if(paquete==="basica_icon") return BASE_INTER.map(s=>{
+    if(s[0].includes("10 cabezales")) return ["20 cabezales robóticos móviles",s[1].replace("10","20")];
+    if(s[0].includes("8×8")) return ["Pista de baile de acero pulido 9,6×9,6 m","Pista de baile premium en acero pulido de 9,6 × 9,6 metros"];
+    if(s[0].includes("4×2 m y frente 4×1")) return ["Cabina con pantalla LED 5×3 m y frente 5×1 m","Cabina de DJ con pantalla LED central de 5 × 3 m y panel frontal LED de 5 × 1 m"];
+    return s;
+  });
+  return BASE_INTER;
+}
+
+function generarPresupuestoHTML(d, blue){
+  const tc = blue||1450;
+  const hoy = new Date();
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const fmtD = dt => dt.getDate()+' de '+meses[dt.getMonth()]+' de '+dt.getFullYear();
+  const venc = new Date(hoy); venc.setDate(venc.getDate()+15);
+  const fechaParts = d.fecha?d.fecha.match(/(\d{4})/):null;
+  const yearDoc = fechaParts?fechaParts[1]:hoy.getFullYear();
+  const numDoc = d.numeroDoc||('#EMD-'+yearDoc+'-'+(180+Math.floor(Math.random()*170)));
+
+  // Build servicios rows
+  const servicios = d.servicios||[];
+  const splitIdx = d.seccionTecnicaDesde??null;
+  let svcsHTML = '';
+  servicios.forEach((svc,i) => {
+    if(splitIdx!==null && i===splitIdx) svcsHTML += `<tr><td colspan="2"><div class="sub-eyebrow">EQUIPAMIENTO TÉCNICO</div></td></tr>`;
+    svcsHTML += `<tr><td style="width:20px;padding:7px 8px 7px 0"><div class="svc-check">✓</div></td><td><div class="svc-name">${svc[0]||svc.nombre||''}</div><div class="svc-desc">${svc[1]||svc.descripcion||''}</div></td></tr>`;
+  });
+
+  // Invitados row
+  const invRow = d.invitados?`<div><div class="dato-lbl">Invitados</div><div class="dato-val">${d.invitados}</div></div>`:'';
+
+  // Opcionales
+  let optsHTML = '';
+  if(d.opcionales&&d.opcionales.length>0){
+    optsHTML = `<div class="section-eyebrow" style="margin-top:20px">Servicios opcionales</div>`;
+    d.opcionales.forEach(opt=>{
+      const nombre=opt[0]||opt.nombre||''; const desc=opt[1]||opt.descripcion||''; const precio=opt[2]||opt.precio||'';
+      optsHTML+=`<div class="opt-item"><div class="opt-dot"></div><div style="flex:1"><div class="opt-name">${nombre}</div><div class="opt-desc">${desc}</div></div><div class="opt-price">${precio}</div></div>`;
+    });
+  }
+
+  // Descuento opcion 2
+  let descHTML = '';
+  if(d.descuentoPagoTotal){
+    descHTML = `<div class="pago-option secondary"><div class="pago-tag">Opción 2 · Descuento ${d.descuentoPagoTotal}</div><div class="pago-title">Pago total anticipado</div><div class="pago-body">Abono del total antes del ${fmtD(venc)}. Incluye un ${d.descuentoPagoTotal} de descuento sobre el precio total.</div></div>`;
+  }
+
+  const notaHTML = d.notaPrecio?`<div class="precio-nota">${d.notaPrecio}</div>`:'';
+
+  return PRESUPUESTO_TEMPLATE
+    .replace('{{FECHA_EMISION}}', fmtD(hoy))
+    .replace('{{FECHA_VENCIMIENTO}}', fmtD(venc))
+    .replace('{{FECHA_VENCIMIENTO}}', fmtD(venc))
+    .replace('{{NUMERO_DOC}}', numDoc)
+    .replace('{{CLIENTE}}', d.cliente||'')
+    .replace('{{TIPO_EVENTO}}', d.tipoEvento||'')
+    .replace('{{FECHA_EVENTO}}', d.fecha||'')
+    .replace('{{SALON}}', d.salon||'')
+    .replace('{{INVITADOS_ROW}}', invRow)
+    .replace('{{SERVICIOS_ROWS}}', svcsHTML)
+    .replace('{{OPCIONALES_SECTION}}', optsHTML)
+    .replace('{{PRECIO}}', String(d.precio||''))
+    .replace('{{NOTA_PRECIO}}', notaHTML)
+    .replace('{{OPCION_DESCUENTO}}', descHTML);
+}
+
+function generarReciboHTML(d, blue){
+  const hoy = new Date();
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const fmtD = dt => dt.getDate()+' de '+meses[dt.getMonth()]+' de '+dt.getFullYear();
+  const yearDoc = hoy.getFullYear();
+  const numDoc = d.numeroDoc||('#REC-'+yearDoc+'-'+(180+Math.floor(Math.random()*170)));
+  const saldo = Number(d.montoTotal||0)-Number(d.montoAbonado||0);
+  const saldoStr = saldo<=0?'Pago total cancelado':fmt(saldo);
+
+  const fechaRow = d.fechaEvento?`<div><div class="lbl">Fecha del evento</div><div class="val">${d.fechaEvento}</div></div>`:'';
+  const salonRow = d.salon?`<div><div class="lbl">Salón</div><div class="val">${d.salon}</div></div>`:'';
+  const medioRow = d.medioPago?`<div><div class="lbl">Medio de pago</div><div class="val">${d.medioPago}</div></div>`:'';
+  const obsSection = d.observaciones?`<div class="eyebrow" style="margin-top:16px">Observaciones</div><p style="font-size:9px;color:#9090A8">${d.observaciones}</p>`:'';
+
+  return RECIBO_TEMPLATE
+    .replace('{{FECHA_EMISION}}', fmtD(hoy))
+    .replace('{{NUMERO_DOC}}', numDoc)
+    .replace(/{{NUMERO_DOC}}/g, numDoc)
+    .replace('{{CLIENTE}}', d.cliente||'')
+    .replace('{{TIPO_EVENTO}}', d.tipoEvento||'')
+    .replace('{{FECHA_ROW}}', fechaRow)
+    .replace('{{SALON_ROW}}', salonRow)
+    .replace('{{MEDIO_ROW}}', medioRow)
+    .replace('{{CONCEPTO}}', d.concepto||'')
+    .replace('{{MONTO_ABONADO}}', fmt(d.montoAbonado||0))
+    .replace(/{{MONTO_ABONADO}}/g, fmt(d.montoAbonado||0))
+    .replace('{{MONTO_TOTAL}}', fmt(d.montoTotal||0))
+    .replace('{{SALDO}}', saldoStr)
+    .replace('{{OBS_SECTION}}', obsSection);
+}
+
+function abrirPDF(htmlContent){
+  const w=window.open('','_blank');
+  if(!w){alert('Permitir ventanas emergentes para ver el PDF');return;}
+  w.document.open();
+  w.document.write(htmlContent);
+  w.document.close();
+  setTimeout(()=>{try{w.print();}catch(e){}},1200);
+}
+
+
 // ══════════════════════════════════════════════════════════════════════════
 // CHATBOT IA — Asistente de Sistema Eliel
 // ══════════════════════════════════════════════════════════════════════════
@@ -1507,60 +1894,53 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           creadoEn:new Date().toISOString(),
           pdfData:null, // will be set after generation
         };
-        // Request PDF generation from backend
+        // Generate PDF locally using template (no API call needed)
         try{
-          const pdfResp=await fetch("https://api.anthropic.com/v1/messages",{
-            method:"POST",
-            headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-            body:JSON.stringify({
-              model:"claude-sonnet-4-6",max_tokens:4000,
-              system:`Sos un generador de HTML para PDFs de presupuestos DJ. Generás un HTML completo con el diseño premium de ELIEL MIZRAHI DJ (fondo #080810, dorado #C9A84C, blanco). El HTML debe ser auto-contenido, imprimible. IMPORTANTE: devolvé ÚNICAMENTE el HTML puro comenzando con <!DOCTYPE html>, sin backticks, sin markdown, sin explicaciones. La primera línea debe ser <!DOCTYPE html>.`,
-              messages:[{role:"user",content:`Generá el HTML del presupuesto con estos datos: ${JSON.stringify(nuevoPres)}. Incluí: header con logo textual "ELIEL MIZRAHI DJ / BUENOS AIRES, ARGENTINA", banda dorada con "${numDoc}", datos del evento, servicios, precio USD ${d.precio_str||d.precio}, condiciones de pago (50/50 o total con 10% desc), footer con @ElielMizrahi / 1153488044.`}]
-            })
-          });
-          const pdfResult=await pdfResp.json();
-          let pdfHtml=pdfResult.content?.[0]?.text||"";
-          // Strip markdown code fences if Claude wrapped the HTML
-          pdfHtml=pdfHtml.replace(/^```html\s*/i,"").replace(/^```\s*/i,"").replace(/\s*```$/,"").trim();
-          // Convert HTML to data URL for download
-          const blob=new Blob([pdfHtml],{type:"text/html"});
-          const url=URL.createObjectURL(blob);
-          nuevoPres.pdfData=url;
-          nuevoPres.pdfHtml=pdfHtml;
+          const serviciosParaHTML = nuevoPres.conTecnica
+            ? obtenerServiciosPaquete(nuevoPres.paquete)
+            : [
+                ["Realización de timing","Planificación y armado del cronograma del evento"],
+                ["Servicio de DJ","Musicalización completa y dirección artística"],
+                ["Coordinación general","Conducción integral del flujo del evento"],
+                ["Comunicación por handies UHF","Canal interno exclusivo para el equipo de trabajo"],
+                ["Reunión técnica previa","Encuentro de planificación y alineación de detalles"],
+              ];
+          const pdfData = {
+            cliente: d.cliente,
+            tipoEvento: d.tipoEvento,
+            fecha: d.fecha,
+            salon: d.salon,
+            invitados: d.invitados||null,
+            servicios: serviciosParaHTML,
+            seccionTecnicaDesde: nuevoPres.conTecnica?5:null,
+            precio: d.precio_str||String(d.precio),
+            notaPrecio: nuevoPres.conTecnica?null:"* Sin técnica incluida",
+            opcionales: d.opcionales||[],
+            descuentoPagoTotal: "10%",
+            numeroDoc: numDoc,
+          };
+          const pdfHtml = generarPresupuestoHTML(pdfData, blue);
+          nuevoPres.pdfHtml = pdfHtml;
         }catch(pdfErr){console.warn("PDF gen failed:",pdfErr);}
         
         const nuevosPresupuestos=[...(data.dj?.presupuestos||[]),nuevoPres];
         save({...data,dj:{...data.dj,presupuestos:nuevosPresupuestos}});
         showToast("✓ Presupuesto generado y guardado");
         setPendingAction(null);
-        if(nuevoPres.pdfHtml){
-          const w=window.open("","_blank");
-          if(w){
-            w.document.open();
-            w.document.write(nuevoPres.pdfHtml);
-            w.document.close();
-            setTimeout(()=>{try{w.print();}catch(e){}},1200);
-          }
-        }
+        if(nuevoPres.pdfHtml){ abrirPDF(nuevoPres.pdfHtml); }
       }
       else if(action.action==="GENERAR_RECIBO_DJ"){
         const d=action.data;
         const numDoc="#REC-"+new Date().getFullYear()+"-"+(180+Math.floor(Math.random()*170));
         try{
-          const pdfResp=await fetch("https://api.anthropic.com/v1/messages",{
-            method:"POST",
-            headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-            body:JSON.stringify({
-              model:"claude-sonnet-4-6",max_tokens:3000,
-              system:`Sos un generador de HTML para recibos de pago de ELIEL MIZRAHI DJ. Diseño premium: fondo #080810, dorado #C9A84C, texto blanco. HTML auto-contenido imprimible. IMPORTANTE: devolvé ÚNICAMENTE el HTML puro comenzando con <!DOCTYPE html>, sin backticks, sin markdown, sin explicaciones.`,
-              messages:[{role:"user",content:`Generá el HTML del recibo ${numDoc}: Cliente: ${d.cliente}, Evento: ${d.tipoEvento} en ${d.salon||""} el ${d.fechaEvento||""}, Total evento: USD ${d.montoTotal}, Abonado: USD ${d.montoAbonado}, Saldo: USD ${d.montoTotal-d.montoAbonado}, Concepto: ${d.concepto}, Medio de pago: ${d.medioPago||"Efectivo"}${d.observaciones?", Obs: "+d.observaciones:""}. Footer: @ElielMizrahi / 1153488044`}]
-            })
-          });
-          const res=await pdfResp.json();
-          let reciboHtml=res.content?.[0]?.text||"";
-          reciboHtml=reciboHtml.replace(/^```html\s*/i,"").replace(/^```\s*/i,"").replace(/\s*```$/,"").trim();
-          const w=window.open("","_blank");
-          if(w){w.document.open();w.document.write(reciboHtml);w.document.close();setTimeout(()=>{try{w.print();}catch(e){}},1200);}
+          const reciboHtml = generarReciboHTML({
+            cliente:d.cliente, tipoEvento:d.tipoEvento,
+            fechaEvento:d.fechaEvento, salon:d.salon,
+            medioPago:d.medioPago||"Efectivo",
+            concepto:d.concepto, montoTotal:d.montoTotal,
+            montoAbonado:d.montoAbonado, observaciones:d.observaciones,
+          }, blue);
+          abrirPDF(reciboHtml);
           // Also register payment in the matching event
           const evMatch=data.dj?.eventos?.find(e=>e.nombre.toLowerCase().includes(d.cliente.toLowerCase()));
           if(evMatch){
