@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.6.1";
+const APP_VERSION = "v2.6.2";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4592,7 +4592,13 @@ function StockView({stockUni,data}){
     else{stockPapel[nombre]=cant;totalPapel+=cant;}
   });
   const Row=([art,cant],esTinta)=>{
-    const conts=(data.contenedores||[]).filter(c=>(c.articulos||[]).some(a=>a.nombre===art)).map(c=>c.nombre).join(", ");
+    const conts=(data.contenedores||[]).filter(c=>{
+      const art2=(c.articulos||[]).find(a=>a.nombre===art);
+      if(!art2) return false;
+      // Solo mostrar si hay stock disponible en ese contenedor
+      const vendido=(data.ventas||[]).filter(v=>v.contId===c.id&&v.articulo===art).reduce((a,v)=>a+Number(v.cantidad),0);
+      return Math.max(0, Number(art2.cantidad)-vendido) > 0;
+    }).map(c=>c.nombre).join(", ");
     return(
       <div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"var(--glass-shadow-sm)"}}>
         <div style={{flex:1,minWidth:0}}>
