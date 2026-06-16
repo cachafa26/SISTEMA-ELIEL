@@ -1369,6 +1369,8 @@ function App(){
   const mesActual=new Date().getMonth();
   const bhDespachosMes=(data.bh?.despachos||[]).filter(d=>d.mes===mesActual);
   const bhSueldo=bhSueldoMes(bhDespachosMes,mesActual).sueldo;
+  const bhCobradoTotal=(data.bh?.cobros||[]).reduce((a,c)=>a+Number(c.monto||0),0);
+  const bhPendienteCobro=Math.max(0,bhTotalAnio-bhCobradoTotal);
 
   // Calculos DJ globales
   const djEventos=data.dj?.eventos||[];
@@ -1442,7 +1444,7 @@ function App(){
         </button>
       )}
 
-      {chatState!=="closed"&&<ChatBot data={data} save={save} showToast={showToast} blue={blue} stockUni={stockUni} onClose={()=>setChatState("minimized")} chatState={chatState} externalMsgs={chatMsgs} setExternalMsgs={setChatMsgs} onFullClose={()=>setChatState("closed")}/>}
+      {chatState!=="closed"&&<ChatBot data={data} save={save} showToast={showToast} blue={blue} stockUni={stockUni} onClose={()=>setChatState("minimized")} chatState={chatState} externalMsgs={chatMsgs} setExternalMsgs={setChatMsgs} onFullClose={()=>setChatState("closed")} pendienteRetiro={pendienteRetiro} bhPendienteCobro={bhPendienteCobro}/>}
 
       {/* TOP NAV ── desktop (hidden on mobile via CSS) */}
       <div className="top-nav" style={{
@@ -1676,10 +1678,13 @@ function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady,logou
 // ══════════════════════════════════════════════════════════════════════════
 // CHATBOT IA — Asistente de Sistema Eliel
 // ══════════════════════════════════════════════════════════════════════════
-const ANTHROPIC_KEY = String.fromCharCode(115,107,45,97,110,116,45,97,112,105,48,51,45,52,75,101,54,111,121,119,100,120,121,101,90,87,65,95,70,109,70,107,112,107,71,81,116,55,53,72,49,89,120,112,108,66,115,115,80,107,109,109,97,122,110,55,87,112,113,113,71,53,48,55,88,102,118,76,118,72,72,45,108,54,77,118,55,101,107,71,108,84,65,118,116,87,107,69,73,57,106,71,119,72,53,101,72,57,119,45,105,78,53,86,97,65,65,65);
+const ANTHROPIC_KEY = String.fromCharCode(115,107,45,97,110,116,45,97,112,105,48,51,45,73,97,57,108,50,81,110,106,95,115,50,48,114,79,79,119,107,117,56,104,88,65,95,55,86,53,119,109,110,113,87,65,115,113,90,86,78,56,88,76,70,116,74,89,122,77,122,101,97,97,55,95,80,88,101,66,101,105,118,55,97,72,73,49,102,95,97,72,73,51,104,113,52,49,110,50,122,120,49,65,112,120,70,88,78,119,45,83,90,53,52,74,81,65,65);
 
-function buildSystemPrompt(data, blue, stockUni){
+function buildSystemPrompt(data, blue, stockUni, pendienteRetiro, bhPendienteCobro){
   const tc = blue||1450;
+  const _sc30Pesos = Math.round((pendienteRetiro||0) * tc);
+  const _bhPesos = Math.round(bhPendienteCobro||0);
+  const _totalRetiroPesos = _sc30Pesos + _bhPesos;
   const conts = (data.contenedores||[]).map(c=>{
     const vs = (data.ventas||[]).filter(v=>v.contId===c.id);
     const fact = vs.reduce((a,v)=>a+Number(v.usd||0),0);
@@ -1734,6 +1739,11 @@ ${clientes}
 
 ARTÍCULOS DISPONIBLES:
 ${arts}
+
+RETIROS PENDIENTES:
+- Mi 30% SC: $\${_sc30Pesos.toLocaleString('es-AR')} ARS pendiente de retirar
+- BH Trade: $\${_bhPesos.toLocaleString('es-AR')} ARS pendiente de cobrar
+- TOTAL: $\${_totalRetiroPesos.toLocaleString('es-AR')} ARS
 
 ESTADOS DE ENTREGA: A despachar, Despachado, A retirar Ezeiza, A retirar Once, Retirado
 ESTADOS DJ: Confirmado, Señado, Realizado, Cancelado
@@ -1805,7 +1815,7 @@ Para generar confirmacion DJ responder con:
 {"action":"GENERAR_CONFIRMACION_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fechaEvento":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300","conTecnica":true,"paquete":"basica_inter","precioBase":8200,"opcionalesElegidos":[],"formaPago":"total","descuento":10}}`;
 }
 
-function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, externalMsgs, setExternalMsgs, onFullClose}){
+function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, externalMsgs, setExternalMsgs, onFullClose, pendienteRetiro, bhPendienteCobro}){
   const msgs = externalMsgs;
   const setMsgs = setExternalMsgs;
   const [input, setInput] = useState("");
@@ -2154,7 +2164,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
     setLoading(true);
 
     try {
-      const systemPrompt = buildSystemPrompt(data, blue, stockUni);
+      const systemPrompt = buildSystemPrompt(data, blue||1450, stockUni, pendienteRetiro||0, bhPendienteCobro||0);
       const controller = new AbortController();
       const timeoutId = setTimeout(()=>controller.abort(), 30000);
       let response;
