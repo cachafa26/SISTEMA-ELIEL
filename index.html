@@ -1040,6 +1040,7 @@ window.abrirPDF = abrirPDF;
 </script>
 
   <script id="src" type="text/raw">
+
 // ── CONSTANTES ────────────────────────────────────────────────────────────
 const APP_VERSION = "v2.8.0";
 const APP_BUILD   = "2026-06-16";
@@ -4350,793 +4351,162 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Fecha","Artículo","Cant","Cliente","$","Cobrado","Estado",""].map(h=><th key={h} style={{padding:"5px 7px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
-            <tbody>{[...ventasCont].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).map(v=>{
-              const cobV=pagadoVenta(v,data.pagos);const saldo=Number(v.total||0)-cobV;
-              return(<tr key={v.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                <td style={{padding:"5px 7px",color:"var(--color-text-secondary)",fontSize:10}}>{v.fecha}</td>
-                <td style={{padding:"5px 7px"}}>{v.articulo}</td><td style={{padding:"5px 7px"}}>{v.cantidad}</td>
-                <td style={{padding:"5px 7px"}}>{v.cliente}</td>
-                <td style={{padding:"5px 7px",color:"var(--color-text-secondary)"}}>${fmt(v.total)}</td>
-                <td style={{padding:"5px 7px",color:saldo>0?"var(--color-text-warning)":saldo<0?"var(--color-text-info)":"var(--color-text-success)",fontSize:10,whiteSpace:"nowrap"}}>{saldo>0?"Debe $"+fmt(saldo):saldo<0?"Favor $"+fmt(Math.abs(saldo)):"✓"}</td>
-                <td style={{padding:"5px 7px"}}><select value={v.estado||"Retirado"} onChange={e=>actualizarEstado(v.id,e.target.value)} style={{fontSize:10,padding:"2px 4px",borderRadius:4}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select></td>
-                <td style={{padding:"5px 7px"}}><button onClick={()=>eliminar(v.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:12}}>✕</button></td>
+            <tbody>{(()=>{
+                const PEND_EST=["A despachar","A retirar Ezeiza","A retirar Once"];
+                // Group by pedidoId
+                const pMap=new Map();
+                ventasCont.forEach(v=>{
+                  const pid=v.pedidoId||v.id;
+                  if(!pMap.has(pid)) pMap.set(pid,{pid,fecha:v.fecha,cliente:v.cliente,
+                    lineas:[],totalARS:0,totalUSD:0,estado:v.estado,entrega:v.entrega,id:v.id});
+                  const p=pMap.get(pid);
+                  p.lineas.push(v);
+                  p.totalARS+=Number(v.total||0);
+                  p.totalUSD+=Number(v.usd||0);
+                  if(v.fecha>p.fecha){p.fecha=v.fecha;p.estado=v.estado;p.entrega=v.entrega;}
+                });
+                const sorted=[...pMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+                const pend=sorted.filter(p=>PEND_EST.includes(p.estado));
+                const done=sorted.filter(p=>!PEND_EST.includes(p.estado));
+                const all=[...pend,...(done.length>0&&pend.length>0?[{_sep:true,pid:"_sep"}]:[]),...done];
+                return all;
+              })().map(p=>{
+              if(p._sep)return(<tr key="_sep"><td colSpan={99} style={{padding:"6px 0"}}><div style={{borderTop:"0.5px solid var(--glass-border)",textAlign:"center",fontSize:10,color:"var(--text-secondary)",paddingTop:5}}>— Despachados / Retirados —</div></td></tr>);
+              const v=p.lineas[0];
+              const cobTotal=p.lineas.reduce((a,vv)=>a+pagadoVenta(vv,data.pagos),0);
+              const saldoTotal=p.totalARS-cobTotal;
+              return(<tr key={p.pid} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                <td style={{padding:"5px 7px",color:"var(--color-text-secondary)",fontSize:10}}>{p.fecha}</td>
+                <td style={{padding:"5px 7px"}}>
+                  {p.lineas.length===1
+                    ? p.lineas[0].articulo
+                    : <details><summary style={{cursor:"pointer",fontWeight:600}}>{p.lineas.length+" artículos"}</summary>
+                        {p.lineas.map(vv=><div key={vv.id} style={{fontSize:10,color:"var(--text-secondary)",paddingLeft:8}}>{vv.articulo} x{vv.cantidad}</div>)}
+                      </details>
+                  }
+                </td>
+                <td style={{padding:"5px 7px"}}>{p.lineas.length===1?p.lineas[0].cantidad:"-"}</td>
+                <td style={{padding:"5px 7px"}}>{p.cliente}</td>
+                <td style={{padding:"5px 7px",textAlign:"right"}}>${fmt(p.totalARS)}</td>
+                <td style={{padding:"5px 7px",textAlign:"right",color:cobTotal>0?"var(--color-text-success)":"inherit"}}>${fmt(cobTotal)}</td>
+                <td style={{padding:"5px 7px"}}>
+                  <select value={p.estado} onChange={e=>{
+                    p.lineas.forEach(vv=>actualizarEstado(vv.id,e.target.value));
+                  }} style={{fontSize:10,padding:"2px 4px",borderRadius:4}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select>
+                </td>
+                <td style={{padding:"5px 7px"}}>
+                  <button onClick={()=>{p.lineas.forEach(vv=>eliminar(vv.id));}} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:12}}>✕</button>
+                </td>
               </tr>);
-            })}</tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StockView({stockUni,data}){
-  const stockPapel={}, stockTinta={};
-  let totalPapel=0, totalTinta=0;
-  Object.entries(stockUni).filter(([,v])=>v>0).forEach(([nombre,cant])=>{
-    if(nombre.includes("TINTA")){stockTinta[nombre]=cant;totalTinta+=cant;}
-    else{stockPapel[nombre]=cant;totalPapel+=cant;}
-  });
-  const Row=([art,cant],esTinta)=>{
-    const conts=(data.contenedores||[]).filter(c=>(c.articulos||[]).some(a=>a.nombre===art)).map(c=>c.nombre).join(", ");
-    return(
-      <div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"var(--glass-shadow-sm)"}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art}</div>
-          <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{conts}</div>
-        </div>
-        <div style={{fontSize:22,fontWeight:700,color:esTinta?"var(--text-info)":"var(--text-primary)",marginLeft:12}}>{fmt(cant)}</div>
-      </div>
-    );
+            })
+            </tbody>({cont,ventasCont,data,save,showToast,blue}){
+  const tcH=blue?Math.round(blue):Number(cont.costos?.tipoCambioFijado||cont.costos?.tipoCambio||1450);
+  const [form,setForm]=useState({fecha:hoy(),articulo:(cont.articulos||[])[0]?.nombre||"",cantidad:"",cliente:"",precioVenta:"",pago:"",tipoCambio:String(tcH),estado:"A retirar Once"});
+  const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+  const costo=cont.costoTotal||0;const enG=costo>0&&cobUSD>costo;
+  const sdMap={};for(const art of(cont.articulos||[])){const v=ventasCont.filter(v=>v.articulo===art.nombre).reduce((a,v)=>a+Number(v.cantidad),0);sdMap[art.nombre]=Math.max(0,Number(art.cantidad)-v);}
+  const registrar=()=>{
+    if(!form.cliente||!form.cantidad||!form.precioVenta){showToast("Completá todos los campos");return;}
+    const total=Number(form.cantidad)*Number(form.precioVenta);const tc=Number(form.tipoCambio)||tcH;
+    save({...data,ventas:[...(data.ventas||[]),{id:Date.now().toString(),contId:cont.id,...form,cantidad:Number(form.cantidad),precioVenta:Number(form.precioVenta),total,usd:total/tc,tipoCambioUsado:tc}]});
+    setForm({...form,cantidad:"",cliente:"",precioVenta:"",pago:""});showToast("Venta registrada");
   };
-  return(
-    <div>
-      <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:"0 0 1.25rem",color:"var(--text-primary)"}}>Stock unificado</h2>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:"1.5rem"}}>
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:6}}>📄 Total Papel</div>
-          <div style={{fontSize:28,fontWeight:700,letterSpacing:"-.03em",color:"var(--text-primary)"}}>{fmt(totalPapel)}</div>
-          <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>rollos disponibles</div>
-        </div>
-        <div style={{background:"var(--bg-tint-blue)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:6}}>🖨️ Total Tinta</div>
-          <div style={{fontSize:28,fontWeight:700,letterSpacing:"-.03em",color:"var(--text-info)"}}>{fmt(totalTinta)}</div>
-          <div style={{fontSize:11,color:"var(--text-info)",marginTop:2,opacity:.8}}>unidades disponibles</div>
-        </div>
-      </div>
-      {totalPapel===0&&totalTinta===0
-        ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin stock.</div>
-        :<>
-          {Object.keys(stockPapel).length>0&&(
-            <div style={{marginBottom:"1.5rem"}}>
-              <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>📄 Papeles</div>
-              <div style={{display:"grid",gap:6}}>{Object.entries(stockPapel).sort((a,b)=>b[1]-a[1]).map(e=>Row(e,false))}</div>
-            </div>
-          )}
-          {Object.keys(stockTinta).length>0&&(
-            <div>
-              <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:8}}>🖨️ Tintas</div>
-              <div style={{display:"grid",gap:6}}>{Object.entries(stockTinta).sort((a,b)=>b[1]-a[1]).map(e=>Row(e,true))}</div>
-            </div>
-          )}
-        </>
-      }
-    </div>
-  );
-}
-
-function VentasView({data,save,showToast}){
-  const [desde,setDesde]=useState("");
-  const [hasta,setHasta]=useState("");
-  const [vistaMode,setVistaMode]=useState("pedidos"); // "pedidos" | "lineas"
-  const [filtroArt,setFiltroArt]=useState("");
-  const [filtroCli,setFiltroCli]=useState("");
-
-  const ARTS_UNICOS=[...new Set((data.ventas||[]).map(v=>v.articulo))].filter(Boolean).sort();
-  const CLIENTES_UNICOS=[...new Set((data.ventas||[]).map(v=>v.cliente))].filter(Boolean).sort();
-
-  const ventasFilt=[...(data.ventas||[])]
-    .filter(v=>{
-      if(desde&&v.fecha<desde)return false;
-      if(hasta&&v.fecha>hasta)return false;
-      if(filtroArt&&v.articulo!==filtroArt)return false;
-      if(filtroCli&&v.cliente!==filtroCli)return false;
-      return true;
-    })
-    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
-
-  const totalUSD=ventasFilt.reduce((a,v)=>a+Number(v.usd||0),0);
   const eliminar=id=>{save({...data,ventas:data.ventas.filter(v=>v.id!==id)});showToast("Eliminada");};
   const actualizarEstado=(id,estado)=>save({...data,ventas:data.ventas.map(v=>v.id===id?{...v,estado}:v)});
-  const hayFiltros=desde||hasta||filtroArt||filtroCli;
-
-  // Group by pedidoId for "pedidos" view
-  const pedidosMap=new Map();
-  for(const v of ventasFilt){
-    const pid=v.pedidoId||v.id;
-    if(!pedidosMap.has(pid))pedidosMap.set(pid,{id:pid,fecha:v.fecha,cliente:v.cliente,lineas:[],totalARS:0,totalUSD:0,estado:v.estado});
-    const p=pedidosMap.get(pid);
-    p.lineas.push(v);
-    p.totalARS+=Number(v.total||0);
-    p.totalUSD+=Number(v.usd||0);
-    // Use most recent state
-    if(v.fecha>p.fecha)p.fecha=v.fecha;
-  }
-  const pedidos=[...pedidosMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  const stBg={"Retirado":"var(--bg-tint-green)","A despachar":"var(--bg-tint-blue)","Despachado":"var(--bg-tint-blue)","A retirar Ezeiza":"var(--bg-tint-amber)","A retirar Once":"var(--bg-tint-amber)"};
-  const stCol={"Retirado":"var(--text-success)","A despachar":"var(--text-info)","Despachado":"var(--text-info)","A retirar Ezeiza":"var(--text-warning)","A retirar Once":"var(--text-warning)"};
-
+  const estimacion=!enG&&costo>0?(()=>{
+    let stockRestARS=0;const tc_=Number(cont.costos?.tipoCambioFijado||cont.costos?.tipoCambio||tcH);
+    for(const art of(cont.articulos||[])){const sd=sdMap[art.nombre]||0;if(sd<=0)continue;const prom=precioPromedioUltimoMes(cont.id,art.nombre,data.ventas);if(prom>0)stockRestARS+=sd*prom;}
+    const stockRestUSD=stockRestARS/tc_;const cobFuturo=cobUSD+stockRestUSD;const ganFutura=Math.max(0,cobFuturo-costo);const mi30Fut=ganFutura*0.3;
+    return{stockRestUSD,ganFutura,mi30Fut};
+  })():null;
   return(
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-        <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:0,color:"var(--text-primary)"}}>Ventas</h2>
-        <span style={{fontSize:11,color:"var(--text-secondary)"}}>{fmtUSD(totalUSD)}</span>
-      </div>
-
-      {/* Vista toggle */}
-      <div style={{display:"flex",gap:4,marginBottom:"1rem",background:"rgba(120,120,128,0.1)",borderRadius:"var(--r-pill)",padding:3,width:"fit-content"}}>
-        {[["pedidos","Por pedido"],["lineas","Por línea"]].map(([mode,label])=>(
-          <button key={mode} onClick={()=>setVistaMode(mode)} style={{padding:"5px 16px",borderRadius:"var(--r-pill)",border:"none",cursor:"pointer",fontSize:12,fontWeight:vistaMode===mode?600:400,background:vistaMode===mode?"var(--bg-card)":"transparent",color:vistaMode===mode?"var(--text-primary)":"var(--text-secondary)",boxShadow:vistaMode===mode?"var(--glass-shadow-sm)":"none",transition:"all .15s"}}>{label}</button>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",marginBottom:"1rem",boxShadow:"var(--glass-shadow-sm)"}}>
-        <FiltroFechas desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta}/>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          <div>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Artículo</label>
-            <select value={filtroArt} onChange={e=>setFiltroArt(e.target.value)}><option value="">Todos</option>{ARTS_UNICOS.map(a=><option key={a} value={a}>{a}</option>)}</select>
-          </div>
-          <div>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Cliente</label>
-            <select value={filtroCli} onChange={e=>setFiltroCli(e.target.value)}><option value="">Todos</option>{CLIENTES_UNICOS.map(c=><option key={c} value={c}>{c}</option>)}</select>
-          </div>
-        </div>
-        {hayFiltros&&<button onClick={()=>{setDesde("");setHasta("");setFiltroArt("");setFiltroCli("");}} style={{marginTop:8,fontSize:11,padding:"4px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>✕ Limpiar filtros</button>}
-      </div>
-
-      {/* PEDIDOS VIEW */}
-      {vistaMode==="pedidos"&&(
-        pedidos.length===0?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin pedidos.</div>:
-        <div style={{display:"grid",gap:8}}>
-          {pedidos.map(p=>(
-            <div key={p.id} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                <div>
-                  <div style={{fontWeight:600,fontSize:14,color:"var(--text-primary)",marginBottom:2}}>{p.cliente}</div>
-                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>{p.fecha}</div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontWeight:700,fontSize:14,color:"var(--text-primary)"}}>${fmt(p.totalARS)}</div>
-                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>{fmtUSD(p.totalUSD)}</div>
-                </div>
-              </div>
-              {/* Lines */}
-              <div style={{borderTop:"0.5px solid var(--glass-border)",paddingTop:8}}>
-                {p.lineas.map((l,i)=>(
-                  <div key={l.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",fontSize:12}}>
-                    <div style={{display:"flex",gap:8,alignItems:"center",flex:1}}>
-                      <span style={{color:"var(--text-primary)",fontWeight:500}}>{l.articulo}</span>
-                      <span style={{color:"var(--text-secondary)"}}>×{l.cantidad}</span>
-                      <span style={{fontSize:10,padding:"1px 6px",borderRadius:"var(--r-pill)",background:stBg[l.estado]||"rgba(120,120,128,0.1)",color:stCol[l.estado]||"var(--text-secondary)"}}>{l.estado||"—"}</span>
-                    </div>
-                    <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                      <span style={{color:"var(--text-secondary)"}}>${fmt(l.total)}</span>
-                      <select value={l.estado||"Retirado"} onChange={e=>actualizarEstado(l.id,e.target.value)} style={{fontSize:10,padding:"2px 4px",borderRadius:4,width:"auto"}}>
-                        {ESTADOS.map(s=><option key={s}>{s}</option>)}
-                      </select>
-                      <button onClick={()=>eliminar(l.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:12,padding:"0 2px"}}>✕</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:"1rem"}}>
+        {(()=>{
+          const allV=(data.ventas||[]).filter(v=>v.contId===cont.id);
+          const tcD=blue||1450;
+          const totalVUSD=allV.reduce((a,v)=>a+ventaUSD(v,tcD),0);
+          const ganBruta=totalVUSD-costo;
+          const mi30Dev=Math.max(0,ganBruta)*0.3;
+          return[
+            {l:"Facturado",v:fmtUSD(totalVUSD),info:true},
+            {l:"Cobrado",v:fmtUSD(cobUSD)},
+            {l:ganBruta>=0?"Ganancia":"Pérdida",v:fmtUSD(Math.abs(ganBruta)),g:ganBruta>0,danger:ganBruta<0&&costo>0},
+            {l:"Mi 30%",v:fmtUSD(mi30Dev),g:mi30Dev>0},
+            {l:"Costo",v:costo>0?fmtUSD(costo):"—"},
+            {l:"Por cobrar",v:fmtUSD(Math.max(0,totalVUSD-cobUSD)),warn:totalVUSD>cobUSD},
+          ].map(x=>(
+            <div key={x.l} style={{
+              background:x.g?"var(--bg-tint-green)":x.danger?"var(--bg-tint-red)":x.warn?"var(--bg-tint-amber)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.08)",
+              borderRadius:"var(--r-md)",padding:"9px 11px",
+              border:"0.5px solid "+(x.g?"var(--border-success)":x.danger?"var(--border-danger)":"var(--glass-border)"),
+            }}>
+              <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:x.g?"var(--text-success)":x.danger?"var(--text-danger)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-secondary)",marginBottom:3}}>{x.l}</div>
+              <div style={{fontSize:12,fontWeight:600,color:x.g?"var(--text-success)":x.danger?"var(--text-danger)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-primary)"}}>{x.v}</div>
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* LÍNEAS VIEW */}
-      {vistaMode==="lineas"&&(
-        ventasFilt.length===0?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin ventas.</div>:
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",overflow:"hidden",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{overflowX:"auto"}}>
-            <table>
-              <thead><tr>{["Fecha","Cont","Artículo","Cant","Cliente","USD","Estado",""].map(h=><th key={h}>{h}</th>)}</tr></thead>
-              <tbody>{ventasFilt.map(v=>{
-                const cont=data.contenedores.find(c=>c.id===v.contId);
-                return(<tr key={v.id}>
-                  <td style={{fontSize:11,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{v.fecha}</td>
-                  <td style={{fontSize:10,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{cont?.nombre?.split(" ")[0]||"—"}</td>
-                  <td style={{fontWeight:500}}>{v.articulo}</td>
-                  <td style={{color:"var(--text-secondary)"}}>{v.cantidad}</td>
-                  <td>{v.cliente}</td>
-                  <td style={{color:"var(--text-secondary)"}}>{fmtUSD(v.usd)}</td>
-                  <td><select value={v.estado||"Retirado"} onChange={e=>actualizarEstado(v.id,e.target.value)} style={{fontSize:10,padding:"2px 4px",borderRadius:4,width:"auto"}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select></td>
-                  <td><button onClick={()=>eliminar(v.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:12}}>✕</button></td>
-                </tr>);
-              })}</tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CuentasView({data,save,showToast}){
-  const [modal,setModal]=useState(null);
-  const [monto,setMonto]=useState("");
-  const [desde,setDesde]=useState("");
-  const [hasta,setHasta]=useState("");
-  const [clienteSel,setClienteSel]=useState(null);
-  const [busq,setBusq]=useState("");
-
-  // Build full client profiles
-  const perfilClientes={};
-  for(const v of(data.ventas||[])){
-    const cl=v.cliente||"(sin nombre)";
-    if(!perfilClientes[cl])perfilClientes[cl]={nombre:cl,ventas:[],debe:0,favor:0,totalHistorico:0,totalUSD:0};
-    const cob=pagadoVenta(v,data.pagos);
-    const saldo=Number(v.total||0)-cob;
-    perfilClientes[cl].ventas.push({...v,saldo,cob});
-    if(saldo>0)perfilClientes[cl].debe+=saldo;
-    else if(saldo<0)perfilClientes[cl].favor+=Math.abs(saldo);
-    perfilClientes[cl].totalHistorico+=Number(v.total||0);
-    perfilClientes[cl].totalUSD+=Number(v.usd||0);
-  }
-
-  // Filter for list
-  const clientes=Object.values(perfilClientes)
-    .filter(c=>!busq||c.nombre.toLowerCase().includes(busq.toLowerCase()))
-    .sort((a,b)=>b.debe-a.debe||b.totalHistorico-a.totalHistorico);
-  const conDeuda=clientes.filter(c=>c.debe>0);
-  const sinDeuda=clientes.filter(c=>c.debe===0);
-
-  const registrarPago=()=>{
-    if(!monto||!modal)return;
-    save({...data,pagos:[...(data.pagos||[]),{id:Date.now().toString(),ventaId:modal.ventaId,monto:Number(monto),fecha:hoy()}]});
-    setMonto("");setModal(null);showToast("Pago registrado");
-  };
-
-  // ── Client Profile Modal ──────────────────────────────────────────────
-  if(clienteSel){
-    const p=perfilClientes[clienteSel]||{nombre:clienteSel,ventas:[],debe:0,favor:0,totalHistorico:0,totalUSD:0};
-    const info=data.clientes?.[clienteSel]||{};
-    const ventasFilt=p.ventas
-      .filter(v=>(!desde||v.fecha>=desde)&&(!hasta||v.fecha<=hasta))
-      .sort((a,b)=>b.fecha.localeCompare(a.fecha));
-    return(
-      <div>
-        <button onClick={()=>setClienteSel(null)} style={{fontSize:13,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",color:"var(--text-primary)",cursor:"pointer",marginBottom:"1rem",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>← Volver</button>
-        
-        {/* Client header */}
-        <div style={{background:"linear-gradient(135deg,rgba(244,121,32,0.15),rgba(91,173,65,0.15),rgba(46,134,193,0.15))",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"20px 22px",marginBottom:"1rem",boxShadow:"var(--glass-shadow)"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
-            <div>
-              <div style={{fontSize:22,fontWeight:700,letterSpacing:"-.02em",color:"var(--text-primary)",marginBottom:3}}>{p.nombre}</div>
-              {info.dni&&<div style={{fontSize:12,color:"var(--text-secondary)"}}>DNI {info.dni}</div>}
-              {info.localidad&&<div style={{fontSize:12,color:"var(--text-secondary)"}}>{info.localidad}, {info.provincia}</div>}
-              {info.expreso&&<div style={{fontSize:12,color:"var(--text-info)",marginTop:2}}>🚚 {info.expreso}</div>}
-            </div>
-            <div style={{textAlign:"right"}}>
-              {p.debe>0&&<div style={{fontSize:15,fontWeight:700,color:"var(--text-danger)"}}>Debe ${fmt(p.debe)}</div>}
-              {p.favor>0&&<div style={{fontSize:13,fontWeight:600,color:"var(--text-info)"}}>A favor ${fmt(p.favor)}</div>}
-              {p.debe===0&&p.favor===0&&<div style={{fontSize:13,color:"var(--text-success)",fontWeight:500}}>✓ Al día</div>}
-            </div>
-          </div>
+          ));
+        })()}
+      </div>      {!enG&&costo>0&&<div style={{background:"var(--color-background-warning)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:"1rem",fontSize:12,color:"var(--color-text-warning)"}}>Faltan {fmtUSD(costo-cobUSD)} cobrados para recuperar</div>}
+      {estimacion&&(
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px",marginBottom:"1rem"}}>
+          <p style={{fontSize:12,fontWeight:500,margin:"0 0 8px",color:"var(--color-text-secondary)"}}>📊 Proyección si se vende el stock restante (precio promedio último mes)</p>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-            {[
-              {l:"Compras totales",v:"$"+fmt(p.totalHistorico)},
-              {l:"USD facturado",v:fmtUSD(p.totalUSD)},
-              {l:"Operaciones",v:fmt(p.ventas.length)},
-            ].map(x=>(
-              <div key={x.l} style={{background:"rgba(255,255,255,0.3)",backdropFilter:"blur(8px)",borderRadius:"var(--r-md)",padding:"10px 12px"}}>
-                <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:4}}>{x.l}</div>
-                <div style={{fontSize:15,fontWeight:600,color:"var(--text-primary)"}}>{x.v}</div>
+            {[{l:"Stock restante est.",v:fmtUSD(estimacion.stockRestUSD)},{l:"Ganancia estimada",v:fmtUSD(estimacion.ganFutura)},{l:"Mi 30% estimado",v:fmtUSD(estimacion.mi30Fut),g:true}].map(x=>(
+              <div key={x.l} style={{background:x.g?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.5rem"}}>
+                <div style={{fontSize:10,color:x.g?"var(--color-text-success)":"var(--color-text-secondary)"}}>{x.l}</div>
+                <div style={{fontSize:12,fontWeight:500,color:x.g?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Payment modal */}
-        {modal&&(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
-            <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"22px",width:"100%",maxWidth:320,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
-              <h3 style={{fontSize:16,fontWeight:600,margin:"0 0 14px",color:"var(--text-primary)"}}>Registrar pago</h3>
-              <label style={{fontSize:12,color:"var(--text-secondary)",display:"block",marginBottom:5}}>Monto recibido ($)</label>
-              <input type="number" value={monto} onChange={e=>setMonto(e.target.value)} autoFocus style={{marginBottom:14}}/>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={registrarPago} style={{flex:1,fontSize:13,padding:"10px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:600}}>Registrar</button>
-                <button onClick={()=>{setModal(null);setMonto("");}} style={{fontSize:13,padding:"10px 16px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)"}}>Cancelar</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Filter */}
-        <FiltroFechas desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta}/>
-
-        {/* Operations table */}
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",overflow:"hidden",boxShadow:"var(--glass-shadow-sm)"}}>
-          {ventasFilt.length===0?<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin operaciones en el período.</div>:(
-            <div style={{overflowX:"auto"}}>
-              <table>
-                <thead><tr>{["Fecha","Artículo","Cant.","Total","Pagado","Saldo",""].map(h=><th key={h}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {ventasFilt.map(v=>(
-                    <tr key={v.id}>
-                      <td style={{fontSize:11,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{v.fecha}</td>
-                      <td style={{fontWeight:500,whiteSpace:"nowrap"}}>{v.articulo} ×{v.cantidad}</td>
-                      <td style={{color:"var(--text-secondary)"}}>{fmtUSD(v.usd)}</td>
-                      <td style={{color:"var(--text-primary)"}}>${fmt(v.total)}</td>
-                      <td style={{color:"var(--text-success)"}}>${fmt(v.cob)}</td>
-                      <td style={{fontWeight:v.saldo>0?600:400,color:v.saldo>0?"var(--text-danger)":v.saldo<0?"var(--text-info)":"var(--text-success)",whiteSpace:"nowrap"}}>
-                        {v.saldo>0?"Debe $"+fmt(v.saldo):v.saldo<0?"Favor $"+fmt(Math.abs(v.saldo)):"✓"}
-                      </td>
-                      <td>{v.saldo>0&&<button onClick={()=>setModal({ventaId:v.id,cliente:p.nombre})} style={{fontSize:11,padding:"4px 10px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"0.5px solid var(--border-success)",background:"var(--bg-tint-green)",color:"var(--text-success)"}}>+ Pago</button>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Client List ───────────────────────────────────────────────────────
-  return(
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-        <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:0,color:"var(--text-primary)"}}>Cuentas corrientes</h2>
-        <span style={{fontSize:11,color:"var(--text-secondary)"}}>{clientes.length} clientes</span>
-      </div>
-
-      {/* Search */}
-      <div style={{marginBottom:"1rem",position:"relative"}}>
-        <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--text-tertiary)",pointerEvents:"none"}}>🔍</span>
-        <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar cliente..." style={{paddingLeft:36}}/>
-      </div>
-
-      <FiltroFechas desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta}/>
-
-      {conDeuda.length>0&&(
-        <>
-          <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-danger)",marginBottom:8}}>Con deuda ({conDeuda.length})</div>
-          <div style={{display:"grid",gap:8,marginBottom:"1.5rem"}}>
-            {conDeuda.map(c=>(
-              <div key={c.nombre} onClick={()=>setClienteSel(c.nombre)}
-                style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"13px 16px",cursor:"pointer",boxShadow:"var(--glass-shadow-sm)",transition:"transform .12s"}}
-                onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
-                onMouseLeave={e=>e.currentTarget.style.transform=""}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div>
-                    <div style={{fontWeight:600,fontSize:14,color:"var(--text-primary)"}}>{c.nombre}</div>
-                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{c.ventas.length} ops · total ${fmt(c.totalHistorico)}</div>
-                  </div>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:15,fontWeight:700,color:"var(--text-danger)"}}>-${fmt(c.debe)}</div>
-                    {c.favor>0&&<div style={{fontSize:11,color:"var(--text-info)"}}>+${fmt(c.favor)} favor</div>}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
       )}
-
-      {sinDeuda.length>0&&(
-        <>
-          <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Al día ({sinDeuda.length})</div>
-          <div style={{display:"grid",gap:6}}>
-            {sinDeuda.map(c=>(
-              <div key={c.nombre} onClick={()=>setClienteSel(c.nombre)}
-                style={{background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",cursor:"pointer",boxShadow:"var(--glass-shadow-sm)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div>
-                  <div style={{fontWeight:500,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</div>
-                  <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:1}}>{c.ventas.length} ops · ${fmt(c.totalHistorico)}</div>
-                </div>
-                <span style={{fontSize:11,color:"var(--text-success)",fontWeight:500}}>✓ Al día</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-      {clientes.length===0&&<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin clientes aún.</div>}
-    </div>
-  );
-}
-
-function ExtractoView({data}){
-  const [desde,setDesde]=useState("");const[hasta,setHasta]=useState("");
-  const movs=[];
-  for(const v of(data.ventas||[])){if(Number(v.pago||0)>0)movs.push({fecha:v.fecha,tipo:"Pago inicial",cliente:v.cliente,monto:Number(v.pago),detalle:v.articulo+" ×"+v.cantidad,contId:v.contId});}
-  for(const p of(data.pagos||[])){const v=(data.ventas||[]).find(v=>v.id===p.ventaId);if(v)movs.push({fecha:p.fecha,tipo:"Pago posterior",cliente:v.cliente,monto:Number(p.monto),detalle:v.articulo+" ×"+v.cantidad,contId:v.contId});}
-  for(const r of(data.retiros||[])){movs.push({fecha:r.fecha,tipo:"Retiro 30%",cliente:"—",monto:0,montoUSD:Number(r.montoUSD),detalle:r.nota||"",contId:null});}
-  const filtrados=movs.filter(m=>(!desde||m.fecha>=desde)&&(!hasta||m.fecha<=hasta)).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
-  const totalCob=filtrados.filter(m=>m.tipo!=="Retiro 30%").reduce((a,m)=>a+m.monto,0);
-  return(<div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.75rem"}}>
-      <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Extracto</h2>
-      <span style={{fontSize:11,color:"var(--color-text-secondary)"}}>Total cobrado: ${fmt(totalCob)}</span>
-    </div>
-    <FiltroFechas desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta}/>
-    {filtrados.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:14}}>Sin movimientos.</p>:(
-      <div style={{display:"grid",gap:6}}>
-        {filtrados.map((m,i)=>{
-          const cont=m.contId?(data.contenedores||[]).find(c=>c.id===m.contId):null;
-          const color=m.tipo==="Retiro 30%"?"var(--color-text-warning)":m.tipo==="Pago posterior"?"var(--color-text-info)":"var(--color-text-success)";
-          return(<div key={i} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"10px 1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div>
-              <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
-                <span style={{fontSize:11,fontWeight:500,color,padding:"1px 6px",borderRadius:4,background:color+"22"}}>{m.tipo}</span>
-                <span style={{fontSize:11,color:"var(--color-text-secondary)"}}>{m.fecha}</span>
-              </div>
-              <div style={{fontSize:13,fontWeight:500}}>{m.cliente}</div>
-              <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{m.detalle+(cont?" · "+cont.nombre:"")}</div>
-            </div>
-            <div style={{textAlign:"right"}}>
-              {m.monto>0&&<div style={{fontSize:15,fontWeight:500,color:"var(--color-text-success)"}}>${fmt(m.monto)}</div>}
-              {m.montoUSD>0&&<div style={{fontSize:13,color:"var(--color-text-warning)",fontWeight:500}}>{fmtUSD(m.montoUSD)}</div>}
-            </div>
-          </div>);
-        })}
-      </div>
-    )}
-  </div>);
-}
-
-function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,blue}){
-  const [form,setForm]=useState({moneda:"ARS",monto:"",tcRetiro:blue?String(Math.round(blue)):"1450",nota:"",fecha:hoy()});
-  const tcActual=blue||1450;
-
-  const registrar=()=>{
-    if(!form.monto){showToast("Ingresá el monto");return;}
-    const montoUSD=form.moneda==="USD"?Number(form.monto):Number(form.monto)/Number(form.tcRetiro||tcActual);
-    save({...data,retiros:[...(data.retiros||[]),{id:Date.now().toString(),fecha:form.fecha,nota:form.nota,montoUSD,montoPesos:form.moneda==="ARS"?Number(form.monto):null,moneda:form.moneda,tcRetiro:Number(form.tcRetiro||tcActual)}]});
-    setForm({moneda:"ARS",monto:"",tcRetiro:String(Math.round(tcActual)),nota:"",fecha:hoy()});
-    showToast("Retiro registrado");
-  };
-
-  const retiros=[...(data.retiros||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
-  const montoEnUSD=form.monto?form.moneda==="USD"?Number(form.monto):Number(form.monto)/Number(form.tcRetiro||tcActual):0;
-  const pctRetirado=mi30Total>0?Math.min(100,(totalRetirado/mi30Total)*100):0;
-
-  // Metric card component local
-  const MC=({label,value,sub,green,info,muted})=>(
-    <div style={{
-      background:green?"var(--bg-tint-green)":info?"var(--bg-tint-blue)":"rgba(120,120,128,0.10)",
-      border:"0.5px solid "+(green?"var(--border-success)":info?"var(--border-info)":"var(--glass-border)"),
-      borderRadius:"var(--r-lg)",padding:"14px 16px",
-      backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
-      boxShadow:"var(--glass-shadow-sm)",
-    }}>
-      <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",
-        color:green?"var(--text-success)":info?"var(--text-info)":"var(--text-secondary)",
-        marginBottom:6}}>{label}</div>
-      <div style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",
-        color:green?"var(--text-success)":info?"var(--text-info)":"var(--text-primary)"}}>{value}</div>
-      {sub&&<div style={{fontSize:11,color:green?"var(--text-success)":info?"var(--text-info)":"var(--text-secondary)",marginTop:4,opacity:.85}}>{sub}</div>}
-    </div>
-  );
-
-  return(
-    <div>
-      <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:"0 0 1.25rem",color:"var(--text-primary)"}}>Mi 30%</h2>
-
-      {/* Main metrics */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1rem"}}>
-        <MC label="30% total devengado"  value={fmtUSD(mi30Total)}/>
-        <MC label="Ya retirado"          value={fmtUSD(totalRetirado)}/>
-        <MC label="Pendiente de cobrar"  value={fmtUSD(pendienteRetiro)}  green={pendienteRetiro>0}
-            sub={"≈ $"+fmt(pendienteRetiro*tcActual)+" ARS"}/>
-        <MC label="Cotización blue"      value={"$"+fmt(tcActual)}  info sub="por dólar"/>
-      </div>
-
-      {/* Progress bar */}
-      {mi30Total>0&&(
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",
-          border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",
-          padding:"14px 16px",marginBottom:"1.5rem",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:8}}>
-            <span style={{color:"var(--text-secondary)"}}>Retirado</span>
-            <span style={{fontWeight:600,color:pctRetirado>=100?"var(--text-success)":"var(--text-primary)"}}>
-              {fmtPct(pctRetirado)}
-            </span>
-          </div>
-          <div style={{height:6,background:"rgba(120,120,128,0.15)",borderRadius:3,overflow:"hidden"}}>
-            <div style={{height:"100%",width:pctRetirado+"%",
-              background:"linear-gradient(90deg,var(--sc-orange),var(--sc-green,#5BAD41))",
-              borderRadius:3,transition:"width .5s cubic-bezier(.4,0,.2,1)"}}/>
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginTop:6,color:"var(--text-secondary)"}}>
-            <span>Retirado: {fmtUSD(totalRetirado)}</span>
-            <span style={{color:"var(--text-success)",fontWeight:600}}>Pendiente: {fmtUSD(pendienteRetiro)}</span>
-          </div>
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
+        <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>Registrar venta manual</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm({...form,fecha:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
+          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.articulo} onChange={e=>setForm({...form,articulo:e.target.value})} style={{width:"100%",marginTop:2}}>{(cont.articulos||[]).map(a=><option key={a.nombre}>{a.nombre}</option>)}</select></div>
+          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cantidad</label><input type="number" value={form.cantidad} onChange={e=>setForm({...form,cantidad:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
+          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Precio ($)</label><input type="number" value={form.precioVenta} onChange={e=>setForm({...form,precioVenta:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
+          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cliente</label><input value={form.cliente} onChange={e=>setForm({...form,cliente:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
+          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Pago recibido ($)</label><input type="number" value={form.pago} onChange={e=>setForm({...form,pago:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
+          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{blue?"Cotización · $"+fmt(blue):"Cotización"}</label><input type="number" value={form.tipoCambio} onChange={e=>setForm({...form,tipoCambio:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
+          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Estado</label><select value={form.estado} onChange={e=>setForm({...form,estado:e.target.value})} style={{width:"100%",marginTop:2}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select></div>
         </div>
-      )}
-
-      {/* Registrar retiro */}
-      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",
-        border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",
-        padding:"16px 18px",marginBottom:"1.5rem",boxShadow:"var(--glass-shadow-sm)"}}>
-        <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",
-          color:"var(--text-secondary)",marginBottom:12}}>Registrar retiro</div>
-
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-          <div>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Moneda</label>
-            <select value={form.moneda} onChange={e=>setForm({...form,moneda:e.target.value})}>
-              <option value="USD">USD</option>
-              <option value="ARS">$ARS</option>
-            </select>
-          </div>
-          <div>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>
-              Monto ({form.moneda})
-            </label>
-            <input type="number" value={form.monto} onChange={e=>setForm({...form,monto:e.target.value})} placeholder="0"/>
-          </div>
-          {form.moneda==="ARS"&&(
-            <div>
-              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>
-                Cotización blue {blue?"· $"+fmt(blue):""}
-              </label>
-              <input type="number" value={form.tcRetiro} onChange={e=>setForm({...form,tcRetiro:e.target.value})}/>
-            </div>
-          )}
-          <div>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label>
-            <input type="date" value={form.fecha} onChange={e=>setForm({...form,fecha:e.target.value})}/>
-          </div>
-          <div style={{gridColumn:"1/-1"}}>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota (opcional)</label>
-            <input value={form.nota} onChange={e=>setForm({...form,nota:e.target.value})} placeholder="Ej: retiro parcial enero"/>
-          </div>
-        </div>
-
-        {form.monto>0&&(
-          <div style={{padding:"9px 12px",background:"var(--bg-tint-green)",border:"0.5px solid var(--border-success)",
-            borderRadius:"var(--r-md)",marginBottom:12,fontSize:12,color:"var(--text-success)",fontWeight:500}}>
-            {form.moneda==="ARS"
-              ?<>Equivale a <strong>{fmtUSD(montoEnUSD)}</strong> al TC ${fmt(form.tcRetiro||tcActual)}</>
-              :<>Equivale a <strong>${fmt(montoEnUSD*tcActual)}</strong> ARS al blue ${fmt(tcActual)}</>
-            }
-          </div>
-        )}
-
-        <button onClick={registrar} style={{
-          fontSize:13,padding:"9px 20px",borderRadius:"var(--r-pill)",border:"none",
-          background:"linear-gradient(135deg,#F47920,#5BAD41)",color:"#fff",
-          fontWeight:600,cursor:"pointer",boxShadow:"0 4px 14px rgba(244,121,32,0.35)",
-        }}>Registrar retiro</button>
+        {form.articulo&&<p style={{fontSize:11,color:"var(--color-text-secondary)",margin:"0 0 6px"}}>Stock disponible: {sdMap[form.articulo]??0}</p>}
+        <button onClick={registrar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>Registrar</button>
       </div>
+      {ventasCont.length>0&&(
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Fecha","Artículo","Cant","Cliente","$","Cobrado","Estado",""].map(h=><th key={h} style={{padding:"5px 7px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+            <tbody>{────────────────────────────────────────────────────────
+const APP_VERSION = "v2.8.0";
+const APP_BUILD   = "2026-06-16";
 
-      {/* Por contenedor */}
-      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px 18px",marginBottom:"1.5rem",boxShadow:"var(--glass-shadow-sm)"}}>
-        <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:12}}>Detalle por contenedor</div>
-        {[...(data.contenedores||[])].sort((a,b)=>b.id.localeCompare(a.id)).map(c=>{
-          const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
-          const facturadoUSD=ventasCont.reduce((a,v)=>a+ventaUSD(v,tcActual),0);
-          const costo=c.costoTotal||0;
-          const ganancia=Math.max(0,facturadoUSD-costo);
-          const mi30c=ganancia*0.3;
-          const pct=costo>0?Math.min(100,facturadoUSD/costo*100):0;
-          return(
-            <div key={c.id} style={{marginBottom:12,paddingBottom:12,borderBottom:"0.5px solid var(--glass-border)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <span style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</span>
-                <span style={{fontSize:12,fontWeight:600,color:ganancia>0?"var(--text-success)":"var(--text-warning)"}}>
-                  Mi 30%: {fmtUSD(mi30c)}
-                </span>
-              </div>
-              <div style={{display:"flex",gap:12,fontSize:11,color:"var(--text-secondary)",flexWrap:"wrap",marginBottom:6}}>
-                <span>Facturado: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(facturadoUSD)}</strong></span>
-                <span>Costo: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(costo)}</strong></span>
-                <span style={{color:ganancia>0?"var(--text-success)":"var(--text-warning)"}}>
-                  {ganancia>0?"Ganancia: "+fmtUSD(ganancia):"Faltan: "+fmtUSD(costo-facturadoUSD)+" para recuperar"}
-                </span>
-              </div>
-              <div style={{height:4,background:"rgba(120,120,128,0.15)",borderRadius:2,overflow:"hidden"}}>
-                <div style={{height:"100%",width:pct+"%",background:pct>=100?"var(--text-success)":"#F47920",borderRadius:2,transition:"width .5s"}}/>
-              </div>
-              <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:3}}>{fmtPct(pct)} de la inversión recuperado</div>
-            </div>
-          );
-        })}
-        {(data.contenedores||[]).length===0&&<div style={{fontSize:12,color:"var(--text-secondary)"}}>Sin contenedores.</div>}
-      </div>
+const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
+const ESTADOS = ["A despachar","Despachado","A retirar Ezeiza","A retirar Once","Retirado"];
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const CATS_GASTO = ["Vivienda","Alimentación","Transporte","Servicios","Salud","Ocio","Inversión","Otros"];
 
-      {/* Historial */}
-      {retiros.length>0&&(
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",
-          border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",
-          padding:"16px 18px",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",
-            color:"var(--text-secondary)",marginBottom:12}}>Historial de retiros</div>
-          {retiros.map(r=>(
-            <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              padding:"9px 0",borderBottom:"0.5px solid var(--glass-border)"}}>
-              <div>
-                <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)"}}>
-                  {fmtUSD(r.montoUSD)}{r.montoPesos?" · $"+fmt(r.montoPesos)+" ARS":""}
-                </div>
-                <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>
-                  {r.fecha}{r.nota?" · "+r.nota:""}{r.tcRetiro?" · TC $"+fmt(r.tcRetiro):""}
-                </div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:12,color:"var(--text-secondary)"}}>
-                  ≈ ${fmt(r.montoUSD*tcActual)} ARS
-                </div>
-                <button onClick={()=>{if(window.confirm("¿Borrar este retiro?"))save({...data,retiros:data.retiros.filter(x=>x.id!==r.id)});}}
-                  style={{fontSize:11,border:"none",background:"none",color:"var(--text-danger)",cursor:"pointer",marginTop:2}}>✕ borrar</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+const fmt = n => Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
+const fmtUSD = n => "USD "+Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct = n => Number(n||0).toFixed(1)+"%";
+const pesoRollo = a => a.pesoUnitarioOverride!=null ? Number(a.pesoUnitarioOverride) : (Number(a.gramaje||0)/1000)*Number(a.ancho||0)*Number(a.largo||0);
+const hoy = () => new Date().toISOString().split("T")[0];
+const haceUnMes = () => { const d=new Date(); d.setMonth(d.getMonth()-1); return d.toISOString().split("T")[0]; };
 
-function DespachosView({data,save,showToast}){
-  const [manual,setManual]=useState(false);
-  const [form,setForm]=useState({cliente:"",dni:"",direccion:"",localidad:"",provincia:"",expreso:"",articulos:""});
-  // Sort: pending first (by date desc), then rest (by date desc)
-  const _allDesp=[...(data.despachos||[])];
-  const _pendDesp=_allDesp.filter(d=>d.estado==="Pendiente").sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
-  const _restDesp=_allDesp.filter(d=>d.estado!=="Pendiente").sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
-  const despachos=[..._pendDesp,..._restDesp];
-  const pendientes=despachos.filter(d=>d.estado==="Pendiente");
-  const agregarManual=()=>{
-    if(!form.cliente)return;
-    save({...data,despachos:[...(data.despachos||[]),{id:Date.now().toString(),fecha:hoy(),...form,estado:"Pendiente"}]});
-    setForm({cliente:"",dni:"",direccion:"",localidad:"",provincia:"",expreso:"",articulos:""});
-    setManual(false);showToast("Despacho agregado");
-  };
-  const actualizarEstado=(id,estado)=>save({...data,despachos:data.despachos.map(d=>d.id===id?{...d,estado}:d)});
-  const calcularBultos=d=>{
-    // Parsea "30GR x5, TINTA NEGRO x3" -> [{nombre,cantidad,esTinta}]
-    if(!d.articulos)return[{...d,bultoLabel:"",bultoNum:1,bultoTotal:1}];
-    // Enrich partial names like "60x500" with full ARTS name
-    const enrichNombre=(n)=>{
-      const found=ARTS.find(a=>a.toLowerCase().includes(n.toLowerCase())||n.toLowerCase().includes(a.toLowerCase().split(' ').slice(-1)[0]));
-      return found||n;
-    };
-    const items=d.articulos.split(",").map(s=>{
-      const m=s.trim().match(/^(.+?)\s*[xX×]\s*(\d+)$/);
-      if(!m)return null;
-      const nombreRaw=m[1].trim();
-      const nombre=enrichNombre(nombreRaw);
-      const cantidad=parseInt(m[2]);
-      const esTinta=nombre.includes("TINTA");
-      return{nombre,cantidad,esTinta};
-    }).filter(Boolean);
-    const rollos=items.filter(i=>!i.esTinta);
-    const tintas=items.filter(i=>i.esTinta);
-    const bultos=[];
-    // 1 etiqueta por cada rollo individual
-    rollos.forEach(r=>{
-      for(let i=0;i<r.cantidad;i++){
-        bultos.push({tipo:"rollo",desc:r.nombre});
-      }
-    });
-    // Tintas: hasta 20 unidades por bulto
-    const totalTintas=tintas.reduce((a,t)=>a+t.cantidad,0);
-    const descTintas=tintas.map(t=>t.nombre.replace("TINTA ","")+" x"+t.cantidad).join(", ");
-    if(totalTintas>0){
-      const numBultosTinta=Math.ceil(totalTintas/20);
-      for(let i=0;i<numBultosTinta;i++){
-        const desde=i*20+1;const hasta=Math.min((i+1)*20,totalTintas);
-        const label=numBultosTinta>1?"Tintas "+desde+"-"+hasta+" de "+totalTintas+" ("+descTintas+")":"Tintas ("+descTintas+")";
-        bultos.push({tipo:"tinta",desc:label});
-      }
-    }
-    // Si no hay artículos reconocibles, 1 bulto genérico
-    if(bultos.length===0)return[{...d,bultoLabel:"",bultoNum:1,bultoTotal:1}];
-    return bultos.map((b,i)=>({...d,bultoLabel:b.desc,bultoNum:i+1,bultoTotal:bultos.length}));
-  };
-  const CSS_ETIQUETA="*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px}"+
-    ".page{display:flex;flex-wrap:wrap;gap:4mm;padding:5mm}"+
-    ".r{border:1.5px solid #000;padding:4mm 5mm;width:95mm;page-break-inside:avoid;break-inside:avoid}"+
-    ".dest{font-size:13px;font-weight:bold;margin-bottom:2mm}"+
-    ".row{display:flex;gap:3mm;margin-bottom:1mm;line-height:1.3}"+
-    ".t{color:#444;min-width:18mm;font-size:9px;text-transform:uppercase;padding-top:1px}"+
-    ".v{font-weight:600;font-size:11px;flex:1}"+
-    ".bulto{margin-top:3mm;padding-top:2mm;border-top:1px dashed #999;font-size:9px;color:#444;display:flex;justify-content:space-between}"+
-    ".bnum{font-size:14px;font-weight:bold;color:#000}"+
-    "@media print{body{margin:0}.page{padding:3mm;gap:3mm}}";
-  const htmlEtiqueta=(b)=>{
-    const total=b.bultoTotal||1;const num=b.bultoNum||1;
-    return "<div class='r'>"+
-      "<div class='dest'>"+(b.cliente||"")+"</div>"+
-      "<div class='row'><div class='t'>DNI</div><div class='v'>"+(b.dni||"—")+"</div></div>"+
-      "<div class='row'><div class='t'>Dirección</div><div class='v'>"+(b.direccion||"—")+"</div></div>"+
-      "<div class='row'><div class='t'>Localidad</div><div class='v'>"+(b.localidad||"—")+"</div></div>"+
-      "<div class='row'><div class='t'>Provincia</div><div class='v'>"+(b.provincia||"—")+"</div></div>"+
-      "<div class='row'><div class='t'>Expreso</div><div class='v'>"+(b.expreso||"—")+"</div></div>"+
-      ((b.bultoLabel||b.articulos)?"<div class='bulto'><span>"+(b.bultoLabel||b.articulos||"")+"</span>"+(total>1?"<span class='bnum'>"+num+"/"+total+"</span>":"")+"</div>":"")+
-      "</div>";
-  };
-  const abrirPDF=(etiquetas,titulo)=>{
-    const w=window.open("","_blank");
-    if(!w)return;
-    const body="<div class='page'>"+etiquetas.map(htmlEtiqueta).join("")+"</div>";
-    w.document.write("<!DOCTYPE html><html><head><meta charset='utf-8'><title>"+titulo+"</title><style>"+CSS_ETIQUETA+"</style></head><body>"+body+"<script>window.onload=()=>{setTimeout(()=>window.print(),300);}<\/script></body></html>");
-    w.document.close();
-  };
-  const imprimirUno=desp=>{
-    const bultos=calcularBultos(desp);
-    abrirPDF(bultos,"Rótulo — "+desp.cliente);
-  };
-  const imprimirTodosPendientes=()=>{
-    if(!pendientes.length){showToast("No hay pendientes");return;}
-    const todasEtiquetas=pendientes.flatMap(d=>calcularBultos(d));
-    const totalBultos=todasEtiquetas.length;
-    abrirPDF(todasEtiquetas,"Rótulos — "+pendientes.length+" despachos");
-    const nuevosDespachos=data.despachos.map(d=>pendientes.some(p=>p.id===d.id)?{...d,estado:"Despachado"}:d);
-    save({...data,despachos:nuevosDespachos});
-    showToast(pendientes.length+" despachos · "+totalBultos+" etiquetas generadas");
-  };
-  return(<div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-      <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Despachos</h2>
-      <div style={{display:"flex",gap:6}}>
-        {pendientes.length>0&&<button onClick={imprimirTodosPendientes} style={{fontSize:11,padding:"6px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-border-info)",color:"var(--color-background-primary)",fontWeight:500}}>🖨️ Imprimir {pendientes.length} pendientes</button>}
-        <button onClick={()=>setManual(true)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>+ Manual</button>
-      </div>
-    </div>
-    {manual&&(<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
-      <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>Nuevo despacho manual</p>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-        <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Nombre completo</label><input value={form.cliente} onChange={e=>setForm({...form,cliente:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-        <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>DNI</label><input value={form.dni} onChange={e=>setForm({...form,dni:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-        <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Expreso</label><input value={form.expreso} onChange={e=>setForm({...form,expreso:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-        <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Dirección</label><input value={form.direccion} onChange={e=>setForm({...form,direccion:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-        <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Localidad</label><input value={form.localidad} onChange={e=>setForm({...form,localidad:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-        <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Provincia</label><input value={form.provincia} onChange={e=>setForm({...form,provincia:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-        <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículos</label><input value={form.articulos} onChange={e=>setForm({...form,articulos:e.target.value})} placeholder="Ej: 30GR x5, 61GR x2" style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-      </div>
-      <div style={{display:"flex",gap:8}}>
-        <button onClick={agregarManual} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-success)",color:"var(--color-background-primary)",fontWeight:500}}>Agregar</button>
-        <button onClick={()=>setManual(false)} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"transparent",color:"var(--color-text-secondary)"}}>Cancelar</button>
-      </div>
-    </div>)}
-    {despachos.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:14}}>Sin despachos.</p>:(
-      <div style={{display:"grid",gap:8}}>
-        {despachos.map((d,i)=>(
-          <React.Fragment key={d.id}>
-          {i===_pendDesp.length&&_pendDesp.length>0&&_restDesp.length>0&&(
-            <div style={{margin:"12px 0 8px",display:"flex",alignItems:"center",gap:8}}>
-              <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
-              <span style={{fontSize:10,color:"var(--text-secondary)",padding:"0 8px"}}>Despachados / Retirados</span>
-              <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
-            </div>
-          )}
-          <div style={{background:"var(--color-background-primary)",border:d.estado==="Pendiente"?"1px solid #378ADD":"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 1rem"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-              <div>
-                <div style={{fontWeight:500,fontSize:14}}>{d.cliente}</div>
-                <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:1}}>{d.fecha+" · "+(d.expreso||"Sin expreso")}</div>
-              </div>
-              <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                <select value={d.estado||"Pendiente"} onChange={e=>actualizarEstado(d.id,e.target.value)} style={{fontSize:11,padding:"3px 6px",borderRadius:4}}><option>Pendiente</option><option>Despachado</option></select>
-                <button onClick={()=>imprimirUno(d)} style={{fontSize:11,padding:"4px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)",whiteSpace:"nowrap"}}>🖨️</button>
-              </div>
-            </div>
-            <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{[d.direccion,d.localidad,d.provincia].filter(Boolean).join(" · ")+(d.dni?" · DNI "+d.dni:"")}</div>
-            {d.articulos&&<div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>{d.articulos}</div>}
-          </div>
-          </React.Fragment>
-        ))}
-      </div>
-    )}
-  </div>);
-}
+const EMPTY = {
+  contenedores:[], ventas:[], pagos:[], retiros:[], despachos:[],
+  clientes:{},          // persistente en Firebase
+  bh:{ despachos:[], cobros:[] },
+  dj:{ eventos:[], presupuestos:[] },
+  fin:{ gastos:[], presupuestos:{} },
+  _v:10
+};
 
-  </script>
+// ── HELPERS SC ────────────────────────────────────────────────────────────
+async
+</script>
 
   <script>
     function runApp() {
