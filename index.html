@@ -1837,27 +1837,24 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
     try {
       if(action.action==="CARGAR_PEDIDO"){
         const cont = (data.contenedores||[]).find(c=>c.id===d.contId||c.nombre.toLowerCase().includes((d.contId||"").toLowerCase()));
-        if(!cont){showToast("Contenedor no encontrado");return;}
+        if(!cont){showToast("Contenedor no encontrado");setPendingAction(null);return;}
         const total = d.cantidad * d.precioVenta;
         const usd = total / (d.tipoCambioUsado||tc);
         const pedidoId = Date.now().toString();
-        // Force correct estado based on entrega type
-          const entregaTipo = d.entrega||"Retira Ezeiza";
-          const _et = entregaTipo.toLowerCase();
-          const estadoVenta = _et.includes("expreso") ? "A despachar"
-            : _et.includes("once") ? "A retirar Once"
-            : "A retirar Ezeiza";
-          const venta = {
+        const entregaTipo = d.entrega||"Retira Ezeiza";
+        const _et = entregaTipo.toLowerCase();
+        const estadoVenta = _et.includes("expreso") ? "A despachar"
+          : _et.includes("once") ? "A retirar Once"
+          : "A retirar Ezeiza";
+        const venta = {
           id: pedidoId+"v1", contId: cont.id, cliente: d.cliente,
           articulo: d.articulo, cantidad: Number(d.cantidad),
           precioVenta: Number(d.precioVenta), total, usd,
           tipoCambioUsado: d.tipoCambioUsado||tc,
           fecha: new Date().toISOString().split("T")[0],
-          estado: estadoVenta,
-          entrega: entregaTipo,
+          estado: estadoVenta, entrega: entregaTipo,
           pago: 0, pedidoId
         };
-        // Merge client info
         const clienteData = {...CLIENTES_BASE,...(data.clientes||{})};
         const cInfo = clienteData[d.cliente]||{};
         const newClientes = {...(data.clientes||{})};
@@ -1869,14 +1866,11 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           ...(d.provincia&&{provincia:d.provincia}),
           ...(d.expreso&&{expreso:d.expreso}),
         };
-        // Auto-create despacho if Expreso
         let newDespachos = data.despachos||[];
         if(estadoVenta==="A despachar"){
           const cInfoFull = {...cInfo,...(d.dni?{dni:d.dni}:{}),...(d.direccion?{direccion:d.direccion}:{}),...(d.localidad?{localidad:d.localidad}:{}),...(d.provincia?{provincia:d.provincia}:{}),...(d.expreso?{expreso:d.expreso}:{})};
           newDespachos = [...newDespachos, {
-            id: pedidoId,
-            pedidoId,
-            cliente: d.cliente,
+            id: pedidoId, pedidoId, cliente: d.cliente,
             articulos: d.articulo+" x"+d.cantidad,
             dni: cInfoFull.dni||d.dni||"",
             direccion: cInfoFull.direccion||d.direccion||"",
@@ -1887,9 +1881,12 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
             estado: "Pendiente",
           }];
         }
+        // Guardar pedido y preguntar si pagó
         save({...data, ventas:[...(data.ventas||[]),venta], clientes:newClientes, despachos:newDespachos});
         showToast("✓ Pedido cargado"+(estadoVenta==="A despachar"?" · Despacho creado":""));
-        setPendingAction(null);
+        // Preguntar pago
+        setPendingAction({action:"_PAGO_PEDIDO_", data:{ventaId: pedidoId+"v1", total}});
+        setMsgs(m=>[...m,{role:"assistant",content:"✓ Pedido cargado. ¿El cliente pagó el total ($"+Number(total).toLocaleString("es-AR")+")?\n\nRespondé **sí** (pagó todo), **no** (no pagó nada), o el monto que pagó (ej: 50000)."}]);
       }
       else if(action.action==="CARGAR_EVENTO_DJ"){
         const cobroN = Number(d.cobro||0);
@@ -2118,6 +2115,35 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
       const lower = text.toLowerCase();
 
       // Special case: waiting for cost to confirm presupuesto
+      // ── Pago de pedido SC ──────────────────────────────────────────────────
+      if(pendingAction.action==="_PAGO_PEDIDO_"){
+        const {ventaId, total} = pendingAction.data;
+        const lower = text.toLowerCase().trim();
+        let pagoMonto = 0;
+        if(lower==="sí"||lower==="si"||lower==="s"||lower==="yes"){
+          pagoMonto = total; // pagó todo
+        } else if(lower==="no"||lower==="n"){
+          pagoMonto = 0; // no pagó nada
+        } else {
+          // intenta parsear un número
+          const num = Number(text.replace(/[^0-9.,]/g,"").replace(",","."));
+          if(!isNaN(num)&&num>0) pagoMonto = num;
+        }
+        // Actualizar la venta con el pago
+        const ventasAct = (data.ventas||[]).map(v=>v.id===ventaId?{...v,pago:pagoMonto}:v);
+        save({...data, ventas:ventasAct});
+        const saldo = Math.max(0, total-pagoMonto);
+        const msg = pagoMonto>=total
+          ? "✓ Pago total registrado. Saldo: $0."
+          : pagoMonto>0
+            ? "✓ Pago parcial de $"+pagoMonto.toLocaleString("es-AR")+" registrado. Saldo pendiente: $"+saldo.toLocaleString("es-AR")+"."
+            : "✓ Sin pago registrado. Saldo pendiente: $"+total.toLocaleString("es-AR")+".";
+        setMsgs(m=>[...m,{role:"assistant",content:msg}]);
+        setPendingAction(null);
+        setLoading(false);
+        return;
+      }
+
       if(pendingAction.action==="_EJECUTAR_CONFIRMACION_PRES"){
         // Parse cost from message: "$150000", "150.000", "USD 800", "0"
         const usdMatch=text.match(/USD\s*([\d.,]+)/i);
