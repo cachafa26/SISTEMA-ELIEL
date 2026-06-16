@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.4.2 · 2026-06-16 -->
+  <!-- v2.5.2 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.4.2</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.5.2</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.4.2";
+const APP_VERSION = "v2.5.2";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1227,10 +1227,13 @@ function FiltroFechas({desde,setDesde,hasta,setHasta}){
 
 // ── BH TRADE HELPERS ──────────────────────────────────────────────────────
 function bhSueldoMes(despachosMes, mes){
-  const total=despachosMes.reduce((a,d)=>a+d.total,0);
+  const totalDespachos=despachosMes.reduce((a,d)=>a+d.total,0);
   const base=160000;
   const esAguinaldo=mes===5||mes===11;
-  return{total,base,aguinaldo:esAguinaldo,sueldo:(total+base)*(esAguinaldo?1.5:1)};
+  // Aguinaldo = 50% del salario base (160k), NOT on despachos
+  const aguinaldoMonto=esAguinaldo?base*0.5:0;
+  const sueldo=totalDespachos+base+aguinaldoMonto;
+  return{total:totalDespachos,base,aguinaldo:esAguinaldo,aguinaldoMonto,sueldo};
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -1369,6 +1372,14 @@ function App(){
   const mesActual=new Date().getMonth();
   const bhDespachosMes=(data.bh?.despachos||[]).filter(d=>d.mes===mesActual);
   const bhSueldo=bhSueldoMes(bhDespachosMes,mesActual).sueldo;
+  // BH total acumulado todos los meses - total cobrado
+  const bhTotalAcumulado=(data.bh?.despachos||[]).reduce((a,d)=>a+d.total,0) +
+    [...new Set((data.bh?.despachos||[]).map(d=>d.mes))].reduce((a,mes)=>{
+      const dm=(data.bh?.despachos||[]).filter(d=>d.mes===mes);
+      return a + bhSueldoMes(dm,mes).base + bhSueldoMes(dm,mes).aguinaldoMonto;
+    },0);
+  const bhCobradoTotal=(data.bh?.cobros||[]).reduce((a,c)=>a+Number(c.monto||0),0);
+  const bhPendienteCobro=Math.max(0,bhTotalAcumulado-bhCobradoTotal);
 
   // Calculos DJ globales
   const djEventos=data.dj?.eventos||[];
@@ -1442,7 +1453,7 @@ function App(){
         </button>
       )}
 
-      {chatState!=="closed"&&<ChatBot data={data} save={save} showToast={showToast} blue={blue} stockUni={stockUni} onClose={()=>setChatState("minimized")} chatState={chatState} externalMsgs={chatMsgs} setExternalMsgs={setChatMsgs} onFullClose={()=>setChatState("closed")}/>}
+      {chatState!=="closed"&&<ChatBot data={data} save={save} showToast={showToast} blue={blue} stockUni={stockUni} onClose={()=>setChatState("minimized")} chatState={chatState} externalMsgs={chatMsgs} setExternalMsgs={setChatMsgs} onFullClose={()=>setChatState("closed")} pendienteRetiro={pendienteRetiro} bhPendienteCobro={bhPendienteCobro}/>}
 
       {/* TOP NAV ── desktop (hidden on mobile via CSS) */}
       <div className="top-nav" style={{
@@ -1729,6 +1740,11 @@ ${deudoresStr||'Ninguno'}
 EVENTOS DJ:
 ${eventos||'Sin eventos'}
 
+RETIROS PENDIENTES:
+- Mi 30% SC: pendiente $\${Math.round((pendienteRetiro||0)*(tc||1450)).toLocaleString('es-AR')} ARS
+- BH Trade: pendiente $\${Math.round(bhPendienteCobro||0).toLocaleString('es-AR')} ARS
+- TOTAL a retirar: $\${Math.round(((pendienteRetiro||0)*(tc||1450))+(bhPendienteCobro||0)).toLocaleString('es-AR')} ARS
+
 CLIENTES REGISTRADOS (primeros 30):
 ${clientes}
 
@@ -1745,13 +1761,18 @@ TU ROL:
 
 ACCIONES QUE PODÉS EJECUTAR (responder con JSON exacto cuando tenés todos los datos):
 Para cargar un PEDIDO:
-{"action":"CARGAR_PEDIDO","data":{"contId":"15VO CONTENEDOR","cliente":"nombre","articulo":"29GR 1,60x600","cantidad":N,"precioVenta":N,"entrega":"Expreso","tipoCambioUsado":TC,"dni":"","direccion":"","localidad":"","provincia":"","expreso":"nombre del transporte"}}
+{"action":"CARGAR_PEDIDO","data":{"contId":"15VO CONTENEDOR","cliente":"nombre","articulo":"29GR 1,60x600","cantidad":N,"precioVenta":N,"entrega":"Expreso","tipoCambioUsado":TC,"dni":"","direccion":"","localidad":"","provincia":"","expreso":"nombre del transporte","pagoCliente":0}}
 
 Para cargar EVENTO DJ:
 {"action":"CARGAR_EVENTO_DJ","data":{"nombre":"nombre evento","fecha":"YYYY-MM-DD","estado":"Confirmado","monedaCobro":"USD","cobro":N,"monedaCosto":"ARS","costo":N,"sena":0,"notas":""}}
 
 Para PAGO de evento DJ (cuando el cliente paga):
 {"action":"REGISTRAR_PAGO_DJ","data":{"cliente":"nombre","monto":N,"moneda":"USD","concepto":"Seña","fecha":"YYYY-MM-DD","nota":""}}
+
+Para RETIRO: puede ser de Mi 30% (SC), de BH Trade, o de ambos.
+Si el monto supera lo disponible en una sola fuente, distribuir automáticamente entre ambas.
+Consultar si no está claro de cuál fuente. Responder con pendiente de cada fuente para que el usuario decida.
+{"action":"CARGAR_RETIRO","data":{"tipo":"sc|bh|ambos","monto":N,"montoSC":N,"montoBH":N,"moneda":"ARS","fecha":"YYYY-MM-DD","nota":""}}
 
 Para RETIRO Mi30:
 {"action":"CARGAR_RETIRO","data":{"moneda":"ARS","monto":N,"tcRetiro":TC,"nota":"","fecha":"YYYY-MM-DD"}}
@@ -1766,6 +1787,7 @@ REGLAS IMPORTANTES:
 - Si falta información para ejecutar una acción, preguntá ESPECÍFICAMENTE qué falta
 - Para pedidos: necesitás contenedor (NOMBRE exacto), artículo (nombre exacto del stock), cantidad, precio unitario en ARS, cliente, tipo de entrega.
 - TIPOS DE ENTREGA: "Expreso" → va a despachos; "Retira Once" → retira en Once; "Retira Ezeiza" → retira en Ezeiza. Si no se aclara, preguntar.
+- PAGO DEL CLIENTE: siempre preguntar si el cliente pagó el total, pagó algo (y cuánto), o no pagó nada. Incluir campo "pagoCliente": N en el JSON (0 si no pagó).
 - Si la entrega es EXPRESO: verificar si el cliente ya tiene datos de envío en el sistema (los clientes registrados tienen dirección, localidad, provincia, expreso). Si YA tiene datos → usar los guardados automáticamente sin preguntar. Si NO tiene datos guardados → preguntar: DNI, dirección, localidad, provincia y empresa de transporte (expreso).
 - Para DJ: necesitás nombre evento, fecha, moneda cobro, monto cobro, moneda costo, monto costo
 - Para despachos: necesitás cliente, artículos, provincia/localidad, expreso
@@ -1778,6 +1800,7 @@ DOCUMENTOS DJ — ELIEL MIZRAHI DJ:
 Podés generar 3 tipos de documentos PDF profesionales:
 
 PARA PRESUPUESTO DJ necesitás: nombre cliente, fecha evento, salon/venue, tipo evento (casamiento/cumpleanos/etc), invitados (aprox), con tecnica o sin, precio USD, recepcionistas (incluidas/opcionales/sin).
+El estado del presupuesto es siempre "Pendiente". NUNCA preguntar el estado al usuario.
 Si falta CUALQUIER dato → preguntar todo en un solo mensaje antes de generar.
 
 PARA CONFIRMACION DJ necesitas del presupuesto original + opcionales elegidos + forma de pago (total con 10pct descuento o 2 cuotas 50/50).
@@ -1805,7 +1828,7 @@ Para generar confirmacion DJ responder con:
 {"action":"GENERAR_CONFIRMACION_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fechaEvento":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300","conTecnica":true,"paquete":"basica_inter","precioBase":8200,"opcionalesElegidos":[],"formaPago":"total","descuento":10}}`;
 }
 
-function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, externalMsgs, setExternalMsgs, onFullClose}){
+function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, externalMsgs, setExternalMsgs, onFullClose, pendienteRetiro, bhPendienteCobro}){
   const msgs = externalMsgs;
   const setMsgs = setExternalMsgs;
   const [input, setInput] = useState("");
@@ -1875,7 +1898,13 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
             estado: "Pendiente",
           }];
         }
-        save({...data, ventas:[...(data.ventas||[]),venta], clientes:newClientes, despachos:newDespachos});
+        // Register client payment if provided
+        let ventaFinal = {...venta};
+        if(d.pagoCliente !== undefined){
+          const pagoNum = Number(d.pagoCliente||0);
+          ventaFinal = {...ventaFinal, pagoCliente:pagoNum, saldoCliente:Math.max(0,total-pagoNum), pagoCancelado:pagoNum>=total};
+        }
+        save({...data, ventas:[...(data.ventas||[]),ventaFinal], clientes:newClientes, despachos:newDespachos});
         showToast("✓ Pedido cargado"+(estadoVenta==="A despachar"?" · Despacho creado":""));
         setPendingAction(null);
       }
@@ -1919,13 +1948,29 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         const montoN = Number(d.monto||0);
         const tcR = Number(d.tcRetiro||tc);
         const montoUSD = d.moneda==="ARS"?montoN/tcR:montoN;
-        const retiro = {
-          id: Date.now().toString(), fecha: d.fecha||new Date().toISOString().split("T")[0],
-          nota: d.nota||"", montoUSD, montoPesos: d.moneda==="ARS"?montoN:null,
-          moneda: d.moneda||"ARS", tcRetiro: tcR
-        };
-        save({...data,retiros:[...(data.retiros||[]),retiro]});
-        showToast("✓ Retiro registrado");
+        const tipo = d.tipo||"sc"; // "sc" | "bh" | "ambos"
+        let newData = {...data};
+        // SC 30% retiro
+        const montoSC = d.monedaSC||d.moneda||"ARS";
+        if(tipo==="sc"||tipo==="ambos"){
+          const mSC = tipo==="ambos"?Number(d.montoSC||0):montoN;
+          if(mSC>0){
+            const retSC={id:Date.now().toString(),fecha:d.fecha||hoy(),nota:d.nota||"",
+              montoUSD:montoSC==="ARS"?mSC/tcR:mSC,montoPesos:montoSC==="ARS"?mSC:null,moneda:montoSC,tcRetiro:tcR};
+            newData={...newData,retiros:[...(newData.retiros||[]),retSC]};
+          }
+        }
+        // BH Trade cobro
+        if(tipo==="bh"||tipo==="ambos"){
+          const mBH = tipo==="ambos"?Number(d.montoBH||0):montoN;
+          if(mBH>0){
+            const cobroBH={id:(Date.now()+1).toString(),fecha:d.fecha||hoy(),nota:d.nota||"Retiro",
+              monto:mBH,moneda:d.moneda||"ARS",mes:new Date().getMonth()};
+            newData={...newData,bh:{...newData.bh,cobros:[...(newData.bh?.cobros||[]),cobroBH]}};
+          }
+        }
+        save(newData);
+        showToast("✓ Retiro registrado"+(tipo==="ambos"?" (SC + BH Trade)":""));
         setPendingAction(null);
       }
       else if(action.action==="CARGAR_GASTO"){
@@ -2379,10 +2424,10 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           }}/>
         </label>
         {attachedFile&&(
-          <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)",marginBottom:6,fontSize:11}}>
-            <span>📄</span>
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 8px",background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)",marginBottom:4,fontSize:11,flexShrink:0}}>
+            <span style={{fontSize:14}}>📎</span>
             <span style={{flex:1,color:"var(--text-info)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{attachedFile.name}</span>
-            <button onClick={()=>setAttachedFile(null)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-secondary)",fontSize:14,padding:0,flexShrink:0}}>✕</button>
+            <button onClick={()=>setAttachedFile(null)} style={{background:"none",border:"none",color:"var(--text-danger)",cursor:"pointer",padding:"0 2px",fontSize:14,flexShrink:0}}>✕</button>
           </div>
         )}
         <textarea
@@ -2685,6 +2730,11 @@ function BHTradeView({data,save,showToast,blue}){
   const [formCobro,setFormCobro]=useState({monto:"",moneda:"ARS",fecha:hoy(),nota:""});
   const cobros=data.bh?.cobros||[];
   const cobradoTotal=cobros.reduce((a,c)=>a+Number(c.monto||0),0);
+  // Total accumulated across ALL months
+  const todosMeses=[...new Set((data.bh?.despachos||[]).map(d=>d.mes))];
+  const totalAcumuladoBH=(data.bh?.despachos||[]).reduce((a,d)=>a+d.total,0) +
+    todosMeses.reduce((a,mes)=>{const dm=(data.bh?.despachos||[]).filter(d=>d.mes===mes);return a+bhSueldoMes(dm,mes).base+bhSueldoMes(dm,mes).aguinaldoMonto;},0);
+  const pendienteCobro=Math.max(0,totalAcumuladoBH-cobradoTotal);
   const guardarCobro=()=>{
     if(!formCobro.monto)return;
     const montoNum=Number(formCobro.monto);
@@ -2722,10 +2772,10 @@ function BHTradeView({data,save,showToast,blue}){
       {/* Métricas anuales */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1.5rem"}}>
         {[
-          {l:"Total acumulado 2026",v:"$"+fmt(bhTotalAnio),sub:despachos.length+" despachos"},
-          {l:"Cobrado 2026",v:"$"+fmt(cobradoTotal),sub:"de lo devengado"},
-          {l:"A cobrar "+MESES[mesActivo]+(s.aguinaldo?" ✦":""),v:"$"+fmt(s.sueldo),sub:s.aguinaldo?"Con aguinaldo ×1.5":"Total + $"+fmt(s.base),green:true},
-          {l:"Despachos "+MESES[mesActivo],v:despMes.length,sub:"$"+fmt(s.total)+" en despachos"},
+          {l:"Total devengado",v:"$"+fmt(totalAcumuladoBH),sub:despachos.length+" despachos"},
+          {l:"Total cobrado",v:"$"+fmt(cobradoTotal),sub:"de lo devengado"},
+          {l:"Pendiente de cobro",v:"$"+fmt(pendienteCobro),sub:"a tu favor",green:pendienteCobro>0},
+          {l:"A cobrar "+MESES[mesActivo]+(s.aguinaldo?" ✦":""),v:"$"+fmt(s.sueldo),sub:s.aguinaldo?"Incl. aguinaldo s/base":"Despachos + base $160k"},
         ].map(x=>(
           <div key={x.l} style={{background:x.green?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
             <div style={{fontSize:11,color:x.green?"var(--color-text-success)":"var(--color-text-secondary)",marginBottom:4}}>{x.l}</div>
@@ -2893,8 +2943,10 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const eventos=data.dj?.eventos||[];
   const presupuestos=[...(data.dj?.presupuestos||[])].filter(p=>p.estado==="Pendiente"||p.estado==="Rechazado").sort((a,b)=>b.id.localeCompare(a.id));
   const hoy2=hoy();
-  const confirmados=[...eventos.filter(e=>(e.estado==="Confirmado"||e.estado==="Señado")&&e.fecha>=hoy2)].sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  const realizados=[...eventos.filter(e=>e.estado==="Realizado"||e.estado==="Cancelado"||(( e.estado==="Confirmado"||e.estado==="Señado")&&e.fecha<hoy2))].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  // Events stay in Confirmados until date passes - regardless of payment status
+  const confirmados=[...eventos.filter(e=>(e.estado==="Confirmado"||e.estado==="Señado"||e.estado==="Realizado")&&e.fecha>=hoy2)].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  // Only go to historial when date has passed
+  const realizados=[...eventos.filter(e=>e.fecha<hoy2||e.estado==="Cancelado")].sort((a,b)=>b.fecha.localeCompare(a.fecha));
 
 
   const ganTotal=realizados.filter(e=>e.estado==="Realizado").reduce((a,e)=>a+Number(e.gananciaUSD||0),0);
