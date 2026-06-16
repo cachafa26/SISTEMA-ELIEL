@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.6.2";
+const APP_VERSION = "v2.6.3";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1917,7 +1917,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         save({...data, ventas:[...(data.ventas||[]),...ventasNuevas], clientes:newClientes, despachos:newDespachos});
         showToast("✓ Pedido cargado"+(estadoVenta==="A despachar"?" · Despacho creado":""));
         // Preguntar pago
-        setPendingAction({action:"_PAGO_PEDIDO_", data:{ventaId: pedidoId+"v1", total}});
+        setPendingAction({action:"_PAGO_PEDIDO_", data:{pedidoId, total}});
         setMsgs(m=>[...m,{role:"assistant",content:"✓ Pedido cargado. ¿El cliente pagó el total ($"+Number(total).toLocaleString("es-AR")+")?\n\nRespondé **sí** (pagó todo), **no** (no pagó nada), o el monto que pagó (ej: 50000)."}]);
       }
       else if(action.action==="CARGAR_EVENTO_DJ"){
@@ -2190,7 +2190,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
       // Special case: waiting for cost to confirm presupuesto
       // ── Pago de pedido SC ──────────────────────────────────────────────────
       if(pendingAction.action==="_PAGO_PEDIDO_"){
-        const {ventaId, total} = pendingAction.data;
+        const {pedidoId: pId, ventaId, total} = pendingAction.data;
         const lower = text.toLowerCase().trim();
         let pagoMonto = 0;
         if(lower==="sí"||lower==="si"||lower==="s"||lower==="yes"){
@@ -2202,8 +2202,11 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           const num = Number(text.replace(/[^0-9.,]/g,"").replace(",","."));
           if(!isNaN(num)&&num>0) pagoMonto = num;
         }
-        // Actualizar la venta con el pago
-        const ventasAct = (data.ventas||[]).map(v=>v.id===ventaId?{...v,pago:pagoMonto}:v);
+        // Actualizar TODAS las ventas del pedido (por pedidoId o ventaId)
+        const ventasAct = (data.ventas||[]).map(v=>{
+          const match = pId ? v.pedidoId===pId : v.id===ventaId;
+          return match ? {...v, pago: pagoMonto} : v;
+        });
         save({...data, ventas:ventasAct});
         const saldo = Math.max(0, total-pagoMonto);
         const msg = pagoMonto>=total
