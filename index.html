@@ -1537,10 +1537,8 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
           });
           const res=await pdfResp.json();
           const reciboHtml=res.content?.[0]?.text||"";
-          const blob=new Blob([reciboHtml],{type:"text/html"});
-          const url=URL.createObjectURL(blob);
-          const a=document.createElement("a");a.href=url;
-          a.download=`Recibo_${d.cliente.replace(/ /g,"_")}_${numDoc}.html`;a.click();
+          const w=window.open("","_blank");
+          if(w){w.document.write(reciboHtml);w.document.close();setTimeout(()=>w.print(),800);}
           // Also register payment in the matching event
           const evMatch=data.dj?.eventos?.find(e=>e.nombre.toLowerCase().includes(d.cliente.toLowerCase()));
           if(evMatch){
@@ -1569,10 +1567,8 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
           });
           const res=await pdfResp.json();
           const confHtml=res.content?.[0]?.text||"";
-          const blob=new Blob([confHtml],{type:"text/html"});
-          const url=URL.createObjectURL(blob);
-          const a=document.createElement("a");a.href=url;
-          a.download=`Confirmacion_${d.cliente.replace(/ /g,"_")}_${numDoc}.html`;a.click();
+          const w=window.open("","_blank");
+          if(w){w.document.write(confHtml);w.document.close();setTimeout(()=>w.print(),800);}
           showToast("✓ Confirmación generada");
         }catch(err){showToast("Error al generar confirmación");console.error(err);}
         setPendingAction(null);
@@ -1662,15 +1658,22 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
       }
       const reply = result.content?.[0]?.text||"Sin respuesta";
 
-      // Try to extract JSON action from reply
-      const jsonMatch = reply.match(/\{[\s\S]*"action"[\s\S]*\}/);
+      // Extract JSON action - strip it from display completely
+      const jsonMatch = reply.match(/\{[\s\S]*?"action"[\s\S]*?\}/);
       if(jsonMatch){
         try{
           const action = JSON.parse(jsonMatch[0]);
           setPendingAction(action);
-          // Show reply without the raw JSON
-          const cleanReply = reply.replace(jsonMatch[0],"").trim();
-          setMsgs(m=>[...m,{role:"assistant",content:cleanReply||reply,action}]);
+          // Show reply without JSON block - just the conversational part
+          let cleanReply = reply.replace(jsonMatch[0],"").trim();
+          // Remove any trailing/leading code fences
+          cleanReply = cleanReply.replace(/```[^`]*```/g,"").trim();
+          if(!cleanReply) cleanReply = "Listo para ejecutar. ¿Confirmás?";
+          // Add confirm prompt only once, at the end
+          if(!cleanReply.includes("Confirmás") && !cleanReply.includes("confirmar") && !cleanReply.includes("Sí") && !cleanReply.includes("sí")){
+            cleanReply += "\n\n¿Confirmás? (sí / no)";
+          }
+          setMsgs(m=>[...m,{role:"assistant",content:cleanReply}]);
         }catch{
           setMsgs(m=>[...m,{role:"assistant",content:reply}]);
         }
@@ -1702,8 +1705,8 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
         </div>
         <button onClick={()=>{
           const k=window.prompt("Ingresá tu API key de Anthropic:","");
-          if(k&&k.startsWith("sk-ant-")){localStorage.setItem("eliel_ai_key",k);window.location.reload();}
-          else if(k){alert("Key inválida. Debe empezar con sk-ant-");}
+          const kk=k.trim();if(kk&&kk.length>20){localStorage.setItem("eliel_ai_key",kk);window.location.reload();}
+          else if(k){alert("Key muy corta o inválida. Pegá la key completa.");}
         }} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",color:"var(--text-secondary)",marginRight:4}} title="Cambiar API key">⚙</button>
         <button onClick={onClose} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",color:"var(--text-secondary)"}}>✕</button>
       </div>
@@ -1757,12 +1760,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
               whiteSpace:"pre-wrap",wordBreak:"break-word",
             }}>
               {m.content}
-              {m.action&&(
-                <div style={{marginTop:8,padding:"8px 10px",background:"rgba(91,173,65,0.15)",borderRadius:8,border:"0.5px solid var(--border-success)"}}>
-                  <div style={{fontSize:11,color:"var(--text-success)",fontWeight:600,marginBottom:4}}>Acción lista para ejecutar</div>
-                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>Respondé <strong style={{color:"var(--text-success)"}}>sí</strong> para confirmar o <strong style={{color:"var(--text-danger)"}}>no</strong> para cancelar</div>
-                </div>
-              )}
+
             </div>
           </div>
         ))}
@@ -2294,8 +2292,10 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 
   const eventos=data.dj?.eventos||[];
   const presupuestos=[...(data.dj?.presupuestos||[])].sort((a,b)=>b.id.localeCompare(a.id));
-  const confirmados=[...eventos.filter(e=>e.estado==="Confirmado"||e.estado==="Señado")].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  const realizados=[...eventos.filter(e=>e.estado==="Realizado"||e.estado==="Cancelado")].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const hoy2=hoy();
+  const confirmados=[...eventos.filter(e=>(e.estado==="Confirmado"||e.estado==="Señado")&&e.fecha>=hoy2)].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const realizados=[...eventos.filter(e=>e.estado==="Realizado"||e.estado==="Cancelado"||(( e.estado==="Confirmado"||e.estado==="Señado")&&e.fecha<hoy2))].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
 
   const ganTotal=realizados.filter(e=>e.estado==="Realizado").reduce((a,e)=>a+Number(e.gananciaUSD||0),0);
   const cobroTotal=realizados.filter(e=>e.estado==="Realizado").reduce((a,e)=>a+Number(e.cobroUSD||0),0);
@@ -2339,19 +2339,41 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const actualizarEstado=(id,estado)=>save({...data,dj:{...data.dj,eventos:eventos.map(x=>x.id===id?{...x,estado}:x)}});
 
   // Confirmar desde presupuesto: crea evento confirmado
+  const [modalConfirmar,setModalConfirmar]=useState(null);
+  const [costoConfirmar,setCostoConfirmar]=useState("");
+  const [monedaCostoConf,setMonedaCostoConf]=useState("ARS");
+
   const confirmarPresupuesto=(p)=>{
+    // Open modal to enter cost before confirming
+    setModalConfirmar(p);
+    setCostoConfirmar("");
+    setMonedaCostoConf("ARS");
+  };
+
+  const ejecutarConfirmacion=()=>{
+    const p=modalConfirmar;
+    if(!p) return;
+    const costoRaw=Number(costoConfirmar||0);
+    const costoUSD=monedaCostoConf==="ARS"?costoRaw/tc:costoRaw;
+    const cobroUSD=Number(p.precio||0);
+    const gananciaUSD=cobroUSD-costoUSD;
     const evento={
-      id:Date.now().toString(),nombre:p.nombre,fecha:p.fecha,estado:"Confirmado",
-      monedaCobro:"USD",cobro:Number(p.precio||0),cobroUSD:Number(p.precio||0),
-      monedaCosto:"ARS",costo:0,costoUSD:0,
-      sena:0,senaUSD:0,saldo:Number(p.precio||0),
-      gananciaUSD:Number(p.precio||0),margen:100,notas:"",tcUsado:tc,
+      id:Date.now().toString(),
+      nombre:p.cliente+" — "+p.tipoEvento+(p.salon?" ("+p.salon+")":""),
+      fecha:p.fecha,estado:"Confirmado",
+      monedaCobro:"USD",cobro:cobroUSD,cobroUSD,
+      monedaCosto:monedaCostoConf,costo:costoRaw,costoUSD,
+      sena:0,senaUSD:0,saldo:cobroUSD,
+      gananciaUSD,margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
+      notas:p.invitados||"",tcUsado:tc,
       presupuestoId:p.id,
+      salon:p.salon,tipoEvento:p.tipoEvento,cliente:p.cliente,
     };
     const nuevosEventos=[...eventos,evento];
     const nuevosPresupuestos=(data.dj?.presupuestos||[]).map(x=>x.id===p.id?{...x,estado:"Confirmado"}:x);
     save({...data,dj:{...data.dj,eventos:nuevosEventos,presupuestos:nuevosPresupuestos}});
-    showToast("✓ Evento confirmado");setTab("confirmados");
+    showToast("✓ Evento confirmado");
+    setModalConfirmar(null);setTab("confirmados");
   };
 
   const rechazarPresupuesto=(id)=>{
@@ -2404,18 +2426,56 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
         ))}
       </div>
 
+      {/* Confirm presupuesto modal */}
+      {modalConfirmar&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:360,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
+            <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Confirmar evento</h3>
+            <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{modalConfirmar.cliente} — {modalConfirmar.tipoEvento}<br/>{modalConfirmar.fecha}{modalConfirmar.salon?" · "+modalConfirmar.salon:""}</p>
+            <div style={{background:"var(--bg-tint-green)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-md)",padding:"8px 12px",marginBottom:14,fontSize:12}}>
+              <span style={{color:"var(--text-secondary)"}}>Cobro: </span>
+              <strong style={{color:"var(--text-success)"}}>USD {modalConfirmar.precio}</strong>
+            </div>
+            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:6}}>Tu costo para este evento</label>
+            <div style={{display:"flex",gap:6,marginBottom:16}}>
+              <select value={monedaCostoConf} onChange={e=>setMonedaCostoConf(e.target.value)} style={{width:72,flexShrink:0}}>
+                <option value="ARS">$ ARS</option>
+                <option value="USD">USD</option>
+              </select>
+              <input type="number" value={costoConfirmar} onChange={e=>setCostoConfirmar(e.target.value)} placeholder="0" autoFocus inputMode="decimal"/>
+            </div>
+            {costoConfirmar&&(
+              <div style={{padding:"8px 12px",background:"rgba(120,120,128,0.08)",borderRadius:"var(--r-md)",marginBottom:14,fontSize:12}}>
+                Ganancia estimada: <strong style={{color:(Number(modalConfirmar.precio)-(monedaCostoConf==="ARS"?Number(costoConfirmar)/(tc):Number(costoConfirmar)))>=0?"var(--text-success)":"var(--text-danger)"}}>{fmtUSD(Number(modalConfirmar.precio)-(monedaCostoConf==="ARS"?Number(costoConfirmar)/tc:Number(costoConfirmar)))}</strong>
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={ejecutarConfirmacion} style={{flex:1,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:14}}>✓ Confirmar</button>
+              <button onClick={()=>setModalConfirmar(null)} style={{padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* IA hint */}
       <div style={{background:"linear-gradient(135deg,rgba(244,121,32,0.1),rgba(91,173,65,0.1))",border:"0.5px solid rgba(244,121,32,0.25)",borderRadius:"var(--r-lg)",padding:"10px 14px",marginBottom:"1.25rem",display:"flex",alignItems:"center",gap:10}}>
         <span style={{fontSize:20}}>🤖</span>
         <div style={{fontSize:12,color:"var(--text-secondary)"}}>Usá el asistente IA para generar presupuestos PDF, confirmar eventos y registrar pagos con lenguaje natural.</div>
       </div>
 
-      {/* Tabs */}
-      <div style={{display:"flex",gap:4,background:"rgba(120,120,128,0.1)",borderRadius:"var(--r-lg)",padding:4,marginBottom:"1.25rem"}}>
-        <TabBtn id="presupuestos" label="Presupuestos" count={presupuestos.filter(p=>p.estado==="Pendiente").length}/>
-        <TabBtn id="confirmados"  label="Confirmados"  count={confirmados.length}/>
-        <TabBtn id="nuevo"        label="+ Evento"     count={0}/>
-        <TabBtn id="realizados"   label="Historial"    count={realizados.length}/>
+      {/* Tabs + add button */}
+      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:"1.25rem"}}>
+        <div style={{display:"flex",flex:1,gap:4,background:"rgba(120,120,128,0.1)",borderRadius:"var(--r-lg)",padding:4}}>
+          <TabBtn id="presupuestos" label="Presupuestos" count={presupuestos.filter(p=>p.estado==="Pendiente").length}/>
+          <TabBtn id="confirmados"  label="Confirmados"  count={confirmados.length}/>
+          <TabBtn id="realizados"   label="Historial"    count={realizados.length}/>
+        </div>
+        <button onClick={()=>setTab(tab==="nuevo"?"confirmados":"nuevo")} style={{
+          flexShrink:0,padding:"8px 14px",borderRadius:"var(--r-lg)",border:"none",cursor:"pointer",
+          background:tab==="nuevo"?"var(--bg-tint-blue)":"linear-gradient(135deg,#185FA5,#2E86C1)",
+          color:"#fff",fontWeight:700,fontSize:13,
+          boxShadow:tab==="nuevo"?"none":"0 4px 14px rgba(24,95,165,0.35)",
+        }}>{tab==="nuevo"?"✕":"+ Evento"}</button>
       </div>
 
       {/* ── TAB: PRESUPUESTOS ── */}
