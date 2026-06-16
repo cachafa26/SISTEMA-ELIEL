@@ -1743,7 +1743,6 @@ EVENTOS DJ:
 ${eventos||'Sin eventos'}
 
 RETIROS PENDIENTES:\n- Mi 30% SC: pendiente $${_sc30Pesos.toLocaleString('es-AR')} ARS\n- BH Trade: pendiente $${_bhPendPesos.toLocaleString('es-AR')} ARS\n- TOTAL a retirar: $${_totalRetiro.toLocaleString('es-AR')} ARS
-- TOTAL a retirar: $\${Math.round(((pendienteRetiro||0)*(tc||1450))+(bhPendienteCobro||0)).toLocaleString('es-AR')} ARS
 
 CLIENTES REGISTRADOS (primeros 30):
 ${clientes}
@@ -2312,7 +2311,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         setMsgs(m=>[...m,{role:"assistant",content:reply}]);
       }
     } catch(err){
-      setMsgs(m=>[...m,{role:"assistant",content:"Error al conectar con el asistente. Verificá tu conexión."}]);
+      setMsgs(m=>[...m,{role:"assistant",content:"⚠ Error: "+(err.message||String(err))}]);
       console.error(err);
     }
     setLoading(false);
