@@ -2899,7 +2899,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const presupuestos=[...(data.dj?.presupuestos||[])].filter(p=>p.estado==="Pendiente"||p.estado==="Rechazado").sort((a,b)=>b.id.localeCompare(a.id));
   const hoy2=hoy();
   const confirmados=[...eventos.filter(e=>(e.estado==="Confirmado"||e.estado==="Señado")&&e.fecha>=hoy2)].sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  const realizados=[...eventos.filter(e=>e.estado==="Realizado"||e.estado==="Cancelado"||(( e.estado==="Confirmado"||e.estado==="Señado")&&e.fecha<hoy2))].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const realizados=[...eventos.filter(e=>e.estado==="Cancelado"||(e.estado==="Confirmado"&&e.fecha<hoy2))].sort((a,b)=>b.fecha.localeCompare(a.fecha));
 
 
   const ganTotal=realizados.filter(e=>e.estado==="Realizado").reduce((a,e)=>a+Number(e.gananciaUSD||0),0);
@@ -2985,7 +2985,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
       pagos.push({id:Date.now().toString(),fecha:hoy(),concepto:"Pago total"+(descuentoConf?" (10% desc.)":""),monto:cobroUSD,moneda:"USD",montoUSD:cobroUSD,nota:""});
     }
     const saldoUSD=Math.max(0,cobroUSD-senaUSD);
-    const estadoEvento=saldoUSD<=0?"Realizado":"Confirmado"; // stays Confirmado until fully paid
+    const estadoEvento="Confirmado"; // siempre Confirmado - pasa a historial solo cuando pasa la fecha
     const evento={
       id:Date.now().toString(),
       nombre:p.cliente+" — "+p.tipoEvento+(p.salon?" ("+p.salon+")":""),
