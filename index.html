@@ -5142,10 +5142,24 @@ function DespachosView({data,save,showToast}){
         var run=new Function("React","useState","useEffect","useRef",result.code+"\nreturn App;");
         var AppComp=run(React,useState,useEffect,useRef);
         var root=ReactDOM.createRoot(document.getElementById("root"));
-        root.render(React.createElement(AppComp));
+        // Wrap in error boundary
+        class ErrBoundary extends React.Component {
+          constructor(p){super(p);this.state={err:null};}
+          static getDerivedStateFromError(e){return {err:e};}
+          componentDidCatch(e,i){console.error("React error:",e,i);}
+          render(){
+            if(this.state.err){
+              return React.createElement("div",{style:{padding:"2rem",color:"#ff6b6b",fontFamily:"monospace",fontSize:13}},
+                "ERROR: "+this.state.err.message+"\n\n"+this.state.err.stack?.split("\n").slice(0,4).join("\n")
+              );
+            }
+            return this.props.children;
+          }
+        }
+        root.render(React.createElement(ErrBoundary,null,React.createElement(AppComp)));
         document.getElementById("loading").style.display="none";
         console.log("\u2713 App lista");
-      }catch(e){console.error("Error:",e);showErr(e);}
+      }catch(e){console.error("Error:",e);showErr(e.message||String(e));}
     }
     if(document.readyState==="complete"){runApp();}
     else{window.addEventListener("load",runApp);}
