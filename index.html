@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.8.0 · 2026-06-16 -->
+  <!-- v2.9.0 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.8.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.9.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1041,8 +1041,9 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 
+
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.8.0";
+const APP_VERSION = "v2.9.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4272,137 +4273,132 @@ function TabCostos({cont,updateCont,showToast,blue}){
 }
 
 function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
-  const tcH=blue?Math.round(blue):Number(cont.costos?.tipoCambioFijado||cont.costos?.tipoCambio||1450);
-  const [form,setForm]=useState({fecha:hoy(),articulo:(cont.articulos||[])[0]?.nombre||"",cantidad:"",cliente:"",precioVenta:"",pago:"",tipoCambio:String(tcH),estado:"A retirar Once"});
-  const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
-  const costo=cont.costoTotal||0;const enG=costo>0&&cobUSD>costo;
-  const sdMap={};for(const art of(cont.articulos||[])){const v=ventasCont.filter(v=>v.articulo===art.nombre).reduce((a,v)=>a+Number(v.cantidad),0);sdMap[art.nombre]=Math.max(0,Number(art.cantidad)-v);}
+  const tc=blue||1450;
+  const [form,setForm]=useState({fecha:hoy(),articulo:(cont.articulos||[])[0]?.nombre||"",cantidad:"",cliente:"",precioVenta:"",tipoCambio:String(Math.round(tc)),estado:"A retirar Once"});
+  const ESTADOS_PEND=["A despachar","A retirar Ezeiza","A retirar Once"];
+  
   const registrar=()=>{
-    if(!form.cliente||!form.cantidad||!form.precioVenta){showToast("Completá todos los campos");return;}
-    const total=Number(form.cantidad)*Number(form.precioVenta);const tc=Number(form.tipoCambio)||tcH;
-    save({...data,ventas:[...(data.ventas||[]),{id:Date.now().toString(),contId:cont.id,...form,cantidad:Number(form.cantidad),precioVenta:Number(form.precioVenta),total,usd:total/tc,tipoCambioUsado:tc}]});
-    setForm({...form,cantidad:"",cliente:"",precioVenta:"",pago:""});showToast("Venta registrada");
+    if(!form.articulo||!form.cantidad||!form.cliente||!form.precioVenta)return;
+    const total=Number(form.cantidad)*Number(form.precioVenta);
+    const usd=total/Number(form.tipoCambio||tc);
+    const v={id:Date.now().toString(),contId:cont.id,cliente:form.cliente,articulo:form.articulo,
+      cantidad:Number(form.cantidad),precioVenta:Number(form.precioVenta),total,usd,
+      tipoCambioUsado:Number(form.tipoCambio||tc),fecha:form.fecha,estado:form.estado,pago:0};
+    save({...data,ventas:[...(data.ventas||[]),v]});
+    showToast("✓ Venta registrada");
+    setForm(f=>({...f,cantidad:"",cliente:"",precioVenta:"",pago:""}));
   };
-  const eliminar=id=>{save({...data,ventas:data.ventas.filter(v=>v.id!==id)});showToast("Eliminada");};
-  const actualizarEstado=(id,estado)=>save({...data,ventas:data.ventas.map(v=>v.id===id?{...v,estado}:v)});
-  const estimacion=!enG&&costo>0?(()=>{
-    let stockRestARS=0;const tc_=Number(cont.costos?.tipoCambioFijado||cont.costos?.tipoCambio||tcH);
-    for(const art of(cont.articulos||[])){const sd=sdMap[art.nombre]||0;if(sd<=0)continue;const prom=precioPromedioUltimoMes(cont.id,art.nombre,data.ventas);if(prom>0)stockRestARS+=sd*prom;}
-    const stockRestUSD=stockRestARS/tc_;const cobFuturo=cobUSD+stockRestUSD;const ganFutura=Math.max(0,cobFuturo-costo);const mi30Fut=ganFutura*0.3;
-    return{stockRestUSD,ganFutura,mi30Fut};
-  })():null;
+  const eliminar=id=>save({...data,ventas:(data.ventas||[]).filter(v=>v.id!==id)});
+  const actualizarEstado=(id,estado)=>save({...data,ventas:(data.ventas||[]).map(v=>v.id===id?{...v,estado}:v)});
+  const actualizarEstadoPedido=(lineas,estado)=>save({...data,ventas:(data.ventas||[]).map(v=>lineas.some(l=>l.id===v.id)?{...v,estado}:v)});
+
+  // Group ventas by pedidoId
+  const pMap=new Map();
+  ventasCont.forEach(v=>{
+    const pid=v.pedidoId||v.id;
+    if(!pMap.has(pid)) pMap.set(pid,{pid,fecha:v.fecha,cliente:v.cliente,lineas:[],totalARS:0,totalUSD:0,estado:v.estado});
+    const p=pMap.get(pid);
+    p.lineas.push(v);
+    p.totalARS+=Number(v.total||0);
+    p.totalUSD+=Number(v.usd||0);
+    if(v.fecha>p.fecha){p.fecha=v.fecha;p.estado=v.estado;}
+  });
+  const sorted=[...pMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const pendientes=sorted.filter(p=>ESTADOS_PEND.includes(p.estado));
+  const procesados=sorted.filter(p=>!ESTADOS_PEND.includes(p.estado));
+
   return(
-    <div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:"1rem"}}>
-        {(()=>{
-          const allV=(data.ventas||[]).filter(v=>v.contId===cont.id);
-          const tcD=blue||1450;
-          const totalVUSD=allV.reduce((a,v)=>a+ventaUSD(v,tcD),0);
-          const ganBruta=totalVUSD-costo;
-          const mi30Dev=Math.max(0,ganBruta)*0.3;
-          return[
-            {l:"Facturado",v:fmtUSD(totalVUSD),info:true},
-            {l:"Cobrado",v:fmtUSD(cobUSD)},
-            {l:ganBruta>=0?"Ganancia":"Pérdida",v:fmtUSD(Math.abs(ganBruta)),g:ganBruta>0,danger:ganBruta<0&&costo>0},
-            {l:"Mi 30%",v:fmtUSD(mi30Dev),g:mi30Dev>0},
-            {l:"Costo",v:costo>0?fmtUSD(costo):"—"},
-            {l:"Por cobrar",v:fmtUSD(Math.max(0,totalVUSD-cobUSD)),warn:totalVUSD>cobUSD},
-          ].map(x=>(
-            <div key={x.l} style={{
-              background:x.g?"var(--bg-tint-green)":x.danger?"var(--bg-tint-red)":x.warn?"var(--bg-tint-amber)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.08)",
-              borderRadius:"var(--r-md)",padding:"9px 11px",
-              border:"0.5px solid "+(x.g?"var(--border-success)":x.danger?"var(--border-danger)":"var(--glass-border)"),
-            }}>
-              <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:x.g?"var(--text-success)":x.danger?"var(--text-danger)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-secondary)",marginBottom:3}}>{x.l}</div>
-              <div style={{fontSize:12,fontWeight:600,color:x.g?"var(--text-success)":x.danger?"var(--text-danger)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-primary)"}}>{x.v}</div>
-            </div>
-          ));
-        })()}
-      </div>      {!enG&&costo>0&&<div style={{background:"var(--color-background-warning)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:"1rem",fontSize:12,color:"var(--color-text-warning)"}}>Faltan {fmtUSD(costo-cobUSD)} cobrados para recuperar</div>}
-      {estimacion&&(
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px",marginBottom:"1rem"}}>
-          <p style={{fontSize:12,fontWeight:500,margin:"0 0 8px",color:"var(--color-text-secondary)"}}>📊 Proyección si se vende el stock restante (precio promedio último mes)</p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-            {[{l:"Stock restante est.",v:fmtUSD(estimacion.stockRestUSD)},{l:"Ganancia estimada",v:fmtUSD(estimacion.ganFutura)},{l:"Mi 30% estimado",v:fmtUSD(estimacion.mi30Fut),g:true}].map(x=>(
-              <div key={x.l} style={{background:x.g?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.5rem"}}>
-                <div style={{fontSize:10,color:x.g?"var(--color-text-success)":"var(--color-text-secondary)"}}>{x.l}</div>
-                <div style={{fontSize:12,fontWeight:500,color:x.g?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
-              </div>
-            ))}
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {/* Form nueva venta */}
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",borderRadius:"var(--r-lg)",padding:"14px 16px",border:"0.5px solid var(--glass-border)"}}>
+        <p style={{fontSize:13,fontWeight:600,margin:"0 0 10px",color:"var(--text-primary)"}}>Registrar venta manual</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+          <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm(f=>({...f,fecha:e.target.value}))}/></div>
+          <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Artículo</label>
+            <select value={form.articulo} onChange={e=>setForm(f=>({...f,articulo:e.target.value}))}>
+              {(cont.articulos||[]).map(a=><option key={a.nombre}>{a.nombre}</option>)}
+            </select>
+          </div>
+          <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Cantidad</label><input type="number" value={form.cantidad} onChange={e=>setForm(f=>({...f,cantidad:e.target.value}))} placeholder="0"/></div>
+          <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Precio ($)</label><input type="number" value={form.precioVenta} onChange={e=>setForm(f=>({...f,precioVenta:e.target.value}))} placeholder="0"/></div>
+          <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Cliente</label><input value={form.cliente} onChange={e=>setForm(f=>({...f,cliente:e.target.value}))} placeholder="Nombre"/></div>
+          <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Estado</label>
+            <select value={form.estado} onChange={e=>setForm(f=>({...f,estado:e.target.value}))}>
+              {["A retirar Once","A retirar Ezeiza","A despachar"].map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <button onClick={registrar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,var(--accent-primary),var(--accent-secondary))",color:"#fff",cursor:"pointer",fontWeight:600}}>+ Registrar venta</button>
+      </div>
+
+      {/* Pedidos pendientes */}
+      {pendientes.length>0&&(
+        <div>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--text-warning)",letterSpacing:".06em",textTransform:"uppercase",marginBottom:6,padding:"0 2px"}}>Pendientes · {pendientes.length}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {pendientes.map(p=><PedidoCard key={p.pid} p={p} onEstado={actualizarEstadoPedido} onDelete={eliminar} blue={blue}/>)}
           </div>
         </div>
       )}
-      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
-        <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>Registrar venta manual</p>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm({...form,fecha:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.articulo} onChange={e=>setForm({...form,articulo:e.target.value})} style={{width:"100%",marginTop:2}}>{(cont.articulos||[]).map(a=><option key={a.nombre}>{a.nombre}</option>)}</select></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cantidad</label><input type="number" value={form.cantidad} onChange={e=>setForm({...form,cantidad:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Precio ($)</label><input type="number" value={form.precioVenta} onChange={e=>setForm({...form,precioVenta:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cliente</label><input value={form.cliente} onChange={e=>setForm({...form,cliente:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Pago recibido ($)</label><input type="number" value={form.pago} onChange={e=>setForm({...form,pago:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{blue?"Cotización · $"+fmt(blue):"Cotización"}</label><input type="number" value={form.tipoCambio} onChange={e=>setForm({...form,tipoCambio:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Estado</label><select value={form.estado} onChange={e=>setForm({...form,estado:e.target.value})} style={{width:"100%",marginTop:2}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select></div>
-        </div>
-        {form.articulo&&<p style={{fontSize:11,color:"var(--color-text-secondary)",margin:"0 0 6px"}}>Stock disponible: {sdMap[form.articulo]??0}</p>}
-        <button onClick={registrar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>Registrar</button>
-      </div>
-      {ventasCont.length>0&&(
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Fecha","Artículo","Cant","Cliente","$","Cobrado","Estado",""].map(h=><th key={h} style={{padding:"5px 7px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
-            <tbody>{(()=>{
-                const PEND_EST=["A despachar","A retirar Ezeiza","A retirar Once"];
-                // Group by pedidoId
-                const pMap=new Map();
-                ventasCont.forEach(v=>{
-                  const pid=v.pedidoId||v.id;
-                  if(!pMap.has(pid)) pMap.set(pid,{pid,fecha:v.fecha,cliente:v.cliente,
-                    lineas:[],totalARS:0,totalUSD:0,estado:v.estado,entrega:v.entrega,id:v.id});
-                  const p=pMap.get(pid);
-                  p.lineas.push(v);
-                  p.totalARS+=Number(v.total||0);
-                  p.totalUSD+=Number(v.usd||0);
-                  if(v.fecha>p.fecha){p.fecha=v.fecha;p.estado=v.estado;p.entrega=v.entrega;}
-                });
-                const sorted=[...pMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-                const pend=sorted.filter(p=>PEND_EST.includes(p.estado));
-                const done=sorted.filter(p=>!PEND_EST.includes(p.estado));
-                const all=[...pend,...(done.length>0&&pend.length>0?[{_sep:true,pid:"_sep"}]:[]),...done];
-                return all;
-              })().map(p=>{
-              if(p._sep)return(<tr key="_sep"><td colSpan={99} style={{padding:"6px 0"}}><div style={{borderTop:"0.5px solid var(--glass-border)",textAlign:"center",fontSize:10,color:"var(--text-secondary)",paddingTop:5}}>— Despachados / Retirados —</div></td></tr>);
-              const v=p.lineas[0];
-              const cobTotal=p.lineas.reduce((a,vv)=>a+pagadoVenta(vv,data.pagos),0);
-              const saldoTotal=p.totalARS-cobTotal;
-              return(<tr key={p.pid} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                <td style={{padding:"5px 7px",color:"var(--color-text-secondary)",fontSize:10}}>{p.fecha}</td>
-                <td style={{padding:"5px 7px"}}>
-                  {p.lineas.length===1
-                    ? p.lineas[0].articulo
-                    : <details><summary style={{cursor:"pointer",fontWeight:600}}>{p.lineas.length+" artículos"}</summary>
-                        {p.lineas.map(vv=><div key={vv.id} style={{fontSize:10,color:"var(--text-secondary)",paddingLeft:8}}>{vv.articulo} x{vv.cantidad}</div>)}
-                      </details>
-                  }
-                </td>
-                <td style={{padding:"5px 7px"}}>{p.lineas.length===1?p.lineas[0].cantidad:"-"}</td>
-                <td style={{padding:"5px 7px"}}>{p.cliente}</td>
-                <td style={{padding:"5px 7px",textAlign:"right"}}>${fmt(p.totalARS)}</td>
-                <td style={{padding:"5px 7px",textAlign:"right",color:cobTotal>0?"var(--color-text-success)":"inherit"}}>${fmt(cobTotal)}</td>
-                <td style={{padding:"5px 7px"}}>
-                  <select value={p.estado} onChange={e=>{
-                    p.lineas.forEach(vv=>actualizarEstado(vv.id,e.target.value));
-                  }} style={{fontSize:10,padding:"2px 4px",borderRadius:4}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select>
-                </td>
-                <td style={{padding:"5px 7px"}}>
-                  <button onClick={()=>{p.lineas.forEach(vv=>eliminar(vv.id));}} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:12}}>✕</button>
-                </td>
-              </tr>);
-            })}
-            </tbody>
-          </table>
+
+      {/* Separador */}
+      {pendientes.length>0&&procesados.length>0&&(
+        <div style={{display:"flex",alignItems:"center",gap:10,margin:"4px 0"}}>
+          <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+          <span style={{fontSize:10,color:"var(--text-secondary)",padding:"0 8px",whiteSpace:"nowrap"}}>Despachados / Retirados</span>
+          <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
         </div>
       )}
+
+      {/* Pedidos procesados */}
+      {procesados.length>0&&(
+        <div style={{display:"flex",flexDirection:"column",gap:8,opacity:0.75}}>
+          {procesados.map(p=><PedidoCard key={p.pid} p={p} onEstado={actualizarEstadoPedido} onDelete={eliminar} blue={blue}/>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PedidoCard({p,onEstado,onDelete,blue}){
+  const ESTADOS=["A despachar","A retirar Ezeiza","A retirar Once","Despachado","Retirado","Cancelado"];
+  const [expanded,setExpanded]=useState(false);
+  const esMulti=p.lineas.length>1;
+  return(
+    <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",transition:"opacity .2s"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+            <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)"}}>{p.cliente}</span>
+            <span style={{fontSize:10,color:"var(--text-secondary)"}}>{p.fecha}</span>
+            {esMulti&&(
+              <button onClick={()=>setExpanded(e=>!e)} style={{fontSize:10,padding:"2px 8px",borderRadius:10,border:"0.5px solid var(--glass-border)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer"}}>
+                {p.lineas.length} artículos {expanded?"▲":"▼"}
+              </button>
+            )}
+          </div>
+          {!esMulti&&<div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{p.lineas[0].articulo} × {p.lineas[0].cantidad}</div>}
+          {esMulti&&expanded&&(
+            <div style={{marginTop:6,display:"flex",flexDirection:"column",gap:3}}>
+              {p.lineas.map(v=>(
+                <div key={v.id} style={{fontSize:11,color:"var(--text-secondary)",display:"flex",gap:8"}}>
+                  <span>{v.articulo}</span><span style={{color:"var(--text-primary)",fontWeight:500}}>×{v.cantidad}</span>
+                  <span style={{color:"var(--text-success)"}}>${v.total?.toLocaleString('es-AR')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{marginTop:4,fontSize:11,fontWeight:600,color:"var(--text-success)"}}>Total: ${p.totalARS?.toLocaleString('es-AR')}</div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end",flexShrink:0}}>
+          <select value={p.estado} onChange={e=>onEstado(p.lineas,e.target.value)}
+            style={{fontSize:11,padding:"3px 6px",borderRadius:6,border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",color:"var(--text-primary)"}}>
+            {ESTADOS.map(s=><option key={s}>{s}</option>)}
+          </select>
+          <button onClick={()=>{if(window.confirm("¿Eliminar pedido?"))p.lineas.forEach(v=>onDelete(v.id));}}
+            style={{fontSize:11,padding:"2px 8px",borderRadius:6,border:"0.5px solid var(--border-danger)",background:"var(--bg-tint-red)",color:"var(--text-danger)",cursor:"pointer"}}>✕ Eliminar</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -4679,6 +4675,7 @@ function DespachosView({data,save,showToast}){
     )}
   </div>);
 }
+
 
 </script>
 
