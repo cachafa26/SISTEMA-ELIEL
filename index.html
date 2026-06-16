@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v1.6.0 · 2026-06-16 -->
+  <!-- v1.9.0 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v1.6.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v1.9.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -649,7 +649,7 @@
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v1.6.0";
+const APP_VERSION = "v1.9.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1286,254 +1286,256 @@ const PRESUPUESTO_TEMPLATE = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <title>Presupuesto ELIEL MIZRAHI DJ</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:#080810;color:#fff;font-family:'Montserrat',sans-serif;font-size:12px;line-height:1.5;}
-.page{max-width:794px;margin:0 auto;background:#080810;min-height:1123px;position:relative;padding:0;}
-/* Hairlines */
-.page::before{content:'';position:fixed;top:0;left:0;right:0;height:1px;background:#C9A84C;}
-.page::after{content:'';position:fixed;bottom:0;left:0;right:0;height:1px;background:#C9A84C;}
+body{background:#080810;color:#fff;font-family:'Montserrat',Arial,sans-serif;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.page{width:794px;min-height:1123px;margin:0 auto;background:#080810;position:relative;}
+/* hairlines */
+.hl-top{position:fixed;top:0;left:0;right:0;height:1px;background:#C9A84C;}
+.hl-bot{position:fixed;bottom:0;left:0;right:0;height:1px;background:#C9A84C;}
 /* HEADER */
-.header{padding:32px 48px 24px;border-bottom:1px solid rgba(201,168,76,0.2);background:linear-gradient(180deg,#0C0C20 0%,#080810 100%);}
-.header-inner{display:flex;justify-content:space-between;align-items:flex-start;}
-.dates-row{display:flex;justify-content:space-between;margin-bottom:20px;}
-.date-block .lbl{font-size:7px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
-.date-block .val{font-size:9px;font-weight:700;color:#fff;}
-.logo-area{text-align:center;flex:1;}
-.logo-triangles{display:inline-block;position:relative;width:60px;height:40px;margin-bottom:6px;}
-.logo-triangles svg{width:60px;height:40px;}
-.brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:4px;text-transform:uppercase;}
-.brand-sub{font-size:7px;font-weight:500;color:rgba(201,168,76,0.7);letter-spacing:4px;text-transform:uppercase;margin-top:3px;}
+.hdr{background:linear-gradient(180deg,#0C0C20 0%,#080810 100%);padding:30px 44px 22px;border-bottom:1px solid rgba(201,168,76,0.18);}
+.hdr-dates{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+.date-col .lbl{font-size:7px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;}
+.date-col .val{font-size:9px;font-weight:700;color:#fff;}
+.date-col.right{text-align:right;}
+.logo-col{text-align:center;flex:1;}
+.logo-col svg{display:block;margin:0 auto 8px;}
+.brand{font-size:22px;font-weight:800;color:#fff;letter-spacing:3px;text-transform:uppercase;line-height:1.1;}
+.brand span{color:#C9A84C;}
+.brand-sub{font-size:7px;font-weight:500;color:rgba(201,168,76,0.7);letter-spacing:4px;text-transform:uppercase;margin-top:4px;}
 /* GOLD BAND */
-.gold-band{background:linear-gradient(135deg,#C9A84C 0%,#E8C97A 40%,#C9A84C 60%,#a07830 100%);padding:12px 48px;display:flex;justify-content:space-between;align-items:center;}
-.gold-band .doc-id{font-size:13px;font-weight:800;color:#080810;letter-spacing:2px;}
-.gold-band .doc-type{font-size:9px;font-weight:700;color:rgba(8,8,16,0.65);letter-spacing:3px;text-transform:uppercase;}
+.gold-band{background:linear-gradient(135deg,#C9A84C 0%,#E8C97A 38%,#C9A84C 62%,#9A7028 100%);padding:11px 44px;display:flex;justify-content:space-between;align-items:center;}
+.gb-doc{font-size:13px;font-weight:800;color:#080810;letter-spacing:2px;}
+.gb-type{font-size:8.5px;font-weight:700;color:rgba(8,8,16,0.6);letter-spacing:3px;text-transform:uppercase;}
 /* CONTENT */
-.content{padding:28px 48px;}
-/* SECTION */
-.section-eyebrow{font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:0.5px solid rgba(201,168,76,0.25);}
-/* EVENTO DATA */
-.evento-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.12);border-radius:8px;padding:18px 20px;position:relative;}
-.evento-grid::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,#C9A84C,#a07830);border-radius:3px 0 0 3px;}
-.dato-lbl{font-size:7.5px;font-weight:600;color:rgba(201,168,76,0.6);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:3px;}
-.dato-val{font-size:11px;font-weight:600;color:#fff;}
-.dato-val.gold{color:#C9A84C;}
+.content{padding:26px 44px 20px;}
+/* SECTION EYEBROW */
+.eyebrow{font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:7px;border-bottom:0.5px solid rgba(201,168,76,0.22);}
+/* EVENTO TABLE */
+.ev-table{width:100%;border-collapse:collapse;margin-bottom:22px;background:rgba(201,168,76,0.03);border:1px solid rgba(201,168,76,0.12);border-radius:8px;overflow:hidden;}
+.ev-table tr{border-bottom:1px solid rgba(255,255,255,0.06);}
+.ev-table tr:last-child{border-bottom:none;}
+.ev-table td{padding:10px 16px;}
+.ev-table .lbl{font-size:8px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;width:160px;}
+.ev-table .val{font-size:11px;font-weight:700;color:#fff;}
+.ev-table .val.gold{color:#C9A84C;}
 /* SERVICIOS */
-.servicios-table{width:100%;border-collapse:collapse;margin-bottom:8px;}
-.servicios-table tr{border-bottom:0.5px solid rgba(255,255,255,0.06);}
-.servicios-table td{padding:7px 6px;vertical-align:top;}
-.svc-check{width:16px;height:16px;background:linear-gradient(135deg,#C9A84C,#a07830);border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#080810;font-weight:900;flex-shrink:0;}
+.svc-table{width:100%;border-collapse:collapse;margin-bottom:4px;}
+.svc-table tr{border-bottom:0.5px solid rgba(255,255,255,0.06);}
+.svc-table td{padding:7px 6px;vertical-align:top;}
+.svc-check-cell{width:22px;padding-right:10px!important;}
+.svc-check{width:15px;height:15px;background:linear-gradient(135deg,#C9A84C,#9A7028);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#080810;font-weight:900;}
 .svc-name{font-size:9.5px;font-weight:700;color:#fff;line-height:1.3;}
 .svc-desc{font-size:8px;color:#9090A8;margin-top:2px;line-height:1.3;}
-/* SUBSECTION TITLE (tecnica) */
-.sub-eyebrow{font-size:7px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin:14px 0 8px;opacity:.75;}
+.sub-eyebrow{font-size:7.5px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin:14px 0 8px;opacity:.8;}
 /* PRECIO */
-.precio-block{display:flex;justify-content:flex-end;align-items:flex-end;margin:18px 0 24px;padding:20px 24px;background:linear-gradient(135deg,rgba(201,168,76,0.1),rgba(201,168,76,0.04));border:1px solid rgba(201,168,76,0.3);border-radius:10px;position:relative;}
-.precio-block::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);}
-.precio-lbl{font-size:7px;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
-.precio-cur{font-size:12px;font-weight:600;color:#C9A84C;line-height:1.2;}
-.precio-num{font-size:36px;font-weight:800;color:#E8C97A;line-height:1;letter-spacing:-1px;}
-.precio-nota{font-size:8px;color:#9090A8;font-style:italic;margin-top:6px;text-align:right;}
-.precio-left{flex:1;}
-.precio-right{text-align:right;}
+.precio-wrap{display:flex;justify-content:flex-end;margin:18px 0 22px;}
+.precio-box{text-align:right;background:linear-gradient(135deg,rgba(201,168,76,0.1),rgba(201,168,76,0.04));border:1px solid rgba(201,168,76,0.32);border-radius:10px;padding:18px 24px 14px;position:relative;min-width:200px;}
+.precio-box::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);}
+.p-lbl{font-size:7px;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
+.p-cur{font-size:12px;font-weight:600;color:#C9A84C;line-height:1.3;}
+.p-num{font-size:36px;font-weight:800;color:#E8C97A;line-height:1;letter-spacing:-1px;}
+.p-nota{font-size:8px;color:#9090A8;font-style:italic;margin-top:8px;}
 /* OPCIONALES */
-.opt-item{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 14px;background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.15);border-radius:7px;margin-bottom:6px;}
-.opt-dot{width:5px;height:5px;background:#C9A84C;border-radius:50%;margin-top:4px;flex-shrink:0;margin-right:10px;}
+.opt-item{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 13px;background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.14);border-radius:7px;margin-bottom:6px;}
+.opt-left{display:flex;gap:9px;align-items:flex-start;flex:1;}
+.opt-dot{width:5px;height:5px;background:#C9A84C;border-radius:50%;margin-top:4px;flex-shrink:0;}
 .opt-name{font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;}
 .opt-desc{font-size:8px;color:#9090A8;line-height:1.3;}
-.opt-price{font-size:10px;font-weight:700;color:#C9A84C;white-space:nowrap;margin-left:12px;}
+.opt-price{font-size:10px;font-weight:700;color:#C9A84C;white-space:nowrap;margin-left:12px;padding-top:2px;}
 /* CONDICIONES PAGO */
 .pago-block{margin-bottom:18px;}
-.pago-option{padding:12px 16px;border-radius:7px;margin-bottom:8px;}
-.pago-option.primary{background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);}
-.pago-option.secondary{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);}
+.pago-opt{padding:11px 15px;border-radius:7px;margin-bottom:7px;}
+.pago-opt.p1{background:rgba(201,168,76,0.07);border:1px solid rgba(201,168,76,0.22);}
+.pago-opt.p2{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);}
 .pago-tag{font-size:6.5px;font-weight:700;color:#C9A84C;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px;}
-.pago-title{font-size:10px;font-weight:700;color:#fff;margin-bottom:4px;}
+.pago-title{font-size:10px;font-weight:700;color:#fff;margin-bottom:3px;}
 .pago-body{font-size:8.5px;color:#9090A8;line-height:1.5;}
-/* TERMINOS */
-.terms-item{display:flex;gap:8px;margin-bottom:8px;}
-.terms-dash{font-size:8px;font-weight:700;color:#C9A84C;flex-shrink:0;margin-top:1px;}
-.terms-text{font-size:8px;color:#9090A8;line-height:1.5;}
+/* TERMS */
+.term-row{display:flex;gap:8px;margin-bottom:7px;}
+.term-dash{font-size:8px;font-weight:700;color:#C9A84C;flex-shrink:0;margin-top:1px;}
+.term-txt{font-size:8px;color:#9090A8;line-height:1.5;}
 /* FOOTER */
-.footer{border-top:0.5px solid rgba(201,168,76,0.2);padding:16px 48px;text-align:center;}
-.footer-text{font-size:8.5px;color:#9090A8;}
-.footer-text strong{color:#fff;}
-@media print{
-  body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .page{max-width:100%;}
-  .page::before,.page::after{position:fixed;}
-}
+.footer{border-top:0.5px solid rgba(201,168,76,0.18);padding:13px 44px;text-align:center;margin-top:auto;}
+.footer-txt{font-size:8.5px;color:#9090A8;}
+.footer-txt strong{color:#fff;}
+.pgnum{position:fixed;bottom:10px;right:30px;font-size:7px;color:#9090A8;}
+@media print{body{background:#080810!important;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}
 </style>
 </head>
 <body>
+<div class="hl-top"></div>
+<div class="hl-bot"></div>
 <div class="page">
-  <!-- HEADER -->
-  <div class="header">
-    <div class="dates-row">
-      <div class="date-block">
-        <div class="lbl">Fecha de emisión</div>
-        <div class="val">{{FECHA_EMISION}}</div>
-      </div>
-      <div class="logo-area">
-        <svg viewBox="0 0 60 42" width="60" height="42" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="0,42 20,0 30,18 15,42" fill="#C9A84C" opacity="0.9"/>
-          <polygon points="30,18 40,0 60,42 45,42" fill="#E8C97A" opacity="0.85"/>
+  <div class="hdr">
+    <div class="hdr-dates">
+      <div class="date-col"><div class="lbl">Fecha de emisión</div><div class="val">{{FECHA_EMISION}}</div></div>
+      <div class="logo-col">
+        <svg width="64" height="44" viewBox="0 0 64 44" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="0,44 21,0 32,20 16,44" fill="#C9A84C"/>
+          <polygon points="32,20 43,0 64,44 48,44" fill="#E8C97A" opacity="0.9"/>
         </svg>
-        <div class="brand-name">ELIEL MIZRAHI <span style="color:#C9A84C">DJ</span></div>
-        <div class="brand-sub">BUENOS AIRES, ARGENTINA</div>
+        <div class="brand">ELIEL MIZRAHI <span>DJ</span></div>
+        <div class="brand-sub">Buenos Aires, Argentina</div>
       </div>
-      <div class="date-block" style="text-align:right">
-        <div class="lbl">Válido hasta</div>
-        <div class="val">{{FECHA_VENCIMIENTO}}</div>
-      </div>
+      <div class="date-col right"><div class="lbl">Válido hasta</div><div class="val">{{FECHA_VENCIMIENTO}}</div></div>
     </div>
   </div>
-
-  <!-- GOLD BAND -->
   <div class="gold-band">
-    <div class="doc-id">{{NUMERO_DOC}}</div>
-    <div class="doc-type">Presupuesto</div>
-    <div class="doc-type">ELIEL MIZRAHI DJ</div>
+    <div class="gb-type">Presupuesto</div>
+    <div class="gb-doc">{{NUMERO_DOC}}</div>
+    <div class="gb-type">ELIEL MIZRAHI DJ</div>
   </div>
-
-  <!-- CONTENT -->
   <div class="content">
-    <!-- DATOS DEL EVENTO -->
-    <div class="section-eyebrow">Datos del evento</div>
-    <div class="evento-grid">
-      <div><div class="dato-lbl">Cliente</div><div class="dato-val gold">{{CLIENTE}}</div></div>
-      <div><div class="dato-lbl">Tipo de evento</div><div class="dato-val">{{TIPO_EVENTO}}</div></div>
-      <div><div class="dato-lbl">Fecha del evento</div><div class="dato-val">{{FECHA_EVENTO}}</div></div>
-      <div><div class="dato-lbl">Salón / Venue</div><div class="dato-val">{{SALON}}</div></div>
+    <div class="eyebrow" style="margin-top:4px">Datos del evento</div>
+    <table class="ev-table">
+      <tr><td class="lbl">Cliente</td><td class="val gold">{{CLIENTE}}</td></tr>
+      <tr><td class="lbl">Tipo de evento</td><td class="val">{{TIPO_EVENTO}}</td></tr>
+      <tr><td class="lbl">Fecha del evento</td><td class="val">{{FECHA_EVENTO}}</td></tr>
+      <tr><td class="lbl">Salón / Venue</td><td class="val">{{SALON}}</td></tr>
       {{INVITADOS_ROW}}
-    </div>
-
-    <!-- SERVICIOS -->
-    <div class="section-eyebrow">Servicios incluidos</div>
-    <table class="servicios-table">{{SERVICIOS_ROWS}}</table>
-
+    </table>
+    <div class="eyebrow">Servicios incluidos</div>
+    <table class="svc-table">{{SERVICIOS_ROWS}}</table>
     {{OPCIONALES_SECTION}}
-
-    <!-- PRECIO -->
-    <div class="precio-block">
-      <div class="precio-left">{{NOTA_PRECIO}}</div>
-      <div class="precio-right">
-        <div class="precio-lbl">Valor</div>
-        <div class="precio-cur">USD</div>
-        <div class="precio-num">{{PRECIO}}</div>
+    <div class="precio-wrap">
+      <div class="precio-box">
+        <div class="p-lbl">Valor</div>
+        <div class="p-cur">USD</div>
+        <div class="p-num">{{PRECIO}}</div>
+        {{NOTA_PRECIO}}
       </div>
     </div>
-
-    <!-- CONDICIONES DE PAGO -->
-    <div class="section-eyebrow">Condiciones de pago</div>
+    <div class="eyebrow">Condiciones de pago</div>
     <div class="pago-block">
-      <div class="pago-option primary">
+      <div class="pago-opt p1">
         <div class="pago-tag">Opción 1</div>
         <div class="pago-title">Pago en dos cuotas</div>
         <div class="pago-body">50% dentro de los 15 días de recibido el presupuesto. El 50% restante hasta 30 días antes del evento.</div>
       </div>
       {{OPCION_DESCUENTO}}
     </div>
-
-    <!-- TÉRMINOS -->
-    <div class="section-eyebrow" style="margin-top:16px">Términos y condiciones</div>
-    <div class="terms-item"><div class="terms-dash">—</div><div class="terms-text">Los precios son válidos hasta el {{FECHA_VENCIMIENTO}}. Transcurrida esa fecha podrán actualizarse, aplicándose el ajuste al saldo pendiente al momento del pago.</div></div>
-    <div class="terms-item"><div class="terms-dash">—</div><div class="terms-text">Las señas abonadas no son reembolsables. En caso de cancelación, el cliente podrá reprogramar la fecha del evento, sujeto a disponibilidad y a diferencia de precio si la hubiere.</div></div>
+    <div class="eyebrow" style="margin-top:14px">Términos y condiciones</div>
+    <div class="term-row"><div class="term-dash">—</div><div class="term-txt">Los precios son válidos hasta el {{FECHA_VENCIMIENTO}}. Transcurrida esa fecha podrán actualizarse, aplicándose el ajuste al saldo pendiente al momento del pago.</div></div>
+    <div class="term-row"><div class="term-dash">—</div><div class="term-txt">Las señas abonadas no son reembolsables. En caso de cancelación, el cliente podrá reprogramar la fecha del evento, sujeto a disponibilidad y a diferencia de precio si la hubiere.</div></div>
   </div>
-
-  <!-- FOOTER -->
-  <div class="footer">
-    <div class="footer-text">@ElielMizrahi &nbsp;·&nbsp; <strong>ELIEL MIZRAHI DJ</strong> &nbsp;·&nbsp; 1153488044 (Eliel)</div>
-  </div>
+  <div class="footer"><div class="footer-txt">@ElielMizrahi &nbsp;·&nbsp; <strong>ELIEL MIZRAHI DJ</strong> &nbsp;·&nbsp; 1153488044 (Eliel)</div></div>
 </div>
-</body>
-</html>
-`;
+<div class="pgnum">01 / 01</div>
+</body></html>`;
 const RECIBO_TEMPLATE = `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>Recibo ELIEL MIZRAHI DJ</title>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Recibo ELIEL MIZRAHI DJ</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:#080810;color:#fff;font-family:'Montserrat',sans-serif;font-size:12px;}
-.page{max-width:794px;margin:0 auto;background:#080810;min-height:1123px;}
-.header{padding:32px 48px 24px;border-bottom:1px solid rgba(201,168,76,0.2);background:linear-gradient(180deg,#0C0C20,#080810);}
-.dates-row{display:flex;justify-content:space-between;margin-bottom:20px;}
-.date-block .lbl{font-size:7px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
-.date-block .val{font-size:9px;font-weight:700;color:#fff;}
-.logo-area{text-align:center;flex:1;}
-.brand-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:4px;text-transform:uppercase;}
-.brand-sub{font-size:7px;font-weight:500;color:rgba(201,168,76,0.7);letter-spacing:4px;margin-top:3px;}
-.gold-band{background:linear-gradient(135deg,#C9A84C,#E8C97A 40%,#C9A84C 60%,#a07830);padding:12px 48px;display:flex;justify-content:space-between;align-items:center;}
-.gold-band .doc-id{font-size:13px;font-weight:800;color:#080810;letter-spacing:2px;}
-.gold-band .doc-type{font-size:9px;font-weight:700;color:rgba(8,8,16,0.65);letter-spacing:3px;text-transform:uppercase;}
-.content{padding:28px 48px;}
-.eyebrow{font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:0.5px solid rgba(201,168,76,0.25);}
-.datos-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.12);border-radius:8px;padding:18px 20px;position:relative;}
-.datos-grid::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,#C9A84C,#a07830);border-radius:3px 0 0 3px;}
-.lbl{font-size:7.5px;font-weight:600;color:rgba(201,168,76,0.6);letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;}
-.val{font-size:11px;font-weight:600;color:#fff;}
-.pago-hero{background:linear-gradient(135deg,rgba(201,168,76,0.12),rgba(201,168,76,0.04));border:1px solid rgba(201,168,76,0.3);border-radius:10px;padding:24px 28px;margin:20px 0;position:relative;}
-.pago-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);}
-.concepto-lbl{font-size:7px;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
-.concepto-val{font-size:16px;font-weight:700;color:#fff;margin-bottom:14px;}
-.monto-lbl{font-size:7px;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
-.monto-cur{font-size:12px;font-weight:600;color:#C9A84C;}
-.monto-num{font-size:36px;font-weight:800;color:#E8C97A;letter-spacing:-1px;}
-.resumen-table{width:100%;border-collapse:collapse;margin:16px 0;}
-.resumen-table tr{border-bottom:0.5px solid rgba(255,255,255,0.08);}
+body{background:#080810;color:#fff;font-family:'Montserrat',Arial,sans-serif;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.page{width:794px;min-height:1123px;margin:0 auto;background:#080810;position:relative;}
+.hl-top{position:fixed;top:0;left:0;right:0;height:1px;background:#C9A84C;}
+.hl-bot{position:fixed;bottom:0;left:0;right:0;height:1px;background:#C9A84C;}
+.hdr{background:linear-gradient(180deg,#0C0C20,#080810);padding:30px 44px 22px;border-bottom:1px solid rgba(201,168,76,0.18);}
+.hdr-dates{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+.date-col .lbl{font-size:7px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;}
+.date-col .val{font-size:9px;font-weight:700;color:#fff;}
+.logo-col{text-align:center;flex:1;}
+.brand{font-size:22px;font-weight:800;color:#fff;letter-spacing:3px;text-transform:uppercase;}
+.brand span{color:#C9A84C;}
+.brand-sub{font-size:7px;font-weight:500;color:rgba(201,168,76,0.7);letter-spacing:4px;text-transform:uppercase;margin-top:4px;}
+.gold-band{background:linear-gradient(135deg,#C9A84C,#E8C97A 38%,#C9A84C 62%,#9A7028);padding:11px 44px;display:flex;justify-content:space-between;align-items:center;}
+.gb-doc{font-size:13px;font-weight:800;color:#080810;letter-spacing:2px;}
+.gb-type{font-size:8.5px;font-weight:700;color:rgba(8,8,16,0.6);letter-spacing:3px;text-transform:uppercase;}
+.content{padding:26px 44px 20px;}
+.eyebrow{font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;padding-bottom:7px;border-bottom:0.5px solid rgba(201,168,76,0.22);}
+.ev-table{width:100%;border-collapse:collapse;margin-bottom:22px;background:rgba(201,168,76,0.03);border:1px solid rgba(201,168,76,0.12);border-radius:8px;overflow:hidden;}
+.ev-table tr{border-bottom:1px solid rgba(255,255,255,0.06);}
+.ev-table tr:last-child{border-bottom:none;}
+.ev-table td{padding:10px 16px;}
+.ev-table .lbl{font-size:8px;font-weight:600;color:#9090A8;letter-spacing:2px;text-transform:uppercase;width:180px;}
+.ev-table .val{font-size:11px;font-weight:700;color:#fff;}
+/* HISTORIAL */
+.historial-table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+.historial-table thead tr{border-bottom:1px solid rgba(201,168,76,0.3);}
+.historial-table th{font-size:8px;font-weight:700;color:#C9A84C;letter-spacing:2px;text-transform:uppercase;padding:6px 8px;text-align:left;}
+.historial-table td{padding:10px 8px;font-size:10px;border-bottom:0.5px solid rgba(255,255,255,0.06);}
+.historial-table .td-concepto{font-weight:700;color:#fff;}
+.historial-table .td-monto{font-weight:700;color:#fff;text-align:right;}
+.historial-table .td-medio{color:#9090A8;}
+.historial-table .td-fecha{color:#9090A8;}
+/* TOTALES */
+.totales-row{display:flex;gap:1px;margin:18px 0;}
+.total-box{flex:1;padding:18px 20px;position:relative;}
+.total-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.total-box.abonado::before{background:#C9A84C;}
+.total-box.saldo::before{background:#c0392b;}
+.t-lbl{font-size:8px;font-weight:700;color:#9090A8;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.t-cur{font-size:12px;font-weight:600;color:#C9A84C;}
+.t-num{font-size:42px;font-weight:800;color:#C9A84C;line-height:1;letter-spacing:-1px;}
+/* RESUMEN */
+.resumen-table{width:100%;border-collapse:collapse;margin:14px 0;}
+.resumen-table tr{border-bottom:0.5px solid rgba(255,255,255,0.07);}
 .resumen-table td{padding:9px 4px;font-size:10px;}
-.resumen-table .r-lbl{color:#9090A8;}
-.resumen-table .r-val{text-align:right;font-weight:600;color:#fff;}
-.resumen-table .r-val.saldo{color:#C9A84C;}
-.footer{border-top:0.5px solid rgba(201,168,76,0.2);padding:16px 48px;text-align:center;}
-.footer-text{font-size:8.5px;color:#9090A8;}
-.footer-text strong{color:#fff;}
-@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
-</style></head><body><div class="page">
-<div class="header">
-  <div class="dates-row">
-    <div class="date-block"><div class="lbl">Fecha de emisión</div><div class="val">{{FECHA_EMISION}}</div></div>
-    <div class="logo-area">
-      <svg viewBox="0 0 60 42" width="60" height="42" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="0,42 20,0 30,18 15,42" fill="#C9A84C" opacity="0.9"/>
-        <polygon points="30,18 40,0 60,42 45,42" fill="#E8C97A" opacity="0.85"/>
-      </svg>
-      <div class="brand-name">ELIEL MIZRAHI <span style="color:#C9A84C">DJ</span></div>
-      <div class="brand-sub">BUENOS AIRES, ARGENTINA</div>
+.r-lbl{color:#9090A8;}
+.r-val{text-align:right;font-weight:600;color:#fff;}
+.footer{border-top:0.5px solid rgba(201,168,76,0.18);padding:13px 44px;text-align:center;}
+.footer-txt{font-size:8.5px;color:#9090A8;}
+.footer-txt strong{color:#fff;}
+.pgnum{position:fixed;bottom:10px;right:30px;font-size:7px;color:#9090A8;}
+@media print{body{background:#080810!important;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}
+</style>
+</head>
+<body>
+<div class="hl-top"></div><div class="hl-bot"></div>
+<div class="page">
+  <div class="hdr">
+    <div class="hdr-dates">
+      <div class="date-col"><div class="lbl">Fecha de emisión</div><div class="val">{{FECHA_EMISION}}</div></div>
+      <div class="logo-col">
+        <svg width="64" height="44" viewBox="0 0 64 44" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="0,44 21,0 32,20 16,44" fill="#C9A84C"/>
+          <polygon points="32,20 43,0 64,44 48,44" fill="#E8C97A" opacity="0.9"/>
+        </svg>
+        <div class="brand">ELIEL MIZRAHI <span>DJ</span></div>
+        <div class="brand-sub">Buenos Aires, Argentina</div>
+      </div>
+      <div class="date-col" style="text-align:right"><div class="lbl">Número</div><div class="val">{{NUMERO_DOC}}</div></div>
     </div>
-    <div class="date-block" style="text-align:right"><div class="lbl">Número</div><div class="val">{{NUMERO_DOC}}</div></div>
   </div>
-</div>
-<div class="gold-band">
-  <div class="doc-id">RECIBO DE PAGO · {{CLIENTE}}</div>
-  <div class="doc-type">{{NUMERO_DOC}}</div>
-</div>
-<div class="content">
-  <div class="eyebrow">Datos del pago</div>
-  <div class="datos-grid">
-    <div><div class="lbl">Cliente</div><div class="val" style="color:#C9A84C">{{CLIENTE}}</div></div>
-    <div><div class="lbl">Evento</div><div class="val">{{TIPO_EVENTO}}</div></div>
-    {{FECHA_ROW}}
-    {{SALON_ROW}}
-    {{MEDIO_ROW}}
+  <div class="gold-band">
+    <div class="gb-type">Recibo de pago</div>
+    <div class="gb-doc">{{NUMERO_DOC}}</div>
+    <div class="gb-type">{{TIPO_EVENTO}} · {{SALON}}</div>
   </div>
-  <div class="pago-hero">
-    <div class="concepto-lbl">Concepto</div>
-    <div class="concepto-val">{{CONCEPTO}}</div>
-    <div class="monto-lbl">Monto abonado</div>
-    <div class="monto-cur">USD</div>
-    <div class="monto-num">{{MONTO_ABONADO}}</div>
+  <div class="content">
+    <div class="eyebrow" style="margin-top:4px">Datos del evento</div>
+    <table class="ev-table">
+      <tr><td class="lbl">Cliente</td><td class="val" style="color:#C9A84C">{{CLIENTE}}</td></tr>
+      <tr><td class="lbl">Evento</td><td class="val">{{TIPO_EVENTO}}</td></tr>
+      {{FECHA_ROW}}
+      {{SALON_ROW}}
+      <tr><td class="lbl">Fecha de emisión</td><td class="val">{{FECHA_EMISION}}</td></tr>
+      {{MEDIO_ROW}}
+    </table>
+    <div class="eyebrow">Historial de pagos</div>
+    <table class="historial-table">
+      <thead><tr><th>Fecha</th><th>Concepto</th><th>Medio</th><th style="text-align:right">Monto</th></tr></thead>
+      <tbody>{{HISTORIAL_ROWS}}</tbody>
+    </table>
+    <div class="totales-row">
+      <div class="total-box abonado"><div class="t-lbl">Total abonado</div><div class="t-cur">USD</div><div class="t-num">{{MONTO_ABONADO_FMT}}</div></div>
+      <div class="total-box saldo"><div class="t-lbl">Saldo pendiente</div><div class="t-cur">USD</div><div class="t-num" style="color:#E8C97A">{{SALDO_FMT}}</div></div>
+    </div>
+    <table class="resumen-table">
+      <tr><td class="r-lbl">Total del evento</td><td class="r-val">USD {{MONTO_TOTAL_FMT}}</td></tr>
+    </table>
+    {{OBS_SECTION}}
   </div>
-  <div class="eyebrow">Resumen financiero</div>
-  <table class="resumen-table">
-    <tr><td class="r-lbl">Total del evento</td><td class="r-val">USD {{MONTO_TOTAL}}</td></tr>
-    <tr><td class="r-lbl">Monto abonado</td><td class="r-val">USD {{MONTO_ABONADO}}</td></tr>
-    <tr><td class="r-lbl" style="font-weight:600;color:#fff">Saldo pendiente</td><td class="r-val saldo">{{SALDO}}</td></tr>
-  </table>
-  {{OBS_SECTION}}
+  <div class="footer"><div class="footer-txt">@ElielMizrahi &nbsp;·&nbsp; <strong>ELIEL MIZRAHI DJ</strong> &nbsp;·&nbsp; 1153488044 (Eliel)</div></div>
 </div>
-<div class="footer"><div class="footer-text">@ElielMizrahi &nbsp;·&nbsp; <strong>ELIEL MIZRAHI DJ</strong> &nbsp;·&nbsp; 1153488044 (Eliel)</div></div>
-</div></body></html>`;
+<div class="pgnum">01 / 01</div>
+</body></html>``;
 
 function obtenerServiciosPaquete(paquete){
   const BASE_INTER = [
@@ -1569,91 +1571,75 @@ function obtenerServiciosPaquete(paquete){
 }
 
 function generarPresupuestoHTML(d, blue){
-  const tc = blue||1450;
-  const hoy = new Date();
-  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const fmtD = dt => dt.getDate()+' de '+meses[dt.getMonth()]+' de '+dt.getFullYear();
-  const venc = new Date(hoy); venc.setDate(venc.getDate()+15);
-  const fechaParts = d.fecha?d.fecha.match(/(\d{4})/):null;
-  const yearDoc = fechaParts?fechaParts[1]:hoy.getFullYear();
-  const numDoc = d.numeroDoc||('#EMD-'+yearDoc+'-'+(180+Math.floor(Math.random()*170)));
-
-  // Build servicios rows
-  const servicios = d.servicios||[];
-  const splitIdx = d.seccionTecnicaDesde??null;
-  let svcsHTML = '';
-  servicios.forEach((svc,i) => {
-    if(splitIdx!==null && i===splitIdx) svcsHTML += `<tr><td colspan="2"><div class="sub-eyebrow">EQUIPAMIENTO TÉCNICO</div></td></tr>`;
-    svcsHTML += `<tr><td style="width:20px;padding:7px 8px 7px 0"><div class="svc-check">✓</div></td><td><div class="svc-name">${svc[0]||svc.nombre||''}</div><div class="svc-desc">${svc[1]||svc.descripcion||''}</div></td></tr>`;
+  const hoy=new Date();
+  const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const fmtD=dt=>dt.getDate()+' de '+meses[dt.getMonth()]+' de '+dt.getFullYear();
+  const venc=new Date(hoy); venc.setDate(venc.getDate()+15);
+  const fechaParts=d.fecha?d.fecha.match(/(\d{4})/):null;
+  const yearDoc=fechaParts?fechaParts[1]:hoy.getFullYear();
+  const numDoc=d.numeroDoc||('#EMD-'+yearDoc+'-'+(180+Math.floor(Math.random()*170)));
+  const servicios=d.servicios||[];
+  const splitIdx=d.seccionTecnicaDesde??null;
+  let svcsHTML='';
+  servicios.forEach((svc,i)=>{
+    if(splitIdx!==null&&i===splitIdx) svcsHTML+=`<tr><td colspan="2"><div class="sub-eyebrow">EQUIPAMIENTO TÉCNICO</div></td></tr>`;
+    const n=svc[0]||svc.nombre||''; const desc=svc[1]||svc.descripcion||'';
+    svcsHTML+=`<tr><td class="svc-check-cell"><div class="svc-check">✓</div></td><td><div class="svc-name">${n}</div><div class="svc-desc">${desc}</div></td></tr>`;
   });
-
-  // Invitados row
-  const invRow = d.invitados?`<div><div class="dato-lbl">Invitados</div><div class="dato-val">${d.invitados}</div></div>`:'';
-
-  // Opcionales
-  let optsHTML = '';
+  const invRow=d.invitados?`<tr><td class="lbl">Invitados</td><td class="val">${d.invitados}</td></tr>`:'';
+  let optsHTML='';
   if(d.opcionales&&d.opcionales.length>0){
-    optsHTML = `<div class="section-eyebrow" style="margin-top:20px">Servicios opcionales</div>`;
+    optsHTML=`<div class="eyebrow" style="margin-top:18px">Servicios opcionales</div>`;
     d.opcionales.forEach(opt=>{
-      const nombre=opt[0]||opt.nombre||''; const desc=opt[1]||opt.descripcion||''; const precio=opt[2]||opt.precio||'';
-      optsHTML+=`<div class="opt-item"><div class="opt-dot"></div><div style="flex:1"><div class="opt-name">${nombre}</div><div class="opt-desc">${desc}</div></div><div class="opt-price">${precio}</div></div>`;
+      const n=opt[0]||opt.nombre||''; const desc=opt[1]||opt.descripcion||''; const p=opt[2]||opt.precio||'';
+      optsHTML+=`<div class="opt-item"><div class="opt-left"><div class="opt-dot"></div><div><div class="opt-name">${n}</div><div class="opt-desc">${desc}</div></div></div><div class="opt-price">${p}</div></div>`;
     });
   }
-
-  // Descuento opcion 2
-  let descHTML = '';
-  if(d.descuentoPagoTotal){
-    descHTML = `<div class="pago-option secondary"><div class="pago-tag">Opción 2 · Descuento ${d.descuentoPagoTotal}</div><div class="pago-title">Pago total anticipado</div><div class="pago-body">Abono del total antes del ${fmtD(venc)}. Incluye un ${d.descuentoPagoTotal} de descuento sobre el precio total.</div></div>`;
-  }
-
-  const notaHTML = d.notaPrecio?`<div class="precio-nota">${d.notaPrecio}</div>`:'';
-
+  const descHTML=d.descuentoPagoTotal?`<div class="pago-opt p2"><div class="pago-tag">Opción 2 · Descuento ${d.descuentoPagoTotal}</div><div class="pago-title">Pago total anticipado</div><div class="pago-body">Abono del total antes del ${fmtD(venc)}. Incluye un ${d.descuentoPagoTotal} de descuento sobre el precio total.</div></div>`:'';
+  const notaHTML=d.notaPrecio?`<div class="p-nota">${d.notaPrecio}</div>`:'';
   return PRESUPUESTO_TEMPLATE
-    .replace('{{FECHA_EMISION}}', fmtD(hoy))
-    .replace('{{FECHA_VENCIMIENTO}}', fmtD(venc))
-    .replace('{{FECHA_VENCIMIENTO}}', fmtD(venc))
-    .replace('{{NUMERO_DOC}}', numDoc)
-    .replace('{{CLIENTE}}', d.cliente||'')
-    .replace('{{TIPO_EVENTO}}', d.tipoEvento||'')
-    .replace('{{FECHA_EVENTO}}', d.fecha||'')
-    .replace('{{SALON}}', d.salon||'')
-    .replace('{{INVITADOS_ROW}}', invRow)
-    .replace('{{SERVICIOS_ROWS}}', svcsHTML)
-    .replace('{{OPCIONALES_SECTION}}', optsHTML)
-    .replace('{{PRECIO}}', String(d.precio||''))
-    .replace('{{NOTA_PRECIO}}', notaHTML)
-    .replace('{{OPCION_DESCUENTO}}', descHTML);
+    .replace('{{FECHA_EMISION}}',fmtD(hoy))
+    .replace(/{{FECHA_VENCIMIENTO}}/g,fmtD(venc))
+    .replace(/{{NUMERO_DOC}}/g,numDoc)
+    .replace('{{CLIENTE}}',d.cliente||'')
+    .replace('{{TIPO_EVENTO}}',d.tipoEvento||'')
+    .replace('{{FECHA_EVENTO}}',d.fecha||'')
+    .replace('{{SALON}}',d.salon||'')
+    .replace('{{INVITADOS_ROW}}',invRow)
+    .replace('{{SERVICIOS_ROWS}}',svcsHTML)
+    .replace('{{OPCIONALES_SECTION}}',optsHTML)
+    .replace('{{PRECIO}}',String(d.precio||''))
+    .replace('{{NOTA_PRECIO}}',notaHTML)
+    .replace('{{OPCION_DESCUENTO}}',descHTML);
 }
 
 function generarReciboHTML(d, blue){
-  const hoy = new Date();
-  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const fmtD = dt => dt.getDate()+' de '+meses[dt.getMonth()]+' de '+dt.getFullYear();
-  const yearDoc = hoy.getFullYear();
-  const numDoc = d.numeroDoc||('#REC-'+yearDoc+'-'+(180+Math.floor(Math.random()*170)));
-  const saldo = Number(d.montoTotal||0)-Number(d.montoAbonado||0);
-  const saldoStr = saldo<=0?'Pago total cancelado':fmt(saldo);
-
-  const fechaRow = d.fechaEvento?`<div><div class="lbl">Fecha del evento</div><div class="val">${d.fechaEvento}</div></div>`:'';
-  const salonRow = d.salon?`<div><div class="lbl">Salón</div><div class="val">${d.salon}</div></div>`:'';
-  const medioRow = d.medioPago?`<div><div class="lbl">Medio de pago</div><div class="val">${d.medioPago}</div></div>`:'';
-  const obsSection = d.observaciones?`<div class="eyebrow" style="margin-top:16px">Observaciones</div><p style="font-size:9px;color:#9090A8">${d.observaciones}</p>`:'';
-
+  const hoy=new Date();
+  const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const fmtD=dt=>dt.getDate()+' de '+meses[dt.getMonth()]+' de '+dt.getFullYear();
+  const numDoc=d.numeroDoc||('#REC-'+hoy.getFullYear()+'-'+(180+Math.floor(Math.random()*170)));
+  const saldo=Math.max(0,Number(d.montoTotal||0)-Number(d.montoAbonado||0));
+  const fmtNum=n=>Number(n||0).toLocaleString('es-AR');
+  const fechaRow=d.fechaEvento?`<tr><td class="lbl">Fecha del evento</td><td class="val">${d.fechaEvento}</td></tr>`:'';
+  const salonRow=d.salon?`<tr><td class="lbl">Salón</td><td class="val">${d.salon}</td></tr>`:'';
+  const medioRow=d.medioPago?`<tr><td class="lbl">Medio de pago</td><td class="val">${d.medioPago}</td></tr>`:'';
+  const obsSection=d.observaciones?`<div class="eyebrow" style="margin-top:14px">Observaciones</div><p style="font-size:9px;color:#9090A8;line-height:1.5">${d.observaciones}</p>`:'';
+  const historial=d.historial||[{fecha:fmtD(hoy),concepto:d.concepto||'Pago',medio:d.medioPago||'Efectivo',monto:Number(d.montoAbonado||0)}];
+  const histRows=historial.map(h=>`<tr><td class="td-fecha">${h.fecha||fmtD(hoy)}</td><td class="td-concepto">${h.concepto}</td><td class="td-medio">${h.medio||'Efectivo'}</td><td class="td-monto">USD ${fmtNum(h.monto)}</td></tr>`).join('');
   return RECIBO_TEMPLATE
-    .replace('{{FECHA_EMISION}}', fmtD(hoy))
-    .replace('{{NUMERO_DOC}}', numDoc)
-    .replace(/{{NUMERO_DOC}}/g, numDoc)
-    .replace('{{CLIENTE}}', d.cliente||'')
-    .replace('{{TIPO_EVENTO}}', d.tipoEvento||'')
-    .replace('{{FECHA_ROW}}', fechaRow)
-    .replace('{{SALON_ROW}}', salonRow)
-    .replace('{{MEDIO_ROW}}', medioRow)
-    .replace('{{CONCEPTO}}', d.concepto||'')
-    .replace('{{MONTO_ABONADO}}', fmt(d.montoAbonado||0))
-    .replace(/{{MONTO_ABONADO}}/g, fmt(d.montoAbonado||0))
-    .replace('{{MONTO_TOTAL}}', fmt(d.montoTotal||0))
-    .replace('{{SALDO}}', saldoStr)
-    .replace('{{OBS_SECTION}}', obsSection);
+    .replace(/{{NUMERO_DOC}}/g,numDoc)
+    .replace(/{{FECHA_EMISION}}/g,fmtD(hoy))
+    .replace(/{{CLIENTE}}/g,d.cliente||'')
+    .replace(/{{TIPO_EVENTO}}/g,d.tipoEvento||'')
+    .replace('{{SALON}}',d.salon||'')
+    .replace('{{FECHA_ROW}}',fechaRow)
+    .replace('{{SALON_ROW}}',salonRow)
+    .replace('{{MEDIO_ROW}}',medioRow)
+    .replace('{{HISTORIAL_ROWS}}',histRows)
+    .replace(/{{MONTO_ABONADO_FMT}}/g,fmtNum(d.montoAbonado||0))
+    .replace('{{SALDO_FMT}}',saldo>0?fmtNum(saldo):'0')
+    .replace('{{MONTO_TOTAL_FMT}}',fmtNum(d.montoTotal||0))
+    .replace('{{OBS_SECTION}}',obsSection);
 }
 
 function abrirPDF(htmlContent){
@@ -1773,6 +1759,9 @@ PARA RECIBO DJ necesitas: nombre cliente, evento, monto total USD, monto abonado
 
 Cuando tenes TODOS los datos, mostrar resumen breve y pedir confirmacion. Si el usuario confirma, responder con el JSON de accion DIRECTAMENTE en el texto, SIN backticks, SIN triple comillas, SIN formato markdown. Solo el JSON puro pegado al final del texto.
 
+Cuando el cliente ACEPTA un presupuesto existente, usar accion:
+{"action":"CONFIRMAR_PRESUPUESTO","data":{"presupuestoId":"id_del_presupuesto_o_null","cliente":"nombre","precio":8200}}
+
 Para generar presupuesto DJ responder con:
 {"action":"GENERAR_PRESUPUESTO_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fecha":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300 personas","conTecnica":true,"paquete":"basica_inter","precio":8200,"precio_str":"8.200","recepcionistas":"opcionales","opcionales":[],"formaPago":"cuotas"}}
 
@@ -1873,6 +1862,53 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         showToast("✓ Gasto registrado");
         setPendingAction(null);
       }
+      else if(action.action==="CONFIRMAR_PRESUPUESTO"){
+        const d=action.data;
+        const pres=(data.dj?.presupuestos||[]).find(p=>
+          p.id===d.presupuestoId ||
+          p.cliente?.toLowerCase().includes((d.cliente||'').toLowerCase())
+        );
+        if(pres){
+          // Ask for cost before confirming — store pres in pending
+          setPendingAction({action:"_EJECUTAR_CONFIRMACION_PRES",data:{pres,costoMoneda:"ARS"}});
+          setMsgs(m=>[...m,{role:"assistant",content:
+            "✓ Encontré el presupuesto de "+pres.cliente+" — "+pres.tipoEvento+" ("+pres.salon+"), "+pres.fecha+".
+
+Cobro: USD "+pres.precio+"
+
+¿Cuál fue tu costo para este evento? Indicá el monto y la moneda (ej: $150.000 ARS o USD 800). Si no lo sabés todavía escribí 0."}]);
+          setLoading(false); return;
+        } else {
+          setMsgs(m=>[...m,{role:"assistant",content:"No encontré el presupuesto. Podés confirmarlo tocando el botón ✓ Confirmar en la sección Presupuestos."}]);
+          setPendingAction(null);
+        }
+      }
+      else if(action.action==="_EJECUTAR_CONFIRMACION_PRES"){
+        // This fires after user provides the cost
+        const {pres,costoRaw,costoMoneda}=action.data;
+        const tc=blue||1450;
+        const costoN=Number(costoRaw||0);
+        const costoUSD=costoMoneda==="ARS"?costoN/tc:costoN;
+        const cobroUSD=Number(pres.precio||0);
+        const gananciaUSD=cobroUSD-costoUSD;
+        const evento={
+          id:Date.now().toString(),
+          nombre:pres.cliente+' — '+pres.tipoEvento+(pres.salon?' ('+pres.salon+')':''),
+          fecha:pres.fecha||'',estado:'Confirmado',
+          monedaCobro:'USD',cobro:cobroUSD,cobroUSD,
+          monedaCosto:costoMoneda||'ARS',costo:costoN,costoUSD,
+          sena:0,senaUSD:0,saldo:cobroUSD,
+          gananciaUSD,margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
+          notas:pres.invitados||'',tcUsado:tc,
+          presupuestoId:pres.id,cliente:pres.cliente,
+          tipoEvento:pres.tipoEvento,salon:pres.salon,
+        };
+        const nuevosEventos=[...(data.dj?.eventos||[]),evento];
+        const nuevosPresupuestos=(data.dj?.presupuestos||[]).map(p=>p.id===pres.id?{...p,estado:'Confirmado'}:p);
+        save({...data,dj:{...data.dj,eventos:nuevosEventos,presupuestos:nuevosPresupuestos}});
+        showToast('✓ Evento confirmado y pasado a Confirmados');
+        setPendingAction(null);
+      }
       else if(action.action==="GENERAR_PRESUPUESTO_DJ"){
         // Generate PDF via API call and save as presupuesto
         const d=action.data;
@@ -1925,7 +1961,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         
         const nuevosPresupuestos=[...(data.dj?.presupuestos||[]),nuevoPres];
         save({...data,dj:{...data.dj,presupuestos:nuevosPresupuestos}});
-        showToast("✓ Presupuesto generado y guardado");
+        showToast("✓ Presupuesto guardado");
         setPendingAction(null);
         if(nuevoPres.pdfHtml){ abrirPDF(nuevoPres.pdfHtml); }
       }
@@ -2010,6 +2046,24 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
     // If there's a pending action and user confirms
     if(pendingAction){
       const lower = text.toLowerCase();
+
+      // Special case: waiting for cost to confirm presupuesto
+      if(pendingAction.action==="_EJECUTAR_CONFIRMACION_PRES"){
+        // Parse cost from message: "$150000", "150.000", "USD 800", "0"
+        const usdMatch=text.match(/USD\s*([\d.,]+)/i);
+        const arsMatch=text.match(/\$\s*([\d.,]+)/i)||text.match(/([\d.,]+)\s*(?:pesos|ars|peso)?/i);
+        let costoRaw=0; let costoMoneda='ARS';
+        if(usdMatch){costoRaw=parseFloat(usdMatch[1].replace(/\./g,'').replace(',','.'));costoMoneda='USD';}
+        else if(arsMatch){costoRaw=parseFloat(arsMatch[1].replace(/\./g,'').replace(',','.'));costoMoneda='ARS';}
+        const updatedAction={...pendingAction,data:{...pendingAction.data,costoRaw,costoMoneda}};
+        setMsgs(m=>[...m,{role:"user",content:text},{role:"assistant",content:"✓ Ejecutando..."}]);
+        setInput("");
+        await executeAction(updatedAction);
+        const costoStr=costoMoneda==="ARS"?"$"+costoRaw.toLocaleString('es-AR'):"USD "+costoRaw;
+        setMsgs(m=>[...m.slice(0,-1),{role:"assistant",content:"✅ Evento confirmado. Costo registrado: "+costoStr+". Ganancia estimada: USD "+(Number(pendingAction.data.pres?.precio||0)-(costoMoneda==="ARS"?costoRaw/(blue||1450):costoRaw)).toFixed(0)+". Podés editarlo desde la sección Confirmados."}]);
+        return;
+      }
+
       // Use word-boundary check to avoid "posible", "básico", "servicio" triggering
       const confirmWords = /\b(si|sí|sip|dale|ok|okay|confirma|confirmado|confirmá|cargá|carga|listo|va|claro|perfecto|adelante|seguí|generar|genera|hacelo|sí\s*x|yep|yes)\b/i;
       if(confirmWords.test(lower)){
@@ -2740,7 +2794,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const [tab,setTab]=useState("presupuestos"); // presupuestos | confirmados | realizados
 
   const eventos=data.dj?.eventos||[];
-  const presupuestos=[...(data.dj?.presupuestos||[])].sort((a,b)=>b.id.localeCompare(a.id));
+  const presupuestos=[...(data.dj?.presupuestos||[])].filter(p=>p.estado==="Pendiente"||p.estado==="Rechazado").sort((a,b)=>b.id.localeCompare(a.id));
   const hoy2=hoy();
   const confirmados=[...eventos.filter(e=>(e.estado==="Confirmado"||e.estado==="Señado")&&e.fecha>=hoy2)].sort((a,b)=>a.fecha.localeCompare(b.fecha));
   const realizados=[...eventos.filter(e=>e.estado==="Realizado"||e.estado==="Cancelado"||(( e.estado==="Confirmado"||e.estado==="Señado")&&e.fecha<hoy2))].sort((a,b)=>b.fecha.localeCompare(a.fecha));
