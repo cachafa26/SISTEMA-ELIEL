@@ -1050,7 +1050,7 @@ function App(){
         </button>
       )}
 
-      {chatState!=="closed"&&<ChatBot data={data} save={save} showToast={showToast} blue={blue} stockUni={stockUni} onClose={()=>setChatState("minimized")}/>}
+      {chatState!=="closed"&&<ChatBot data={data} save={save} showToast={showToast} blue={blue} stockUni={stockUni} onClose={()=>setChatState("minimized")} chatState={chatState} externalMsgs={chatMsgs} setExternalMsgs={setChatMsgs} onFullClose={()=>setChatState("closed")}/>}
 
       {/* TOP NAV ── desktop (hidden on mobile via CSS) */}
       <div className="top-nav" style={{
@@ -1396,7 +1396,7 @@ Para generar confirmacion DJ responder con:
 {"action":"GENERAR_CONFIRMACION_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fechaEvento":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300","conTecnica":true,"paquete":"basica_inter","precioBase":8200,"opcionalesElegidos":[],"formaPago":"total","descuento":10}}`;
 }
 
-function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, externalMsgs, setExternalMsgs}){
+function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, externalMsgs, setExternalMsgs, onFullClose}){
   const msgs = externalMsgs;
   const setMsgs = setExternalMsgs;
   const [input, setInput] = useState("");
@@ -1762,7 +1762,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         boxShadow:"0 8px 28px rgba(244,121,32,0.45)",
         animation:"fadeIn .2s ease",
       }}
-      onClick={()=>setChatState&&window.dispatchEvent(new CustomEvent("openChat"))}>
+      onClick={()=>window.dispatchEvent(new CustomEvent("openChat"))}>
         <span style={{fontSize:18}}>🤖</span>
         <div>
           <div style={{fontSize:11,fontWeight:700,color:"#fff",lineHeight:1}}>Asistente IA</div>
@@ -1791,7 +1791,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         </div>
         
         <button onClick={onClose} title="Minimizar" style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,cursor:"pointer",color:"var(--text-secondary)",marginRight:6}}>▼</button>
-        <button onClick={()=>window.dispatchEvent(new CustomEvent("closeChat"))} title="Cerrar sesión de chat" style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",color:"var(--text-secondary)"}}>✕</button>
+        <button onClick={()=>onFullClose&&onFullClose()} title="Cerrar chat" style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",color:"var(--text-secondary)"}}>✕</button>
       </div>
 
 
