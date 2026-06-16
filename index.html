@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.6.0 · 2026-06-16 -->
+  <!-- v2.8.0 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.6.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.8.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.6.0";
+const APP_VERSION = "v2.8.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1383,7 +1383,7 @@ function App(){
 
   // Calculos DJ globales
   const djEventos=data.dj?.eventos||[];
-  const djRealizados=djEventos.filter(e=>e.estado==="Realizado");
+  const djRealizados=djEventos.filter(e=>e.estado==="Realizado"||e.fecha<new Date().toISOString().split("T")[0]);
   const djGananciaUSD=djRealizados.reduce((a,e)=>a+Number(e.gananciaUSD||e.ganancia||0),0);
   const djCobradoUSD=djRealizados.reduce((a,e)=>a+Number(e.cobroUSD||e.cobro||0),0);
   const djGanancia=djGananciaUSD; // alias for backward compat
@@ -1752,12 +1752,16 @@ ARTÍCULOS DISPONIBLES:
 ${arts}
 
 ESTADOS DE ENTREGA: A despachar, Despachado, A retirar Ezeiza, A retirar Once, Retirado
-ESTADOS DJ: Confirmado, Señado, Realizado, Cancelado
+ESTADOS DJ: Confirmado (evento aceptado, en curso), Realizado (evento terminado), Cancelado
 
 TU ROL:
 1. Respondés preguntas sobre el negocio con los datos reales
 2. Cuando el usuario quiere CARGAR DATOS (pedido, evento, retiro, gasto, despacho), recopilás TODA la información necesaria preguntando lo que falta, y cuando tenés todo generás un JSON de acción
 3. Siempre confirmás antes de ejecutar cualquier acción
+
+REGLAS ESTRICTAS:
+- GENERAR_PRESUPUESTO_DJ: NUNCA preguntar el estado. El estado siempre es "Pendiente" automáticamente.
+- Los presupuestos van a la pestaña Presupuestos. El cliente lo aceptará/rechazará después.
 
 ACCIONES QUE PODÉS EJECUTAR (responder con JSON exacto cuando tenés todos los datos):
 Para cargar un PEDIDO:
@@ -1847,8 +1851,11 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
     const tc = blue||1450;
     try {
       if(action.action==="CARGAR_PEDIDO"){
-        const cont = (data.contenedores||[]).find(c=>c.id===d.contId||c.nombre.toLowerCase().includes((d.contId||"").toLowerCase()));
-        if(!cont){showToast("Contenedor no encontrado");return;}
+        // Try exact ID first, then name match, then pick first container with stock
+        let cont = (data.contenedores||[]).find(c=>c.id===d.contId);
+        if(!cont) cont = (data.contenedores||[]).find(c=>c.nombre.toLowerCase().includes((d.contId||"").toLowerCase()));
+        if(!cont && (data.contenedores||[]).length>0) cont = data.contenedores[0]; // fallback to first
+        if(!cont){showToast("No hay contenedores cargados");setPendingAction(null);return;}
         const total = d.cantidad * d.precioVenta;
         const usd = total / (d.tipoCambioUsado||tc);
         const pedidoId = Date.now().toString();
@@ -1938,7 +1945,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         const pagos=[...(ev.pagos||[]),{id:Date.now().toString(),fecha:d.fecha||hoy(),concepto:d.concepto||"Pago",monto:montoN,moneda:d.moneda||"USD",montoUSD,nota:d.nota||""}];
         const totalPagadoUSD=pagos.reduce((a,p)=>a+p.montoUSD,0);
         const nuevoSaldo=Math.max(0,Number(ev.cobroUSD||0)-totalPagadoUSD);
-        const nuevoEstado=nuevoSaldo<=0?"Realizado":totalPagadoUSD>0?"Señado":ev.estado;
+        const nuevoEstado=nuevoSaldo<=0?"Realizado":ev.estado; // keep Confirmado, don't use Señado
         const nuevosEventos=eventos.map(e=>e.id===ev.id?{...e,pagos,saldo:nuevoSaldo,senaUSD:totalPagadoUSD,estado:nuevoEstado}:e);
         save({...data,dj:{...data.dj,eventos:nuevosEventos}});
         showToast("✓ Pago registrado en "+ev.nombre);
@@ -2407,30 +2414,40 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         padding:"8px 12px calc(8px + env(safe-area-inset-bottom))",
         background:"var(--bg-nav)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",
         borderTop:"0.5px solid var(--glass-border)",flexShrink:0,
-        display:"flex",gap:8,alignItems:"flex-end",
+        display:"flex",flexDirection:"column",gap:0,
       }}>
-        <label style={{width:34,height:34,borderRadius:"50%",border:"0.5px solid "+(attachedFile?"var(--border-info)":"var(--glass-border)"),background:attachedFile?"var(--bg-tint-blue)":"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0,color:attachedFile?"var(--text-info)":"var(--text-secondary)",position:"relative",title:attachedFile?attachedFile.name:"Adjuntar PDF"}}>
-          {attachedFile?<>📎<span style={{position:"absolute",top:-4,right:-4,width:10,height:10,background:"var(--text-info)",borderRadius:"50%",border:"1.5px solid var(--bg-base)"}}></span></>:"📎"}
-          <input type="file" accept=".pdf,image/png,image/jpeg,image/webp" style={{display:"none"}} onChange={async e=>{
-            const file=e.target.files?.[0]; if(!file) return;
-            const reader=new FileReader();
-            reader.onload=ev=>{
-              const b64=ev.target.result.split(",")[1];
-              const mediaType=file.type||"application/pdf";
-              setAttachedFile({name:file.name,base64:b64,mediaType});
-            };
-            reader.readAsDataURL(file);
-            e.target.value="";
-          }}/>
-        </label>
+        {/* File preview - above input row */}
         {attachedFile&&(
-          <div style={{display:"flex",alignItems:"center",gap:4,padding:"3px 8px 3px 6px",background:"var(--bg-tint-blue)",borderRadius:10,border:"0.5px solid var(--border-info)",marginBottom:3,alignSelf:"flex-start",maxWidth:"90%"}}>
-            <span style={{fontSize:11}}>📎</span>
-            <span style={{fontSize:10,color:"var(--text-info)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:150}}>{attachedFile.name}</span>
-            <button onClick={()=>setAttachedFile(null)} style={{background:"none",border:"none",color:"var(--text-danger)",cursor:"pointer",padding:0,fontSize:12,lineHeight:1,flexShrink:0}}>×</button>
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:8,marginBottom:6,fontSize:11}}>
+            <span>📎</span>
+            <span style={{flex:1,color:"var(--text-info)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{attachedFile.name}</span>
+            <button onClick={()=>setAttachedFile(null)} style={{background:"none",border:"none",color:"var(--text-danger)",cursor:"pointer",fontSize:16,padding:0,lineHeight:1}}>×</button>
           </div>
         )}
-        <textarea
+        {/* Input row */}
+        <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+          {/* File button - separate from label for mobile compat */}
+          <div style={{position:"relative",flexShrink:0}}>
+            <button type="button"
+              onClick={()=>{const inp=document.getElementById('chatFileInput');if(inp)inp.click();}}
+              style={{width:34,height:34,borderRadius:"50%",border:"0.5px solid "+(attachedFile?"var(--border-info)":"var(--glass-border)"),background:attachedFile?"var(--bg-tint-blue)":"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",color:attachedFile?"var(--text-info)":"var(--text-secondary)"}}>
+              📎{attachedFile&&<span style={{position:"absolute",top:-3,right:-3,width:8,height:8,background:"var(--text-info)",borderRadius:"50%",border:"1.5px solid var(--bg-base)"}}></span>}
+            </button>
+            <input id="chatFileInput" type="file" accept=".pdf,image/png,image/jpeg,image/webp" style={{display:"none"}} onChange={async e=>{
+              const file=e.target.files?.[0]; if(!file) return;
+              const reader=new FileReader();
+              reader.onload=ev=>{
+                const b64=ev.target.result.split(",")[1];
+                const mediaType=file.type||"application/pdf";
+                setAttachedFile({name:file.name,base64:b64,mediaType});
+              };
+              reader.readAsDataURL(file);
+              e.target.value="";
+            }}/>
+          </div>
+          <textarea
+            ref={inputRef}
+            value={input}<textarea
           ref={inputRef}
           value={input}
           onChange={e=>{setInput(e.target.value);e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,120)+"px";}}
@@ -2656,7 +2673,7 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
             <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Ahorro / patrimonio (USD)</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1.5rem"}}>
               <Card label="Mi 30% SC pendiente" value={fmtUSD(pendienteRetiro)} sub={"≈$"+fmt(pendienteRetiro*tc)+" ARS"} color={pendienteRetiro>0?"var(--text-success)":undefined} onClick={()=>goModulo("supercoating")}/>
-              <Card label="DJ ganancia USD" value={fmtUSD(djGananciaUSD)} sub={djEventos.filter(e=>e.estado==="Realizado").length+" eventos"} color={djGananciaUSD>0?"var(--text-success)":undefined} onClick={()=>goModulo("dj")}/>
+              <Card label="DJ ganancia USD" value={fmtUSD(djGananciaUSD)} sub={realizados.length+" eventos en historial"} color={djGananciaUSD>0?"var(--text-success)":undefined} onClick={()=>goModulo("dj")}/>
               <Card label="SC facturado USD" value={fmtUSD(totalVentaUSD||0)} sub="total ventas"/>
               <Card label="SC cobrado USD" value={fmtUSD(totalCobUSD||0)} sub="efectivamente cobrado"/>
             </div>
@@ -2944,13 +2961,14 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const presupuestos=[...(data.dj?.presupuestos||[])].filter(p=>p.estado==="Pendiente"||p.estado==="Rechazado").sort((a,b)=>b.id.localeCompare(a.id));
   const hoy2=hoy();
   // Events stay in Confirmados until date passes - regardless of payment status
-  const confirmados=[...eventos.filter(e=>(e.estado==="Confirmado"||e.estado==="Señado"||e.estado==="Realizado")&&e.fecha>=hoy2)].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  // Events in Confirmados: Confirmado or Señado (partial pay), only future dates
+  const confirmados=[...eventos.filter(e=>(e.estado==="Confirmado"||e.estado==="Señado")&&e.fecha>=hoy2)].sort((a,b)=>a.fecha.localeCompare(b.fecha));
   // Only go to historial when date has passed
-  const realizados=[...eventos.filter(e=>e.fecha<hoy2||e.estado==="Cancelado")].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const realizados=[...eventos.filter(e=>e.fecha<hoy2||e.estado==="Cancelado"||e.estado==="Realizado")].sort((a,b)=>b.fecha.localeCompare(a.fecha));
 
 
-  const ganTotal=realizados.filter(e=>e.estado==="Realizado").reduce((a,e)=>a+Number(e.gananciaUSD||0),0);
-  const cobroTotal=realizados.filter(e=>e.estado==="Realizado").reduce((a,e)=>a+Number(e.cobroUSD||0),0);
+  const ganTotal=realizados.reduce((a,e)=>a+Number(e.gananciaUSD||0),0);
+  const cobroTotal=realizados.reduce((a,e)=>a+Number(e.cobroUSD||0),0);
   const saldoTotal=confirmados.filter(e=>e.saldo>0).reduce((a,e)=>a+Number(e.saldo||0),0);
 
   const previewCobroUSD=form.monedaCobro==="ARS"?Number(form.cobro||0)/tc:Number(form.cobro||0);
@@ -3027,7 +3045,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
       pagos.push({id:Date.now().toString(),fecha:hoy(),concepto:"Pago total"+(descuentoConf?" (10% desc.)":""),monto:cobroUSD,moneda:"USD",montoUSD:cobroUSD,nota:""});
     }
     const saldoUSD=Math.max(0,cobroUSD-senaUSD);
-    const estadoEvento=saldoUSD<=0?"Realizado":senaUSD>0?"Señado":"Confirmado";
+    const estadoEvento=saldoUSD<=0?"Realizado":"Confirmado";
     const evento={
       id:Date.now().toString(),
       nombre:p.cliente+" — "+p.tipoEvento+(p.salon?" ("+p.salon+")":""),
@@ -3056,7 +3074,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     const pagos=[...(evento.pagos||[]),{id:Date.now().toString(),fecha:formPago.fecha,concepto:formPago.concepto,monto:montoNum,moneda:formPago.moneda,montoUSD,nota:formPago.nota}];
     const totalPagadoUSD=pagos.reduce((a,p)=>a+p.montoUSD,0);
     const nuevoSaldo=Math.max(0,Number(evento.cobroUSD||0)-totalPagadoUSD);
-    const nuevoEstado=nuevoSaldo<=0?"Realizado":totalPagadoUSD>0?"Señado":evento.estado;
+    const nuevoEstado=nuevoSaldo<=0?"Realizado":evento.estado;
     const nuevosEventos=eventos.map(e=>e.id===evento.id?{...e,pagos,saldo:nuevoSaldo,senaUSD:totalPagadoUSD,estado:nuevoEstado}:e);
     save({...data,dj:{...data.dj,eventos:nuevosEventos}});
     showToast("✓ Pago registrado");
@@ -3368,7 +3386,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
                 <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
                   <button onClick={()=>setModalPago(e)} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",cursor:"pointer",fontWeight:600}}>+ Pago</button>
                   <select value={e.estado} onChange={ev=>actualizarEstado(e.id,ev.target.value)} style={{fontSize:11,padding:"3px 6px",borderRadius:6,width:"auto"}}>
-                    {["Confirmado","Señado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}
+                    {["Confirmado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}
                   </select>
                   <button onClick={()=>editar(e)} style={{border:"none",background:"none",cursor:"pointer",fontSize:14,padding:"2px 4px"}}>✏️</button>
                   <button onClick={()=>{if(window.confirm("¿Eliminar?"))eliminarEvento(e.id);}} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:14}}>✕</button>
@@ -3399,7 +3417,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
             <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nombre del evento</label><input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Casamiento García — Salón XYZ"/></div>
             <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm(f=>({...f,fecha:e.target.value}))}/></div>
-            <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Estado</label><select value={form.estado} onChange={e=>setForm(f=>({...f,estado:e.target.value}))}>{["Confirmado","Señado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}</select></div>
+            <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Estado</label><select value={form.estado} onChange={e=>setForm(f=>({...f,estado:e.target.value}))}>{["Confirmado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}</select></div>
             <MonedaInput labelText="Cobro total" monedaKey="monedaCobro" montoKey="cobro" form={form} setForm={setForm}/>
             <MonedaInput labelText="Costo total" monedaKey="monedaCosto" montoKey="costo" form={form} setForm={setForm}/>
             <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Seña ({form.monedaCobro})</label><input type="number" value={form.sena} onChange={e=>setForm(f=>({...f,sena:e.target.value}))} placeholder="0" inputMode="decimal"/></div>
@@ -4963,7 +4981,11 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
 function DespachosView({data,save,showToast}){
   const [manual,setManual]=useState(false);
   const [form,setForm]=useState({cliente:"",dni:"",direccion:"",localidad:"",provincia:"",expreso:"",articulos:""});
-  const despachos=[...(data.despachos||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  // Sort: pending first (by date desc), then rest (by date desc)
+  const _allDesp=[...(data.despachos||[])];
+  const _pendDesp=_allDesp.filter(d=>d.estado==="Pendiente").sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const _restDesp=_allDesp.filter(d=>d.estado!=="Pendiente").sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const despachos=[..._pendDesp,..._restDesp];
   const pendientes=despachos.filter(d=>d.estado==="Pendiente");
   const agregarManual=()=>{
     if(!form.cliente)return;
@@ -5074,7 +5096,15 @@ function DespachosView({data,save,showToast}){
     </div>)}
     {despachos.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:14}}>Sin despachos.</p>:(
       <div style={{display:"grid",gap:8}}>
-        {despachos.map(d=>(
+        {despachos.map((d,i)=>(
+          <React.Fragment key={d.id}>
+          {i===_pendDesp.length&&_pendDesp.length>0&&_restDesp.length>0&&(
+            <div style={{margin:"12px 0 8px",display:"flex",alignItems:"center",gap:8}}>
+              <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+              <span style={{fontSize:10,color:"var(--text-secondary)",padding:"0 8px"}}>Despachados / Retirados</span>
+              <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+            </div>
+          )}
           <div key={d.id} style={{background:"var(--color-background-primary)",border:d.estado==="Pendiente"?"1px solid #378ADD":"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 1rem"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
               <div>
