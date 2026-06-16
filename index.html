@@ -1040,6 +1040,7 @@ window.abrirPDF = abrirPDF;
 </script>
 
   <script id="src" type="text/raw">
+
 // ── CONSTANTES ────────────────────────────────────────────────────────────
 const APP_VERSION = "v2.8.0";
 const APP_BUILD   = "2026-06-16";
@@ -4398,113 +4399,14 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
                 </td>
               </tr>);
             })
-            </tbody>({cont,ventasCont,data,save,showToast,blue}){
-  const tcH=blue?Math.round(blue):Number(cont.costos?.tipoCambioFijado||cont.costos?.tipoCambio||1450);
-  const [form,setForm]=useState({fecha:hoy(),articulo:(cont.articulos||[])[0]?.nombre||"",cantidad:"",cliente:"",precioVenta:"",pago:"",tipoCambio:String(tcH),estado:"A retirar Once"});
-  const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
-  const costo=cont.costoTotal||0;const enG=costo>0&&cobUSD>costo;
-  const sdMap={};for(const art of(cont.articulos||[])){const v=ventasCont.filter(v=>v.articulo===art.nombre).reduce((a,v)=>a+Number(v.cantidad),0);sdMap[art.nombre]=Math.max(0,Number(art.cantidad)-v);}
-  const registrar=()=>{
-    if(!form.cliente||!form.cantidad||!form.precioVenta){showToast("Completá todos los campos");return;}
-    const total=Number(form.cantidad)*Number(form.precioVenta);const tc=Number(form.tipoCambio)||tcH;
-    save({...data,ventas:[...(data.ventas||[]),{id:Date.now().toString(),contId:cont.id,...form,cantidad:Number(form.cantidad),precioVenta:Number(form.precioVenta),total,usd:total/tc,tipoCambioUsado:tc}]});
-    setForm({...form,cantidad:"",cliente:"",precioVenta:"",pago:""});showToast("Venta registrada");
-  };
-  const eliminar=id=>{save({...data,ventas:data.ventas.filter(v=>v.id!==id)});showToast("Eliminada");};
-  const actualizarEstado=(id,estado)=>save({...data,ventas:data.ventas.map(v=>v.id===id?{...v,estado}:v)});
-  const estimacion=!enG&&costo>0?(()=>{
-    let stockRestARS=0;const tc_=Number(cont.costos?.tipoCambioFijado||cont.costos?.tipoCambio||tcH);
-    for(const art of(cont.articulos||[])){const sd=sdMap[art.nombre]||0;if(sd<=0)continue;const prom=precioPromedioUltimoMes(cont.id,art.nombre,data.ventas);if(prom>0)stockRestARS+=sd*prom;}
-    const stockRestUSD=stockRestARS/tc_;const cobFuturo=cobUSD+stockRestUSD;const ganFutura=Math.max(0,cobFuturo-costo);const mi30Fut=ganFutura*0.3;
-    return{stockRestUSD,ganFutura,mi30Fut};
-  })():null;
-  return(
-    <div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:8,marginBottom:"1rem"}}>
-        {(()=>{
-          const allV=(data.ventas||[]).filter(v=>v.contId===cont.id);
-          const tcD=blue||1450;
-          const totalVUSD=allV.reduce((a,v)=>a+ventaUSD(v,tcD),0);
-          const ganBruta=totalVUSD-costo;
-          const mi30Dev=Math.max(0,ganBruta)*0.3;
-          return[
-            {l:"Facturado",v:fmtUSD(totalVUSD),info:true},
-            {l:"Cobrado",v:fmtUSD(cobUSD)},
-            {l:ganBruta>=0?"Ganancia":"Pérdida",v:fmtUSD(Math.abs(ganBruta)),g:ganBruta>0,danger:ganBruta<0&&costo>0},
-            {l:"Mi 30%",v:fmtUSD(mi30Dev),g:mi30Dev>0},
-            {l:"Costo",v:costo>0?fmtUSD(costo):"—"},
-            {l:"Por cobrar",v:fmtUSD(Math.max(0,totalVUSD-cobUSD)),warn:totalVUSD>cobUSD},
-          ].map(x=>(
-            <div key={x.l} style={{
-              background:x.g?"var(--bg-tint-green)":x.danger?"var(--bg-tint-red)":x.warn?"var(--bg-tint-amber)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.08)",
-              borderRadius:"var(--r-md)",padding:"9px 11px",
-              border:"0.5px solid "+(x.g?"var(--border-success)":x.danger?"var(--border-danger)":"var(--glass-border)"),
-            }}>
-              <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:x.g?"var(--text-success)":x.danger?"var(--text-danger)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-secondary)",marginBottom:3}}>{x.l}</div>
-              <div style={{fontSize:12,fontWeight:600,color:x.g?"var(--text-success)":x.danger?"var(--text-danger)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-primary)"}}>{x.v}</div>
-            </div>
-          ));
-        })()}
-      </div>      {!enG&&costo>0&&<div style={{background:"var(--color-background-warning)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:"1rem",fontSize:12,color:"var(--color-text-warning)"}}>Faltan {fmtUSD(costo-cobUSD)} cobrados para recuperar</div>}
-      {estimacion&&(
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px",marginBottom:"1rem"}}>
-          <p style={{fontSize:12,fontWeight:500,margin:"0 0 8px",color:"var(--color-text-secondary)"}}>📊 Proyección si se vende el stock restante (precio promedio último mes)</p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-            {[{l:"Stock restante est.",v:fmtUSD(estimacion.stockRestUSD)},{l:"Ganancia estimada",v:fmtUSD(estimacion.ganFutura)},{l:"Mi 30% estimado",v:fmtUSD(estimacion.mi30Fut),g:true}].map(x=>(
-              <div key={x.l} style={{background:x.g?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"0.5rem"}}>
-                <div style={{fontSize:10,color:x.g?"var(--color-text-success)":"var(--color-text-secondary)"}}>{x.l}</div>
-                <div style={{fontSize:12,fontWeight:500,color:x.g?"var(--color-text-success)":"var(--color-text-primary)"}}>{x.v}</div>
-              </div>
-            ))}
-          </div>
+            </tbody>
+          </table>
         </div>
       )}
-      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
-        <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>Registrar venta manual</p>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm({...form,fecha:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.articulo} onChange={e=>setForm({...form,articulo:e.target.value})} style={{width:"100%",marginTop:2}}>{(cont.articulos||[]).map(a=><option key={a.nombre}>{a.nombre}</option>)}</select></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cantidad</label><input type="number" value={form.cantidad} onChange={e=>setForm({...form,cantidad:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Precio ($)</label><input type="number" value={form.precioVenta} onChange={e=>setForm({...form,precioVenta:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cliente</label><input value={form.cliente} onChange={e=>setForm({...form,cliente:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Pago recibido ($)</label><input type="number" value={form.pago} onChange={e=>setForm({...form,pago:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{blue?"Cotización · $"+fmt(blue):"Cotización"}</label><input type="number" value={form.tipoCambio} onChange={e=>setForm({...form,tipoCambio:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Estado</label><select value={form.estado} onChange={e=>setForm({...form,estado:e.target.value})} style={{width:"100%",marginTop:2}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select></div>
-        </div>
-        {form.articulo&&<p style={{fontSize:11,color:"var(--color-text-secondary)",margin:"0 0 6px"}}>Stock disponible: {sdMap[form.articulo]??0}</p>}
-        <button onClick={registrar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>Registrar</button>
-      </div>
-      {ventasCont.length>0&&(
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Fecha","Artículo","Cant","Cliente","$","Cobrado","Estado",""].map(h=><th key={h} style={{padding:"5px 7px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
-            <tbody>{────────────────────────────────────────────────────────
-const APP_VERSION = "v2.8.0";
-const APP_BUILD   = "2026-06-16";
+    </div>
+  );
+}
 
-const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
-const ESTADOS = ["A despachar","Despachado","A retirar Ezeiza","A retirar Once","Retirado"];
-const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-const CATS_GASTO = ["Vivienda","Alimentación","Transporte","Servicios","Salud","Ocio","Inversión","Otros"];
-
-const fmt = n => Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
-const fmtUSD = n => "USD "+Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
-const fmtPct = n => Number(n||0).toFixed(1)+"%";
-const pesoRollo = a => a.pesoUnitarioOverride!=null ? Number(a.pesoUnitarioOverride) : (Number(a.gramaje||0)/1000)*Number(a.ancho||0)*Number(a.largo||0);
-const hoy = () => new Date().toISOString().split("T")[0];
-const haceUnMes = () => { const d=new Date(); d.setMonth(d.getMonth()-1); return d.toISOString().split("T")[0]; };
-
-const EMPTY = {
-  contenedores:[], ventas:[], pagos:[], retiros:[], despachos:[],
-  clientes:{},          // persistente en Firebase
-  bh:{ despachos:[], cobros:[] },
-  dj:{ eventos:[], presupuestos:[] },
-  fin:{ gastos:[], presupuestos:{} },
-  _v:10
-};
-
-// ── HELPERS SC ────────────────────────────────────────────────────────────
-async
 
 function StockView({stockUni,data}){
   const items=Object.entries(stockUni).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
@@ -4777,6 +4679,7 @@ function DespachosView({data,save,showToast}){
     )}
   </div>);
 }
+
 </script>
 
   <script>
