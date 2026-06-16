@@ -2367,9 +2367,19 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         padding:"8px 12px calc(8px + env(safe-area-inset-bottom))",
         background:"var(--bg-nav)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",
         borderTop:"0.5px solid var(--glass-border)",flexShrink:0,
-        display:"flex",gap:8,alignItems:"flex-end",
+        display:"flex",flexDirection:"column",gap:6,
       }}>
-        <label style={{width:34,height:34,borderRadius:"50%",border:"0.5px solid "+(attachedFile?"var(--border-info)":"var(--glass-border)"),background:attachedFile?"var(--bg-tint-blue)":"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0,color:attachedFile?"var(--text-info)":"var(--text-secondary)",position:"relative",title:attachedFile?attachedFile.name:"Adjuntar PDF"}}>
+        {/* File preview - arriba del input row */}
+        {attachedFile&&(
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"5px 10px",background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)",fontSize:11}}>
+            <span>📄</span>
+            <span style={{flex:1,color:"var(--text-info)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{attachedFile.name}</span>
+            <button onClick={()=>setAttachedFile(null)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-secondary)",fontSize:16,padding:0,flexShrink:0,lineHeight:1}}>✕</button>
+          </div>
+        )}
+        {/* Input row */}
+        <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+        <label style={{width:34,height:34,borderRadius:"50%",border:"0.5px solid "+(attachedFile?"var(--border-info)":"var(--glass-border)"),background:attachedFile?"var(--bg-tint-blue)":"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0,color:attachedFile?"var(--text-info)":"var(--text-secondary)",position:"relative"}}>
           {attachedFile?<>📎<span style={{position:"absolute",top:-4,right:-4,width:10,height:10,background:"var(--text-info)",borderRadius:"50%",border:"1.5px solid var(--bg-base)"}}></span></>:"📎"}
           <input type="file" accept=".pdf,image/png,image/jpeg,image/webp" style={{display:"none"}} onChange={async e=>{
             const file=e.target.files?.[0]; if(!file) return;
@@ -2383,13 +2393,6 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
             e.target.value="";
           }}/>
         </label>
-        {attachedFile&&(
-          <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)",marginBottom:6,fontSize:11}}>
-            <span>📄</span>
-            <span style={{flex:1,color:"var(--text-info)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{attachedFile.name}</span>
-            <button onClick={()=>setAttachedFile(null)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-secondary)",fontSize:14,padding:0,flexShrink:0}}>✕</button>
-          </div>
-        )}
         <textarea
           ref={inputRef}
           value={input}
@@ -2417,6 +2420,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
             transition:"all .15s",boxShadow:input.trim()&&!loading?"0 4px 12px rgba(244,121,32,0.4)":"none",
           }}
         >➤</button>
+        </div>{/* end input row */}
       </div>
       </>
     </div>
