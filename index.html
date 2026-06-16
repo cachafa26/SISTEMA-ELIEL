@@ -5104,7 +5104,7 @@ function DespachosView({data,save,showToast}){
               <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
             </div>
           )}
-          <div key={d.id} style={{background:"var(--color-background-primary)",border:d.estado==="Pendiente"?"1px solid #378ADD":"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 1rem"}}>
+          <div style={{background:"var(--color-background-primary)",border:d.estado==="Pendiente"?"1px solid #378ADD":"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 1rem"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
               <div>
                 <div style={{fontWeight:500,fontSize:14}}>{d.cliente}</div>
@@ -5118,6 +5118,7 @@ function DespachosView({data,save,showToast}){
             <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{[d.direccion,d.localidad,d.provincia].filter(Boolean).join(" · ")+(d.dni?" · DNI "+d.dni:"")}</div>
             {d.articulos&&<div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>{d.articulos}</div>}
           </div>
+          </React.Fragment>
         ))}
       </div>
     )}
