@@ -4660,9 +4660,9 @@ function VentasView({data,save,showToast}){
       </div>
 
       {/* PEDIDOS VIEW */}
-      {vistaMode==="pedidos"&&(
-        pedidos.length===0?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin pedidos.</div>:
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {vistaMode==="pedidos"&&(pedidos.length===0
+        ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin pedidos.</div>
+        :<div style={{display:"flex",flexDirection:"column",gap:8}}>
           {pedidos.map((p,pidx)=>{
             const isPend=PEND_EST.includes(p.estado);
             const glowColor=p.estado==="A despachar"?"#F47920":p.estado==="A retirar Ezeiza"?"#5BAD41":"#2E86C1";
@@ -4701,7 +4701,7 @@ function VentasView({data,save,showToast}){
             </React.Fragment>);
           })}
         </div>
-      )
+      )}
     </div>
   );
 }
