@@ -2445,13 +2445,11 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
               e.target.value="";
             }}/>
           </div>
-          <textarea
+               <textarea
             ref={inputRef}
-            value={input}<textarea
-          ref={inputRef}
-          value={input}
-          onChange={e=>{setInput(e.target.value);e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,120)+"px";}}
-          onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage(input);}}}
+            value={input}
+            onChange={e=>{setInput(e.target.value);e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,120)+"px";}}
+            onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage(input);}}}
           placeholder="Escribí acá... (Enter para enviar)"
           rows={1}
           style={{
