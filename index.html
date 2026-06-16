@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.3.2 · 2026-06-16 -->
+  <!-- v2.4.0 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.3.2</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.4.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.3.2";
+const APP_VERSION = "v2.4.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2920,6 +2920,9 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const [formPago,setFormPago]=useState({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:""});
   const [costoConfirmar,setCostoConfirmar]=useState("");
   const [monedaCostoConf,setMonedaCostoConf]=useState("ARS");
+  const [formaPagoConf,setFormaPagoConf]=useState("cuotas"); // "cuotas" | "total"
+  const [senaConf,setSenaConf]=useState("");
+  const [descuentoConf,setDescuentoConf]=useState(false);
 
   const confirmarPresupuesto=(p)=>{
     // Open modal to enter cost before confirming
@@ -2933,25 +2936,40 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     if(!p) return;
     const costoRaw=Number(costoConfirmar||0);
     const costoUSD=monedaCostoConf==="ARS"?costoRaw/tc:costoRaw;
-    const cobroUSD=Number(p.precio||0);
+    let cobroUSD=Number(p.precio||0);
+    // Apply 10% discount if paid in full with discount
+    if(formaPagoConf==="total"&&descuentoConf) cobroUSD=Math.round(cobroUSD*0.9*100)/100;
     const gananciaUSD=cobroUSD-costoUSD;
+    // Build initial pagos array if seña was paid
+    const pagos=[];
+    let senaUSD=0;
+    if(formaPagoConf==="cuotas"&&Number(senaConf)>0){
+      senaUSD=Number(senaConf);
+      pagos.push({id:Date.now().toString(),fecha:hoy(),concepto:"Seña",monto:senaUSD,moneda:"USD",montoUSD:senaUSD,nota:"Al confirmar"});
+    } else if(formaPagoConf==="total"){
+      senaUSD=cobroUSD;
+      pagos.push({id:Date.now().toString(),fecha:hoy(),concepto:"Pago total"+(descuentoConf?" (10% desc.)":""),monto:cobroUSD,moneda:"USD",montoUSD:cobroUSD,nota:""});
+    }
+    const saldoUSD=Math.max(0,cobroUSD-senaUSD);
+    const estadoEvento=saldoUSD<=0?"Realizado":senaUSD>0?"Señado":"Confirmado";
     const evento={
       id:Date.now().toString(),
       nombre:p.cliente+" — "+p.tipoEvento+(p.salon?" ("+p.salon+")":""),
-      fecha:fechaEspToISO(p.fecha),estado:"Confirmado",
+      fecha:fechaEspToISO(p.fecha),estado:estadoEvento,
       monedaCobro:"USD",cobro:cobroUSD,cobroUSD,
       monedaCosto:monedaCostoConf,costo:costoRaw,costoUSD,
-      sena:0,senaUSD:0,saldo:cobroUSD,
+      pagos,senaUSD,saldo:saldoUSD,
       gananciaUSD,margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
       notas:p.invitados||"",tcUsado:tc,
       presupuestoId:p.id,
       salon:p.salon,tipoEvento:p.tipoEvento,cliente:p.cliente,
+      formaPago:formaPagoConf,descuento10:descuentoConf,
     };
     const nuevosEventos=[...eventos,evento];
     const nuevosPresupuestos=(data.dj?.presupuestos||[]).map(x=>x.id===p.id?{...x,estado:"Confirmado"}:x);
     save({...data,dj:{...data.dj,eventos:nuevosEventos,presupuestos:nuevosPresupuestos}});
     showToast("✓ Evento confirmado");
-    setModalConfirmar(null);setTab("confirmados");
+    setModalConfirmar(null);setFormaPagoConf("cuotas");setSenaConf("");setDescuentoConf(false);setCostoConfirmar("");setTab("confirmados");
   };
 
   const registrarPago=(evento)=>{
@@ -3070,47 +3088,97 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
               </div>
             </div>
             {formPago.monto&&Number(formPago.monto)>0&&(
-              <div style={{padding:"8px 12px",background:"var(--bg-tint-green)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-md)",marginBottom:12,fontSize:12,color:"var(--text-success)"}}>
-                {formPago.moneda==="ARS"
-                  ?<>= <strong>{fmtUSD(Number(formPago.monto)/(blue||1450))}</strong> al TC ${fmt(blue||1450)}</>
-                  :<>= <strong>${fmt(Number(formPago.monto)*(blue||1450))}</strong> ARS</>
-                }
+              <div style={{padding:"8px 12px",background:"var(--bg-tint-green)",border:"0.5px solimodalConfirmar&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+          <div style={{background:"var(--bg-modal,#13132A)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:400,boxShadow:"0 24px 60px rgba(0,0,0,0.5)",maxHeight:"90vh",overflowY:"auto"}}>
+            <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 2px",color:"var(--text-primary)"}}>Confirmar evento</h3>
+            <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 14px"}}>{modalConfirmar.cliente} — {modalConfirmar.tipoEvento}{modalConfirmar.salon?" · "+modalConfirmar.salon:""}<br/><span style={{color:"var(--text-secondary)"}}>{modalConfirmar.fecha}</span></p>
+
+            {/* Cobro original */}
+            <div style={{background:"var(--bg-tint-green)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-md)",padding:"10px 14px",marginBottom:14,fontSize:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{color:"var(--text-secondary)"}}>Precio presupuestado</span>
+              <strong style={{color:"var(--text-success)",fontSize:14}}>USD {modalConfirmar.precio}</strong>
+            </div>
+
+            {/* Forma de pago */}
+            <label style={{fontSize:11,fontWeight:600,color:"var(--text-secondary)",display:"block",marginBottom:8,textTransform:"uppercase",letterSpacing:".04em"}}>Forma de pago elegida</label>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+              <button onClick={()=>setFormaPagoConf("cuotas")} style={{padding:"10px 8px",borderRadius:"var(--r-md)",border:"0.5px solid "+(formaPagoConf==="cuotas"?"var(--border-info)":"var(--glass-border)"),background:formaPagoConf==="cuotas"?"var(--bg-tint-blue)":"none",cursor:"pointer",textAlign:"center"}}>
+                <div style={{fontSize:18,marginBottom:2}}>📅</div>
+                <div style={{fontSize:11,fontWeight:700,color:formaPagoConf==="cuotas"?"var(--text-info)":"var(--text-primary)"}}>Cuotas 50/50</div>
+                <div style={{fontSize:9,color:"var(--text-secondary)"}}>Seña + saldo</div>
+              </button>
+              <button onClick={()=>setFormaPagoConf("total")} style={{padding:"10px 8px",borderRadius:"var(--r-md)",border:"0.5px solid "+(formaPagoConf==="total"?"var(--border-success)":"var(--glass-border)"),background:formaPagoConf==="total"?"var(--bg-tint-green)":"none",cursor:"pointer",textAlign:"center"}}>
+                <div style={{fontSize:18,marginBottom:2}}>💰</div>
+                <div style={{fontSize:11,fontWeight:700,color:formaPagoConf==="total"?"var(--text-success)":"var(--text-primary)"}}>Pago total</div>
+                <div style={{fontSize:9,color:"var(--text-secondary)"}}>Pago completo</div>
+              </button>
+            </div>
+
+            {/* Si cuotas: campo seña */}
+            {formaPagoConf==="cuotas"&&(
+              <div style={{marginBottom:14}}>
+                <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:6}}>Seña cobrada (USD)</label>
+                <input type="number" value={senaConf} onChange={e=>setSenaConf(e.target.value)}
+                  placeholder={"Ej: "+(Math.round(Number(modalConfirmar.precio)/2))} inputMode="decimal"
+                  style={{width:"100%"}}/>
+                {senaConf&&Number(senaConf)>0&&(
+                  <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:4}}>
+                    Saldo pendiente: <strong style={{color:"var(--text-warning)"}}>USD {fmt(Number(modalConfirmar.precio)-Number(senaConf))}</strong>
+                  </div>
+                )}
               </div>
             )}
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>registrarPago(modalPago)} style={{flex:1,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:14}}>Registrar pago</button>
-              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:""}); }} style={{padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Confirm presupuesto modal */}
-      {modalConfirmar&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
-          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:360,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
-            <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Confirmar evento</h3>
-            <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{modalConfirmar.cliente} — {modalConfirmar.tipoEvento}<br/>{modalConfirmar.fecha}{modalConfirmar.salon?" · "+modalConfirmar.salon:""}</p>
-            <div style={{background:"var(--bg-tint-green)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-md)",padding:"8px 12px",marginBottom:14,fontSize:12}}>
-              <span style={{color:"var(--text-secondary)"}}>Cobro: </span>
-              <strong style={{color:"var(--text-success)"}}>USD {modalConfirmar.precio}</strong>
-            </div>
+            {/* Si total: opción descuento 10% */}
+            {formaPagoConf==="total"&&(
+              <div style={{marginBottom:14,padding:"10px 14px",background:"var(--bg-tint-green)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-md)"}}>
+                <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
+                  <input type="checkbox" checked={descuentoConf} onChange={e=>setDescuentoConf(e.target.checked)}
+                    style={{width:18,height:18,cursor:"pointer"}}/>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:600,color:"var(--text-primary)"}}>Aplicar 10% de descuento por pago total</div>
+                    {descuentoConf&&<div style={{fontSize:11,color:"var(--text-success)",marginTop:2}}>
+                      Precio final: <strong>USD {fmt(Math.round(Number(modalConfirmar.precio)*0.9*100)/100)}</strong>
+                      <span style={{color:"var(--text-secondary)",marginLeft:6}}>(-USD {fmt(Math.round(Number(modalConfirmar.precio)*0.1*100)/100)})</span>
+                    </div>}
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {/* Costo */}
             <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:6}}>Tu costo para este evento</label>
-            <div style={{display:"flex",gap:6,marginBottom:16}}>
+            <div style={{display:"flex",gap:6,marginBottom:12}}>
               <select value={monedaCostoConf} onChange={e=>setMonedaCostoConf(e.target.value)} style={{width:72,flexShrink:0}}>
                 <option value="ARS">$ ARS</option>
                 <option value="USD">USD</option>
               </select>
-              <input type="number" value={costoConfirmar} onChange={e=>setCostoConfirmar(e.target.value)} placeholder="0" autoFocus inputMode="decimal"/>
+              <input type="number" value={costoConfirmar} onChange={e=>setCostoConfirmar(e.target.value)} placeholder="0" inputMode="decimal"/>
             </div>
-            {costoConfirmar&&(
-              <div style={{padding:"8px 12px",background:"rgba(120,120,128,0.08)",borderRadius:"var(--r-md)",marginBottom:14,fontSize:12}}>
-                Ganancia estimada: <strong style={{color:(Number(modalConfirmar.precio)-(monedaCostoConf==="ARS"?Number(costoConfirmar)/(tc):Number(costoConfirmar)))>=0?"var(--text-success)":"var(--text-danger)"}}>{fmtUSD(Number(modalConfirmar.precio)-(monedaCostoConf==="ARS"?Number(costoConfirmar)/tc:Number(costoConfirmar)))}</strong>
-              </div>
-            )}
+
+            {/* Preview ganancia */}
+            {(costoConfirmar||formaPagoConf==="total")&&(()=>{
+              const cobro=formaPagoConf==="total"&&descuentoConf?Math.round(Number(modalConfirmar.precio)*0.9*100)/100:Number(modalConfirmar.precio);
+              const costoU=monedaCostoConf==="ARS"?Number(costoConfirmar||0)/tc:Number(costoConfirmar||0);
+              const gan=cobro-costoU;
+              return(
+                <div style={{padding:"8px 12px",background:"rgba(120,120,128,0.08)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-md)",marginBottom:14,fontSize:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between"}}>
+                    <span style={{color:"var(--text-secondary)"}}>Cobro final:</span>
+                    <strong style={{color:"var(--text-primary)"}}>USD {fmt(cobro)}</strong>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+                    <span style={{color:"var(--text-secondary)"}}>Ganancia estimada:</span>
+                    <strong style={{color:gan>=0?"var(--text-success)":"var(--text-danger)"}}>USD {fmt(Math.round(gan*100)/100)}</strong>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div style={{display:"flex",gap:8}}>
               <button onClick={ejecutarConfirmacion} style={{flex:1,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:14}}>✓ Confirmar</button>
-              <button onClick={()=>setModalConfirmar(null)} style={{padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer",fontSize:13}}>Cancelar</button>
+              <button onClick={()=>{setModalConfirmar(null);setFormaPagoConf("cuotas");setSenaConf("");setDescuentoConf(false);setCostoConfirmar("");}} style={{padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
             </div>
           </div>
         </div>
