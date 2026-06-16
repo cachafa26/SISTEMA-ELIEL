@@ -604,6 +604,7 @@ function App(){
   const [lastUpdate,setLastUpdate]=useState(null);
 
   const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("sc_status_theme",n);document.documentElement.setAttribute("data-theme",n);return n;});
+  const logout=()=>{localStorage.removeItem("eliel_session");localStorage.removeItem("eliel_status_session");window.location.replace("login.html");};
 
   useEffect(()=>{
     document.documentElement.setAttribute("data-theme",theme);
@@ -721,16 +722,10 @@ function App(){
           {lastUpdate&&<div style={{fontSize:10,color:"var(--text-secondary)"}}>
             {lastUpdate.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
           </div>}
-          <button onClick={toggleTheme} style={{
-            width:30,height:30,borderRadius:"50%",
-            border:"0.5px solid var(--glass-border)",
-            background:"var(--bg-card)",
-            backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:14,cursor:"pointer",flexShrink:0,
-          }}>
+          <button onClick={toggleTheme} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0}}>
             {theme==="dark"?"☀️":"🌙"}
           </button>
+          <button onClick={logout} title="Cerrar sesión" style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,cursor:"pointer",flexShrink:0,color:"var(--text-secondary)"}}>⏻</button>
         </div>
       </div>
 
@@ -1212,7 +1207,7 @@ function ViewVentas({data}){
   const fmt=n=>Number(n||0).toLocaleString("es-AR");
 
   const ARTS_UNICOS=[...new Set((data.ventas||[]).map(v=>v.articulo))].filter(Boolean).sort();
-  const CONTS_UNICOS=(data.contenedores||[]).map(c=>({id:c.id,nombre:c.nombre}));
+  const CONTS_UNICOS=[...(data.contenedores||[])].sort((a,b)=>b.id.localeCompare(a.id)).map(c=>({id:c.id,nombre:c.nombre}));
   const stBg={"Retirado":"var(--bg-tint-green)","A despachar":"var(--bg-tint-blue)","Despachado":"var(--bg-tint-blue)","A retirar Ezeiza":"var(--bg-tint-amber)","A retirar Once":"var(--bg-tint-amber)"};
   const stCol={"Retirado":"var(--text-success)","A despachar":"var(--text-info)","Despachado":"var(--text-info)","A retirar Ezeiza":"var(--text-warning)","A retirar Once":"var(--text-warning)"};
 
