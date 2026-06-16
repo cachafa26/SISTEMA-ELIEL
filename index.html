@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.5.6";
+const APP_VERSION = "v2.5.7";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4587,7 +4587,6 @@ function StockView({stockUni,data}){
 function VentasView({data,save,showToast}){
   const [desde,setDesde]=useState("");
   const [hasta,setHasta]=useState("");
-  const [vistaMode,setVistaMode]=useState("pedidos"); // "pedidos" | "lineas"
   const [filtroArt,setFiltroArt]=useState("");
   const [filtroCli,setFiltroCli]=useState("");
 
@@ -4637,12 +4636,7 @@ function VentasView({data,save,showToast}){
       </div>
 
       {/* Vista toggle */}
-      <div style={{display:"flex",gap:4,marginBottom:"1rem",background:"rgba(120,120,128,0.1)",borderRadius:"var(--r-pill)",padding:3,width:"fit-content"}}>
-        {[["pedidos","Por pedido"],["lineas","Por línea"]].map(([mode,label])=>(
-          <button key={mode} onClick={()=>setVistaMode(mode)} style={{padding:"5px 16px",borderRadius:"var(--r-pill)",border:"none",cursor:"pointer",fontSize:12,fontWeight:vistaMode===mode?600:400,background:vistaMode===mode?"var(--bg-card)":"transparent",color:vistaMode===mode?"var(--text-primary)":"var(--text-secondary)",boxShadow:vistaMode===mode?"var(--glass-shadow-sm)":"none",transition:"all .15s"}}>{label}</button>
-        ))}
-      </div>
-
+  
       {/* Filters */}
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",marginBottom:"1rem",boxShadow:"var(--glass-shadow-sm)"}}>
         <FiltroFechas desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta}/>
@@ -4660,7 +4654,7 @@ function VentasView({data,save,showToast}){
       </div>
 
       {/* PEDIDOS VIEW */}
-      {vistaMode==="pedidos"&&(pedidos.length===0
+      {(pedidos.length===0
         ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin pedidos.</div>
         :<div style={{display:"flex",flexDirection:"column",gap:8}}>
           {pedidos.map((p,pidx)=>{
@@ -4697,7 +4691,44 @@ function VentasView({data,save,showToast}){
                   <div style={{fontWeight:700,fontSize:14,color:"var(--text-primary)"}}>${fmt(p.totalARS)}</div>
                   <div style={{fontSize:11,color:"var(--text-secondary)"}}>{fmtUSD(p.totalUSD)}</div>
                 </div>
-              </div>              </div>
+              </div>
+              {/* Líneas del pedido */}
+              <div style={{borderTop:"0.5px solid var(--glass-border)",paddingTop:8,marginTop:8}}>
+                {p.lineas.length===1
+                  ?<div style={{fontSize:12,color:"var(--text-secondary)"}}>{p.lineas[0].articulo} × {p.lineas[0].cantidad}</div>
+                  :<details style={{fontSize:12}}>
+                    <summary style={{cursor:"pointer",color:"var(--text-secondary)",listStyle:"none"}}>
+                      ▶ {p.lineas.length} artículos
+                    </summary>
+                    <div style={{marginTop:4,paddingLeft:8,display:"flex",flexDirection:"column",gap:2}}>
+                      {p.lineas.map(l=>(
+                        <div key={l.id} style={{display:"flex",gap:8,fontSize:11}}>
+                          <span style={{color:"var(--text-secondary)"}}>{l.articulo}</span>
+                          <span style={{fontWeight:500}}>×{l.cantidad}</span>
+                          <span style={{color:"var(--text-success)"}}>${fmt(l.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                }
+              </div>
+              {/* Selector de estado */}
+              <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
+                <select
+                  value={p.estado}
+                  onChange={e=>{
+                    const nuevoEstado=e.target.value;
+                    p.lineas.forEach(l=>{
+                      save({...data,ventas:(data.ventas||[]).map(v=>v.id===l.id?{...v,estado:nuevoEstado}:v)});
+                    });
+                  }}
+                  style={{fontSize:11,padding:"4px 8px",borderRadius:6,
+                    border:"0.5px solid var(--glass-border)",
+                    background:"var(--bg-card)",color:"var(--text-primary)"}}>
+                  {ESTADOS.map(s=><option key={s}>{s}</option>)}
+                </select>
+              </div>
+              </div>
             </React.Fragment>);
           })}
         </div>
