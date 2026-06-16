@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.6.4";
+const APP_VERSION = "v2.6.5";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4508,7 +4508,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
               p.totalARS+=Number(v.total||0);
               if(v.fecha>p.fecha){p.fecha=v.fecha;p.estado=v.estado;}
             });
-            const sorted=[...pMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.pid.localeCompare(a.pid));
+            const sorted=[...pMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.pid||"").localeCompare(a.pid||""));
             const pend=sorted.filter(p=>PEND.includes(p.estado));
             const done=sorted.filter(p=>!PEND.includes(p.estado));
             const all=[...pend,...done];
@@ -4685,7 +4685,7 @@ function VentasView({data,save,showToast}){
     if(v.fecha>p.fecha)p.fecha=v.fecha;
   }
   const PEND_EST=["A despachar","A retirar Ezeiza","A retirar Once"];
-  const _pedSorted=[...pedidosMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.pid.localeCompare(a.pid));
+  const _pedSorted=[...pedidosMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
   const _pedPend=_pedSorted.filter(p=>PEND_EST.includes(p.estado));
   const _pedDone=_pedSorted.filter(p=>!PEND_EST.includes(p.estado));
   const pedidos=[..._pedPend,..._pedDone];
