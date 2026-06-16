@@ -2952,6 +2952,8 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const [formaPagoConf,setFormaPagoConf]=useState("cuotas"); // "cuotas" | "total"
   const [senaConf,setSenaConf]=useState("");
   const [descuentoConf,setDescuentoConf]=useState(false);
+  const [showFormPres,setShowFormPres]=useState(false);
+  const [formPres,setFormPres]=useState({cliente:"",tipoEvento:"Casamiento",fecha:"",salon:"",invitados:"",precio:"",notas:""});
 
   const confirmarPresupuesto=(p)=>{
     // Open modal to enter payment details
@@ -3012,7 +3014,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     const pagos=[...(evento.pagos||[]),{id:Date.now().toString(),fecha:formPago.fecha,concepto:formPago.concepto,monto:montoNum,moneda:formPago.moneda,montoUSD,nota:formPago.nota}];
     const totalPagadoUSD=pagos.reduce((a,p)=>a+p.montoUSD,0);
     const nuevoSaldo=Math.max(0,Number(evento.cobroUSD||0)-totalPagadoUSD);
-    const nuevoEstado=nuevoSaldo<=0?"Realizado":totalPagadoUSD>0?"Señado":evento.estado;
+    const nuevoEstado=evento.estado; // estado no cambia al registrar pago - solo cambia a Realizado cuando pasa la fecha
     const nuevosEventos=eventos.map(e=>e.id===evento.id?{...e,pagos,saldo:nuevoSaldo,senaUSD:totalPagadoUSD,estado:nuevoEstado}:e);
     save({...data,dj:{...data.dj,eventos:nuevosEventos}});
     showToast("✓ Pago registrado");
@@ -3020,6 +3022,25 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     setFormPago({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:""});
   };
 
+  const guardarPresupuesto=()=>{
+    if(!formPres.cliente||!formPres.fecha||!formPres.precio){showToast("Completá cliente, fecha y precio");return;}
+    const presId=Date.now().toString();
+    const yearDoc=formPres.fecha.slice(0,4)||new Date().getFullYear();
+    const numDoc="#EMD-"+yearDoc+"-"+Math.floor(Math.random()*170+180);
+    const nuevoPres={
+      id:presId, cliente:formPres.cliente, tipoEvento:formPres.tipoEvento,
+      fecha:formPres.fecha, salon:formPres.salon, invitados:formPres.invitados,
+      precio:Number(formPres.precio), precio_str:String(formPres.precio),
+      opcionales:[], recepcionistas:"sin", formaPago:"cuotas",
+      numeroDoc:numDoc, estado:"Pendiente", notas:formPres.notas,
+      creadoEn:new Date().toISOString()
+    };
+    const nuevosPresupuestos=[...(data.dj?.presupuestos||[]),nuevoPres];
+    save({...data,dj:{...data.dj,presupuestos:nuevosPresupuestos}});
+    showToast("✓ Presupuesto guardado");
+    setShowFormPres(false);
+    setFormPres({cliente:"",tipoEvento:"Casamiento",fecha:"",salon:"",invitados:"",precio:"",notas:""});
+  };
   const rechazarPresupuesto=(id)=>{
     const nuevos=(data.dj?.presupuestos||[]).map(x=>x.id===id?{...x,estado:"Rechazado"}:x);
     save({...data,dj:{...data.dj,presupuestos:nuevos}});showToast("Presupuesto cancelado");
@@ -3255,10 +3276,33 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 
       {/* ── TAB: PRESUPUESTOS ── */}
       {tab==="presupuestos"&&(
-        <div>
-          {presupuestos.length===0
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {/* Botón nuevo presupuesto */}
+          <button onClick={()=>setShowFormPres(f=>!f)} style={{alignSelf:"flex-start",fontSize:12,padding:"7px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,var(--accent-primary),var(--accent-secondary))",color:"#fff",cursor:"pointer",fontWeight:600}}>
+            {showFormPres?"✕ Cancelar":"+ Nuevo presupuesto"}
+          </button>
+          {/* Form nuevo presupuesto manual */}
+          {showFormPres&&(
+            <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px"}}>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:"var(--text-primary)"}}>Nuevo presupuesto</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                {[["Cliente","cliente","text"],["Tipo de evento","tipoEvento","text"],["Fecha (YYYY-MM-DD)","fecha","date"],["Salón","salon","text"],["Invitados","invitados","text"],["Precio (USD)","precio","number"]].map(([label,key,type])=>(
+                  <div key={key}>
+                    <div style={{fontSize:10,color:"var(--text-secondary)",marginBottom:3}}>{label}</div>
+                    <input type={type} value={formPres[key]} onChange={e=>setFormPres(f=>({...f,[key]:e.target.value}))}
+                      style={{width:"100%",padding:"6px 8px",borderRadius:6,border:"0.5px solid var(--glass-border)",background:"var(--bg-input)",color:"var(--text-primary)",fontSize:12,boxSizing:"border-box"}}/>
+                  </div>
+                ))}
+              </div>
+              <button onClick={guardarPresupuesto} style={{padding:"8px 18px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:13}}>
+                Guardar presupuesto
+              </button>
+            </div>
+          )}
+          {/* Lista presupuestos */}
+          {presupuestos.length===0&&!showFormPres
             ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)"}}>
-              Sin presupuestos. Usá el asistente IA para generar uno.
+              Sin presupuestos. Creá uno con el botón de arriba o usá el asistente IA.
             </div>
             :<div style={{display:"grid",gap:10}}>
               {presupuestos.map(p=>(
