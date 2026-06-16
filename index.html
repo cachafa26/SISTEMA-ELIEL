@@ -2672,7 +2672,7 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
             <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Ahorro / patrimonio (USD)</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1.5rem"}}>
               <Card label="Mi 30% SC pendiente" value={fmtUSD(pendienteRetiro)} sub={"≈$"+fmt(pendienteRetiro*tc)+" ARS"} color={pendienteRetiro>0?"var(--text-success)":undefined} onClick={()=>goModulo("supercoating")}/>
-              <Card label="DJ ganancia USD" value={fmtUSD(djGananciaUSD)} sub={realizados.length+" eventos en historial"} color={djGananciaUSD>0?"var(--text-success)":undefined} onClick={()=>goModulo("dj")}/>
+              <Card label="DJ ganancia USD" value={fmtUSD(djGananciaUSD)} sub={djRealizados.length+" eventos en historial"} color={djGananciaUSD>0?"var(--text-success)":undefined} onClick={()=>goModulo("dj")}/>
               <Card label="SC facturado USD" value={fmtUSD(totalVentaUSD||0)} sub="total ventas"/>
               <Card label="SC cobrado USD" value={fmtUSD(totalCobUSD||0)} sub="efectivamente cobrado"/>
             </div>
