@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.6.3";
+const APP_VERSION = "v2.6.4";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1713,7 +1713,7 @@ function buildSystemPrompt(data, blue, stockUni, pendienteRetiro, bhPendienteCob
   const stockResumen = Object.entries(stockUni).filter(([,v])=>v>0)
     .map(([k,v])=>`${k}: ${v} u`).join(', ');
 
-  const ventasRecientes = [...(data.ventas||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,10)
+  const ventasRecientes = [...(data.ventas||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||"")).slice(0,10)
     .map(v=>`${v.fecha} ${v.cliente} ${v.articulo} x${v.cantidad} $${v.total} USD${v.usd||0}`).join('\n');
 
   const deudores = {};
@@ -2698,7 +2698,7 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
     // Retiros de Mi 30% SC
     ...(data.retiros||[]).map(r=>({fecha:r.fecha,desc:"Retiro 30% SC"+(r.nota?" — "+r.nota:""),monto:r.montoPesos||Math.round((r.montoUSD||0)*tcActual),modulo:"Super Coating",color:"var(--color-text-success)"})),
     ...(data.fin?.gastos||[]).map(g=>({fecha:g.fecha,desc:g.desc,monto:-g.monto,modulo:"Gasto",color:"var(--color-text-danger)"})),
-  ].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,8);
+  ].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||"")).slice(0,8);
 
   const tcBar=blue||1450;
   const fuentes=[
@@ -2952,7 +2952,7 @@ function BHTradeView({data,save,showToast,blue}){
         {cobros.length===0
           ?<div style={{padding:"1rem 0",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin cobros aún. Registrá cuando cobrás.</div>
           :<div>
-            {[...cobros].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(c=>(
+            {[...cobros].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||"")).map(c=>(
               <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"0.5px solid var(--glass-border)"}}>
                 <div>
                   <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)"}}>${fmt(c.monto)}</div>
@@ -3023,7 +3023,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const presupuestos=[...(data.dj?.presupuestos||[])].filter(p=>p.estado==="Pendiente"||p.estado==="Rechazado").sort((a,b)=>b.id.localeCompare(a.id));
   const hoy2=hoy();
   const confirmados=[...eventos.filter(e=>(e.estado==="Confirmado"||e.estado==="Señado")&&e.fecha>=hoy2)].sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  const realizados=[...eventos.filter(e=>e.estado==="Cancelado"||(e.estado==="Confirmado"&&e.fecha<hoy2))].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const realizados=[...eventos.filter(e=>e.estado==="Cancelado"||(e.estado==="Confirmado"&&e.fecha<hoy2))].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
 
 
   const ganTotal=realizados.filter(e=>e.estado==="Realizado").reduce((a,e)=>a+Number(e.gananciaUSD||0),0);
@@ -3841,7 +3841,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
       {gastos.length>0&&(
         <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
           <div style={{fontSize:13,fontWeight:500,marginBottom:12}}>Historial de gastos</div>
-          {[...gastos].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(g=>(
+          {[...gastos].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||"")).map(g=>(
             <div key={g.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,color:"var(--color-text-primary)",fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.desc}</div>
@@ -4508,7 +4508,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
               p.totalARS+=Number(v.total||0);
               if(v.fecha>p.fecha){p.fecha=v.fecha;p.estado=v.estado;}
             });
-            const sorted=[...pMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+            const sorted=[...pMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.pid.localeCompare(a.pid));
             const pend=sorted.filter(p=>PEND.includes(p.estado));
             const done=sorted.filter(p=>!PEND.includes(p.estado));
             const all=[...pend,...done];
@@ -4665,7 +4665,7 @@ function VentasView({data,save,showToast}){
       if(filtroCli&&v.cliente!==filtroCli)return false;
       return true;
     })
-    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
 
   const totalUSD=ventasFilt.reduce((a,v)=>a+Number(v.usd||0),0);
   const eliminar=id=>{save({...data,ventas:data.ventas.filter(v=>v.id!==id)});showToast("Eliminada");};
@@ -4685,7 +4685,7 @@ function VentasView({data,save,showToast}){
     if(v.fecha>p.fecha)p.fecha=v.fecha;
   }
   const PEND_EST=["A despachar","A retirar Ezeiza","A retirar Once"];
-  const _pedSorted=[...pedidosMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const _pedSorted=[...pedidosMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.pid.localeCompare(a.pid));
   const _pedPend=_pedSorted.filter(p=>PEND_EST.includes(p.estado));
   const _pedDone=_pedSorted.filter(p=>!PEND_EST.includes(p.estado));
   const pedidos=[..._pedPend,..._pedDone];
@@ -4843,7 +4843,7 @@ function CuentasView({data,save,showToast}){
     const info=data.clientes?.[clienteSel]||{};
     const ventasFilt=p.ventas
       .filter(v=>(!desde||v.fecha>=desde)&&(!hasta||v.fecha<=hasta))
-      .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      .sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
     return(
       <div>
         <button onClick={()=>setClienteSel(null)} style={{fontSize:13,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",color:"var(--text-primary)",cursor:"pointer",marginBottom:"1rem",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>← Volver</button>
@@ -4993,7 +4993,7 @@ function ExtractoView({data}){
   for(const v of(data.ventas||[])){if(Number(v.pago||0)>0)movs.push({fecha:v.fecha,tipo:"Pago inicial",cliente:v.cliente,monto:Number(v.pago),detalle:v.articulo+" ×"+v.cantidad,contId:v.contId});}
   for(const p of(data.pagos||[])){const v=(data.ventas||[]).find(v=>v.id===p.ventaId);if(v)movs.push({fecha:p.fecha,tipo:"Pago posterior",cliente:v.cliente,monto:Number(p.monto),detalle:v.articulo+" ×"+v.cantidad,contId:v.contId});}
   for(const r of(data.retiros||[])){movs.push({fecha:r.fecha,tipo:"Retiro 30%",cliente:"—",monto:0,montoUSD:Number(r.montoUSD),detalle:r.nota||"",contId:null});}
-  const filtrados=movs.filter(m=>(!desde||m.fecha>=desde)&&(!hasta||m.fecha<=hasta)).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const filtrados=movs.filter(m=>(!desde||m.fecha>=desde)&&(!hasta||m.fecha<=hasta)).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)||(b.id||"").localeCompare(a.id||""));
   const totalCob=filtrados.filter(m=>m.tipo!=="Retiro 30%").reduce((a,m)=>a+m.monto,0);
   return(<div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.75rem"}}>
@@ -5038,7 +5038,7 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
     showToast("Retiro registrado");
   };
 
-  const retiros=[...(data.retiros||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const retiros=[...(data.retiros||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)||(b.id||"").localeCompare(a.id||""));
   const montoEnUSD=form.monto?form.moneda==="USD"?Number(form.monto):Number(form.monto)/Number(form.tcRetiro||tcActual):0;
   const pctRetirado=mi30Total>0?Math.min(100,(totalRetirado/mi30Total)*100):0;
 
@@ -5224,7 +5224,7 @@ function DespachosView({data,save,showToast}){
   const [manual,setManual]=useState(false);
   const [form,setForm]=useState({cliente:"",dni:"",direccion:"",localidad:"",provincia:"",expreso:"",articulos:""});
   // Pendientes primero (newest first), luego despachados (newest first)
-  const _allDesp=[...(data.despachos||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const _allDesp=[...(data.despachos||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)||(b.id||"").localeCompare(a.id||""));
   const _pendDesp=_allDesp.filter(d=>d.estado==="Pendiente");
   const _restDesp=_allDesp.filter(d=>d.estado!=="Pendiente");
   const despachos=[..._pendDesp,..._restDesp];
