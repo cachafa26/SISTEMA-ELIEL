@@ -1746,7 +1746,7 @@ RETIROS PENDIENTES:
 - TOTAL: $${_totalRetiroPesos.toLocaleString('es-AR')} ARS
 
 ESTADOS DE ENTREGA: A despachar, Despachado, A retirar Ezeiza, A retirar Once, Retirado
-ESTADOS DJ: Confirmado, Señado, Realizado, Cancelado
+ESTADOS DJ: Pendiente (presupuesto aguardando respuesta), Confirmado (cliente aceptó), Realizado (evento terminado)
 
 TU ROL:
 1. Respondés preguntas sobre el negocio con los datos reales
@@ -2010,33 +2010,9 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           formaPago:d.formaPago||"cuotas",
           numeroDoc:numDoc,
           estado:"Pendiente",
-          creadoEn:new Date().toISOString(),
-          pdfData:null, // will be set after generation
+          creadoEn:new Date().toISOString()
         };
-        // Generate PDF using globally exposed function
-        const _pdfData2 = {
-          cliente: d.cliente, tipoEvento: d.tipoEvento, fecha: d.fecha,
-          salon: d.salon, invitados: d.invitados||null,
-          conTecnica: d.conTecnica||false,
-          paquete: d.paquete||"basica_inter",
-          precio: d.precio_str||String(d.precio),
-          opcionales: d.opcionales||[],
-          descuentoPagoTotal: "10%",
-          numeroDoc: numDoc,
-        };
-        const pdfHtml = window.generarPresupuestoHTML(_pdfData2, blue);
-        nuevoPres.pdfHtml = pdfHtml||"";
-        if(pdfHtml && pdfHtml.length > 100){
-          const _pw = window.open("","_blank");
-          if(_pw){
-            _pw.document.open();
-            _pw.document.write(pdfHtml);
-            _pw.document.close();
-            setTimeout(function(){ try{_pw.print();}catch(e){} }, 1200);
-          } else {
-            showToast("Activar ventanas emergentes para ver el PDF");
-          }
-        }
+        // Guardar presupuesto (sin PDF - se genera desde la vista)
         const nuevosPresupuestos=[...(data.dj?.presupuestos||[]),nuevoPres];
         save({...data,dj:{...data.dj,presupuestos:nuevosPresupuestos}});
         showToast("✓ Presupuesto guardado");
