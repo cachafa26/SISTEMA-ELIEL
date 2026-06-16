@@ -1379,7 +1379,7 @@ PARA CONFIRMACION DJ necesitas del presupuesto original + opcionales elegidos + 
 
 PARA RECIBO DJ necesitas: nombre cliente, evento, monto total USD, monto abonado USD, concepto (sena/anticipo/cuota/pago total), medio de pago (default efectivo).
 
-Cuando tenes TODOS los datos, mostrar resumen breve y pedir confirmacion. Si el usuario confirma, responder con el JSON de accion DIRECTAMENTE en el texto, SIN backticks, SIN ```json, SIN formato markdown. Solo el JSON puro pegado al final del texto.
+Cuando tenes TODOS los datos, mostrar resumen breve y pedir confirmacion. Si el usuario confirma, responder con el JSON de accion DIRECTAMENTE en el texto, SIN backticks, SIN triple comillas, SIN formato markdown. Solo el JSON puro pegado al final del texto.
 
 Para generar presupuesto DJ responder con:
 {"action":"GENERAR_PRESUPUESTO_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fecha":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300 personas","conTecnica":true,"paquete":"basica_inter","precio":8200,"precio_str":"8.200","recepcionistas":"opcionales","opcionales":[],"formaPago":"cuotas"}}
