@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.5.1";
+const APP_VERSION = "v2.5.2";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2623,9 +2623,15 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
 
   // movimientos recientes de los 3 módulos
   const recientes=[
-    ...(data.bh?.despachos||[]).map(d=>({fecha:d.fecha,desc:"Despacho "+d.exp,monto:d.total,modulo:"BH Trade",color:"var(--color-text-info)"})),
-    ...(data.dj?.eventos||[]).filter(e=>e.estado==="Realizado").map(e=>({fecha:e.fecha,desc:e.nombre,monto:e.cobro,modulo:"DJ",color:"var(--color-text-warning)"})),
-    ...(data.retiros||[]).map(r=>({fecha:r.fecha,desc:"Retiro SC",monto:r.montoPesos||r.montoUSD*tcActual,modulo:"Super Coating",color:"var(--color-text-success)"})),
+    // Cobros de BH Trade
+    ...(data.bh?.cobros||[]).map(c=>({fecha:c.fecha,desc:"Cobro BH Trade"+(c.nota?" — "+c.nota:""),monto:Number(c.monto||0),modulo:"BH Trade",color:"var(--color-text-info)"})),
+    // Ganancias DJ cobradas: eventos que tienen al menos un pago registrado, mostrar la gananciaUSD convertida
+    ...(data.dj?.eventos||[]).filter(e=>(e.pagos||[]).length>0).map(e=>{
+      const totalCobrado=(e.pagos||[]).reduce((a,p)=>a+Number(p.montoUSD||p.monto||0),0);
+      return {fecha:(e.pagos||[]).slice(-1)[0]?.fecha||e.fecha, desc:"Cobro DJ — "+e.nombre, monto:Math.round(totalCobrado*tcActual), modulo:"DJ", color:"var(--color-text-warning)"};
+    }),
+    // Retiros de Mi 30% SC
+    ...(data.retiros||[]).map(r=>({fecha:r.fecha,desc:"Retiro 30% SC"+(r.nota?" — "+r.nota:""),monto:r.montoPesos||Math.round((r.montoUSD||0)*tcActual),modulo:"Super Coating",color:"var(--color-text-success)"})),
     ...(data.fin?.gastos||[]).map(g=>({fecha:g.fecha,desc:g.desc,monto:-g.monto,modulo:"Gasto",color:"var(--color-text-danger)"})),
   ].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,8);
 
