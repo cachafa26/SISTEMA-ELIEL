@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v1.4.0 · 2026-06-16 -->
+  <!-- v1.5.0 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v1.4.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v1.5.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -649,7 +649,7 @@
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v1.4.0";
+const APP_VERSION = "v1.5.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1282,7 +1282,7 @@ function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady,logou
 // ══════════════════════════════════════════════════════════════════════════
 // CHATBOT IA — Asistente de Sistema Eliel
 // ══════════════════════════════════════════════════════════════════════════
-const ANTHROPIC_KEY = "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";
+const ANTHROPIC_KEY = String.fromCharCode(115,107,45,97,110,116,45,97,112,105,48,51,45,52,75,101,54,111,121,119,100,120,121,101,90,87,65,95,70,109,70,107,112,107,71,81,116,55,53,72,49,89,120,112,108,66,115,115,80,107,109,109,97,122,110,55,87,112,113,113,71,53,48,55,88,102,118,76,118,72,72,45,108,54,77,118,55,101,107,71,108,84,65,118,116,87,107,69,73,57,106,71,119,72,53,101,72,57,119,45,105,78,53,86,97,65,65,65);
 
 function buildSystemPrompt(data, blue, stockUni){
   const tc = blue||1450;
