@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.0.0 · 2026-06-16 -->
+  <!-- v2.0.2 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.0.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.0.2</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1024,7 +1024,7 @@ function abrirPDF(htmlContent){
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.0.0";
+const APP_VERSION = "v2.0.2";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1929,37 +1929,37 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           creadoEn:new Date().toISOString(),
           pdfData:null, // will be set after generation
         };
-        // Generate PDF locally using template (no API call needed)
+        // Generate PDF locally
+        const serviciosParaHTML = nuevoPres.conTecnica
+          ? window.obtenerServiciosPaquete(nuevoPres.paquete)
+          : [
+              ["Realización de timing","Planificación y armado del cronograma del evento"],
+              ["Servicio de DJ","Musicalización completa y dirección artística"],
+              ["Coordinación general","Conducción integral del flujo del evento"],
+              ["Comunicación por handies UHF","Canal interno exclusivo para el equipo de trabajo"],
+              ["Reunión técnica previa","Encuentro de planificación y alineación de detalles"],
+            ];
+        const pdfData = {
+          cliente: d.cliente, tipoEvento: d.tipoEvento, fecha: d.fecha,
+          salon: d.salon, invitados: d.invitados||null,
+          servicios: serviciosParaHTML,
+          seccionTecnicaDesde: nuevoPres.conTecnica?5:null,
+          precio: d.precio_str||String(d.precio),
+          notaPrecio: nuevoPres.conTecnica?null:"* Sin técnica incluida",
+          opcionales: d.opcionales||[],
+          descuentoPagoTotal: "10%",
+          numeroDoc: numDoc,
+        };
+        let pdfHtml = "";
         try{
-          const serviciosParaHTML = nuevoPres.conTecnica
-            ? obtenerServiciosPaquete(nuevoPres.paquete)
-            : [
-                ["Realización de timing","Planificación y armado del cronograma del evento"],
-                ["Servicio de DJ","Musicalización completa y dirección artística"],
-                ["Coordinación general","Conducción integral del flujo del evento"],
-                ["Comunicación por handies UHF","Canal interno exclusivo para el equipo de trabajo"],
-                ["Reunión técnica previa","Encuentro de planificación y alineación de detalles"],
-              ];
-          const pdfData = {
-            cliente: d.cliente,
-            tipoEvento: d.tipoEvento,
-            fecha: d.fecha,
-            salon: d.salon,
-            invitados: d.invitados||null,
-            servicios: serviciosParaHTML,
-            seccionTecnicaDesde: nuevoPres.conTecnica?5:null,
-            precio: d.precio_str||String(d.precio),
-            notaPrecio: nuevoPres.conTecnica?null:"* Sin técnica incluida",
-            opcionales: d.opcionales||[],
-            descuentoPagoTotal: "10%",
-            numeroDoc: numDoc,
-          };
-          const pdfHtml = generarPresupuestoHTML(pdfData, blue);
-          nuevoPres.pdfHtml = pdfHtml;
-        }catch(pdfErr){console.warn("PDF gen failed:",pdfErr);}
-        
-        // Open PDF first (before async state changes, to avoid popup blocker)
-        if(nuevoPres.pdfHtml){ abrirPDF(nuevoPres.pdfHtml); }
+          pdfHtml = window.generarPresupuestoHTML(pdfData, blue);
+        }catch(pdfErr){
+          console.error("PDF gen failed:",pdfErr);
+          showToast("Error generando PDF: "+pdfErr.message);
+        }
+        nuevoPres.pdfHtml = pdfHtml;
+        // Open PDF immediately (before state changes to avoid popup blocker)
+        if(pdfHtml){ window.abrirPDF(pdfHtml); }
         const nuevosPresupuestos=[...(data.dj?.presupuestos||[]),nuevoPres];
         save({...data,dj:{...data.dj,presupuestos:nuevosPresupuestos}});
         showToast("✓ Presupuesto guardado");
@@ -1969,14 +1969,14 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         const d=action.data;
         const numDoc="#REC-"+new Date().getFullYear()+"-"+(180+Math.floor(Math.random()*170));
         try{
-          const reciboHtml = generarReciboHTML({
+          const reciboHtml = window.generarReciboHTML({
             cliente:d.cliente, tipoEvento:d.tipoEvento,
             fechaEvento:d.fechaEvento, salon:d.salon,
             medioPago:d.medioPago||"Efectivo",
             concepto:d.concepto, montoTotal:d.montoTotal,
             montoAbonado:d.montoAbonado, observaciones:d.observaciones,
           }, blue);
-          abrirPDF(reciboHtml);
+          window.window.abrirPDF(reciboHtml);
           // Also register payment in the matching event
           const evMatch=data.dj?.eventos?.find(e=>e.nombre.toLowerCase().includes(d.cliente.toLowerCase()));
           if(evMatch){
@@ -3019,8 +3019,13 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
                     <div style={{fontSize:13,fontWeight:600,color:"var(--text-success)"}}>USD {p.precio}</div>
                     <div style={{display:"flex",gap:6}}>
                       {p.pdfData&&<button onClick={()=>{
-                        if(p.pdfHtml){const w=window.open("","_blank");if(w){w.document.open();w.document.write(p.pdfHtml);w.document.close();setTimeout(()=>{try{w.print();}catch(e){}},1200);}}
-                        else if(p.pdfData){const a=document.createElement("a");a.href=p.pdfData;a.download="Presupuesto_"+p.cliente+".html";a.click();}
+                        if(p.pdfHtml&&p.pdfHtml.length>100){
+                          const w=window.open("","_blank");
+                          if(w){w.document.open();w.document.write(p.pdfHtml);w.document.close();setTimeout(()=>{try{w.print();}catch(e){}},1200);}
+                          else{showToast("Permitir ventanas emergentes para ver el PDF");}
+                        } else {
+                          showToast("PDF no disponible para este presupuesto");
+                        }
                       }} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer"}}>⬇ PDF</button>}
                       {p.estado==="Pendiente"&&<>
                         <button onClick={()=>confirmarPresupuesto(p)} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",cursor:"pointer",fontWeight:600}}>✓ Confirmar</button>
