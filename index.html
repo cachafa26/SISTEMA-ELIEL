@@ -1956,16 +1956,33 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           p.id===d.presupuestoId ||
           p.cliente?.toLowerCase().includes((d.cliente||'').toLowerCase())
         );
-        if(pres){
-          // Ask for cost before confirming — store pres in pending
-          setPendingAction({action:"_EJECUTAR_CONFIRMACION_PRES",data:{pres,costoMoneda:"ARS"}});
-          setMsgs(m=>[...m,{role:"assistant",content:"✓ Encontré el presupuesto de "+pres.cliente+" — "+pres.tipoEvento+" ("+pres.salon+"), "+pres.fecha+".\n\nCobro: USD "+pres.precio+"\n\n¿Cuál fue tu costo para este evento? Indicá el monto y la moneda (ej: $150.000 ARS o USD 800). Si no sabés todavía, escribí 0."}]);
-          setLoading(false); return;
-        } else {
-          setMsgs(m=>[...m,{role:"assistant",content:"No encontré el presupuesto. Podés confirmarlo tocando el botón ✓ Confirmar en la sección Presupuestos."}]);
-          setPendingAction(null);
-        }
+        if(!pres){showToast("Presupuesto no encontrado");setPendingAction(null);return;}
+        const fechaISO = fechaEspToISO(pres.fecha)||pres.fecha||hoy();
+        const evento={
+          id: Date.now().toString(),
+          nombre: pres.cliente+" — "+pres.tipoEvento+(pres.salon?" ("+pres.salon+")":""),
+          fecha: fechaISO,
+          estado: "Confirmado",
+          monedaCobro: "USD",
+          cobro: Number(pres.precio||0),
+          cobroUSD: Number(pres.precio||0),
+          monedaCosto: "ARS",
+          costo: 0, costoUSD: 0,
+          pagos: [], senaUSD: 0,
+          saldo: Number(pres.precio||0),
+          gananciaUSD: Number(pres.precio||0),
+          notas: pres.invitados||"",
+          salon: pres.salon, tipoEvento: pres.tipoEvento, cliente: pres.cliente,
+          presupuestoId: pres.id,
+        };
+        const nuevosEventos=[...(data.dj?.eventos||[]), evento];
+        const nuevosPresupuestos=(data.dj?.presupuestos||[]).map(x=>x.id===pres.id?{...x,estado:"Confirmado"}:x);
+        save({...data, dj:{...data.dj, eventos:nuevosEventos, presupuestos:nuevosPresupuestos}});
+        showToast("✓ Evento confirmado");
+        setMsgs(m=>[...m,{role:"assistant",content:"✓ Listo! El presupuesto de "+pres.cliente+" fue confirmado y aparece en Confirmados."}]);
+        setPendingAction(null);
       }
+
       else if(action.action==="_EJECUTAR_CONFIRMACION_PRES"){
         // This fires after user provides the cost
         const {pres,costoRaw,costoMoneda}=action.data;
@@ -2937,10 +2954,13 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const [descuentoConf,setDescuentoConf]=useState(false);
 
   const confirmarPresupuesto=(p)=>{
-    // Open modal to enter cost before confirming
+    // Open modal to enter payment details
     setModalConfirmar(p);
     setCostoConfirmar("");
     setMonedaCostoConf("ARS");
+    setFormaPagoConf("cuotas");
+    setSenaConf("");
+    setDescuentoConf(false);
   };
 
   const ejecutarConfirmacion=()=>{
@@ -2963,11 +2983,11 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
       pagos.push({id:Date.now().toString(),fecha:hoy(),concepto:"Pago total"+(descuentoConf?" (10% desc.)":""),monto:cobroUSD,moneda:"USD",montoUSD:cobroUSD,nota:""});
     }
     const saldoUSD=Math.max(0,cobroUSD-senaUSD);
-    const estadoEvento=saldoUSD<=0?"Realizado":senaUSD>0?"Señado":"Confirmado";
+    const estadoEvento=saldoUSD<=0?"Realizado":"Confirmado"; // stays Confirmado until fully paid
     const evento={
       id:Date.now().toString(),
       nombre:p.cliente+" — "+p.tipoEvento+(p.salon?" ("+p.salon+")":""),
-      fecha:fechaEspToISO(p.fecha),estado:estadoEvento,
+      fecha:fechaEspToISO(p.fecha)||p.fecha||hoy(),estado:estadoEvento,
       monedaCobro:"USD",cobro:cobroUSD,cobroUSD,
       monedaCosto:monedaCostoConf,costo:costoRaw,costoUSD,
       pagos,senaUSD,saldo:saldoUSD,
