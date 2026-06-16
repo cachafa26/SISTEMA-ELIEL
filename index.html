@@ -1741,9 +1741,9 @@ ARTÍCULOS DISPONIBLES:
 ${arts}
 
 RETIROS PENDIENTES:
-- Mi 30% SC: $\${_sc30Pesos.toLocaleString('es-AR')} ARS pendiente de retirar
-- BH Trade: $\${_bhPesos.toLocaleString('es-AR')} ARS pendiente de cobrar
-- TOTAL: $\${_totalRetiroPesos.toLocaleString('es-AR')} ARS
+- Mi 30% SC: $${_sc30Pesos.toLocaleString('es-AR')} ARS pendiente de retirar
+- BH Trade: $${_bhPesos.toLocaleString('es-AR')} ARS pendiente de cobrar
+- TOTAL: $${_totalRetiroPesos.toLocaleString('es-AR')} ARS
 
 ESTADOS DE ENTREGA: A despachar, Despachado, A retirar Ezeiza, A retirar Once, Retirado
 ESTADOS DJ: Confirmado, Señado, Realizado, Cancelado
@@ -1805,8 +1805,10 @@ Cuando el usuario adjunta un PDF o archivo:
 Cuando el cliente ACEPTA un presupuesto existente, usar accion:
 {"action":"CONFIRMAR_PRESUPUESTO","data":{"presupuestoId":"id_del_presupuesto_o_null","cliente":"nombre","precio":8200}}
 
+REGLA PRESUPUESTO DJ: El estado siempre es "Pendiente" automáticamente. NUNCA preguntar al usuario por el estado. Las condiciones de pago son siempre 50/50 en cuotas o total con 10% descuento - NO preguntar.
+
 Para generar presupuesto DJ responder con:
-{"action":"GENERAR_PRESUPUESTO_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fecha":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300 personas","conTecnica":true,"paquete":"basica_inter","precio":8200,"precio_str":"8.200","recepcionistas":"opcionales","opcionales":[],"formaPago":"cuotas"}}
+{"action":"GENERAR_PRESUPUESTO_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fecha":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300 personas","conTecnica":true,"paquete":"basica_inter","precio":8200,"precio_str":"8.200","recepcionistas":"opcionales","opcionales":[]}}
 
 Para generar recibo DJ responder con:
 {"action":"GENERAR_RECIBO_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fechaEvento":"15 de agosto de 2026","salon":"Nombre salon","montoTotal":8200,"montoAbonado":4100,"concepto":"Sena","medioPago":"Efectivo","observaciones":null}}
