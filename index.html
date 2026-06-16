@@ -823,6 +823,11 @@ function App(){
   const [showSearch,setShowSearch]=useState(false);
   const [theme,setTheme]=useState(()=>localStorage.getItem("eliel_theme")||"light");
   const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("eliel_theme",n);document.documentElement.setAttribute("data-theme",n);return n;});
+  const logout=()=>{
+    localStorage.removeItem("eliel_session");
+    localStorage.removeItem("eliel_status_session");
+    window.location.replace("login.html");
+  };
   useEffect(()=>{
     document.documentElement.setAttribute("data-theme",theme);
   },[theme]);
@@ -914,7 +919,7 @@ function App(){
     mi30Total+=gananciaCont*0.3;
   }
   // Ventas sin contenedor (edge case)
-  const contIds=new Set((data.contenedores||[]).map(c=>c.id));
+  const contIds=new Set([...(data.contenedores||[]).sort((a,b)=>b.id.localeCompare(a.id)).map(c=>c.id));
   const ventasHuerfanas=(data.ventas||[]).filter(v=>!contIds.has(v.contId));
   totalVentaUSD+=ventasHuerfanas.reduce((a,v)=>a+ventaUSD(v,tcForCalc),0);
   totalCobUSD+=ventasHuerfanas.reduce((a,v)=>a+ventaCobradoUSD(v,data.pagos,tcForCalc),0);
@@ -1047,14 +1052,11 @@ function App(){
             display:"flex",alignItems:"center",justifyContent:"center",
             fontSize:14,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)",
           }} title="Buscar (⌘K)">🔍</button>
-          <button onClick={toggleTheme} style={{
-            width:30,height:30,borderRadius:"50%",
-            border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",
-            backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:14,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)",
-          }}>
+          <button onClick={toggleTheme} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)"}}>
             {theme==="dark"?"☀️":"🌙"}
+          </button>
+          <button onClick={logout} title="Cerrar sesión" style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)",color:"var(--text-secondary)"}}>
+            ⏻
           </button>
         </div>
       </div>
@@ -1140,7 +1142,7 @@ function App(){
       </div>
 
       {/* BOTTOM NAV ── mobile */}
-      <BottomNav modulos={modulos} modulo={modulo} goModulo={goModulo} toggleTheme={toggleTheme} theme={theme} blue={blue} fbReady={fbReady}/>
+      <BottomNav modulos={modulos} modulo={modulo} goModulo={goModulo} toggleTheme={toggleTheme} theme={theme} blue={blue} fbReady={fbReady} logout={logout} onSearch={()=>setShowSearch(true)}/>
     </div>
   );
 }
@@ -1149,7 +1151,7 @@ function App(){
 // ══════════════════════════════════════════════════════════════════════════
 // BOTTOM NAV — Liquid Glass pill selector
 // ══════════════════════════════════════════════════════════════════════════
-function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady}){
+function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady,logout,onSearch}){
   const trackRef = useRef(null);
   const [pillStyle,setPillStyle] = useState({left:0,width:0});
   const activeIdx = modulos.findIndex(m=>m.id===modulo);
@@ -1188,22 +1190,27 @@ function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady}){
           </button>
         ))}
       </div>
-      {/* Theme + sync row below track */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 4px 0",marginTop:3}}>
-        <div style={{
-          fontSize:9,fontWeight:500,padding:"2px 8px",borderRadius:"var(--r-pill)",
-          background:fbReady?"var(--bg-tint-green)":"var(--bg-tint-amber)",
-          color:fbReady?"var(--text-success)":"var(--text-warning)",
-        }}>
-          {fbReady?"● sync":"⚠ local"}
+      {/* Action row below track */}
+      <div style={{display:"flex",justifyContent:"space-around",alignItems:"center",padding:"4px 8px 0",marginTop:2}}>
+        {/* Search */}
+        <button onClick={onSearch} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:"var(--r-md)"}}>
+          <span style={{fontSize:17}}>🔍</span>
+          <span style={{fontSize:8,fontWeight:500,color:"var(--text-secondary)"}}>Buscar</span>
+        </button>
+        {/* Theme */}
+        <button onClick={toggleTheme} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:"var(--r-md)"}}>
+          <span style={{fontSize:17}}>{theme==="dark"?"☀️":"🌙"}</span>
+          <span style={{fontSize:8,fontWeight:500,color:"var(--text-secondary)"}}>Tema</span>
+        </button>
+        {/* Sync status */}
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"4px 8px"}}>
+          <span style={{fontSize:9,fontWeight:600,color:fbReady?"var(--text-success)":"var(--text-warning)"}}>{fbReady?"●":"⚠"}</span>
+          <span style={{fontSize:8,fontWeight:500,color:"var(--text-secondary)"}}>{fbReady?"sync":"local"}</span>
         </div>
-        {blue&&<div style={{fontSize:9,fontWeight:600,color:"var(--text-success)"}}>💵 ${blue.toLocaleString("es-AR")}</div>}
-        <button
-          onClick={toggleTheme}
-          className="bottom-nav-theme"
-          style={{padding:"2px 6px",fontSize:18}}
-        >
-          {theme==="dark"?"☀️":"🌙"}
+        {/* Logout */}
+        <button onClick={logout} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:"var(--r-md)"}}>
+          <span style={{fontSize:17}}>🔐</span>
+          <span style={{fontSize:8,fontWeight:500,color:"var(--text-secondary)"}}>Salir</span>
         </button>
       </div>
     </div>
@@ -1368,10 +1375,11 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
     ...(data.fin?.gastos||[]).map(g=>({fecha:g.fecha,desc:g.desc,monto:-g.monto,modulo:"Gasto",color:"var(--color-text-danger)"})),
   ].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,8);
 
+  const tcBar=blue||1450;
   const fuentes=[
-    {n:"Super Coating",v:totalRetirado*(blue||1450),c:"var(--color-text-success)"},
-    {n:"BH Trade",v:bhTotalAnio,c:"var(--color-text-info)"},
-    {n:"DJ",v:djCobrado,c:"var(--color-text-warning)"},
+    {n:"Super Coating",v:totalRetirado*tcBar,c:"var(--text-success)",sub:"USD "+fmtUSD(totalRetirado)},
+    {n:"BH Trade",v:bhTotalAnio,c:"var(--text-info)"},
+    {n:"DJ",v:djCobrado*tcBar,c:"var(--text-warning)",sub:"USD "+fmtUSD(djCobrado)},
   ];
   const maxBar=Math.max(...fuentes.map(f=>f.v),1);
 
@@ -1418,10 +1426,13 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
             <div key={f.n} style={{marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
                 <span style={{color:"var(--color-text-primary)"}}>{f.n}</span>
-                <span style={{color:"var(--color-text-secondary)"}}>${fmt(f.v)}</span>
+                <div style={{textAlign:"right"}}>
+                  <span style={{color:"var(--text-primary)",fontWeight:600}}>${fmt(f.v)}</span>
+                  {f.sub&&<div style={{fontSize:10,color:"var(--text-secondary)"}}>{f.sub}</div>}
+                </div>
               </div>
-              <div style={{height:6,background:"rgba(120,120,128,0.08)",borderRadius:3,overflow:"hidden"}}>
-                <div style={{height:"100%",width:(f.v/maxBar*100)+"%",background:f.c,borderRadius:3}}/>
+              <div style={{height:6,background:"rgba(120,120,128,0.15)",borderRadius:3,overflow:"hidden"}}>
+                <div style={{height:"100%",width:(f.v/maxBar*100)+"%",background:f.c,borderRadius:3,transition:"width .5s"}}/>
               </div>
             </div>
           ))}
@@ -1498,7 +1509,7 @@ function BHTradeView({data,save,showToast,blue}){
   const bhTotalAnio=despachos.reduce((a,d)=>a+d.total,0);
   const mesesConData=[...new Set(despachos.map(d=>d.mes))];
   const mesesMostrar=[...new Set([...mesesConData,new Date().getMonth()])].sort((a,b)=>a-b);
-  const despMes=despachos.filter(d=>d.mes===mesActivo);
+  const despMes=[...despachos.filter(d=>d.mes===mesActivo)].sort((a,b)=>b.id.localeCompare(a.id));
   const s=bhSueldoMes(despMes,mesActivo);
 
   return(
@@ -1632,6 +1643,30 @@ function BHTradeView({data,save,showToast,blue}){
 // ══════════════════════════════════════════════════════════════════════════
 // DJ
 // ══════════════════════════════════════════════════════════════════════════
+// ── MonedaInput: module-level to prevent remount on each keystroke ────────
+function MonedaInput({labelText,monedaKey,montoKey,form,setForm}){
+  return(
+    <div>
+      <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>{labelText}</label>
+      <div style={{display:"flex",gap:6}}>
+        <select value={form[monedaKey]} onChange={e=>setForm(f=>({...f,[monedaKey]:e.target.value}))}
+          style={{width:72,flexShrink:0,flex:"none"}}>
+          <option value="USD">USD</option>
+          <option value="ARS">$ ARS</option>
+        </select>
+        <input
+          type="number"
+          value={form[montoKey]}
+          onChange={e=>setForm(f=>({...f,[montoKey]:e.target.value}))}
+          placeholder="0"
+          inputMode="decimal"
+          style={{flex:1,minWidth:0}}
+        />
+      </div>
+    </div>
+  );
+}
+
 function DJView({data,save,showToast,blue}){
   const tc=blue||1450;
   const initForm={nombre:"",fecha:hoy(),estado:"Confirmado",
@@ -1691,19 +1726,7 @@ function DJView({data,save,showToast,blue}){
   const stColor={Realizado:"var(--text-success)",Confirmado:"var(--text-info)",Señado:"var(--text-warning)",Cancelado:"var(--text-danger)"};
   const stBg   ={Realizado:"var(--bg-tint-green)",Confirmado:"var(--bg-tint-blue)",Señado:"var(--bg-tint-amber)",Cancelado:"var(--bg-tint-red)"};
 
-  const MonedaInput=({labelText,monedaKey,montoKey,defaultMoneda})=>(
-    <div>
-      <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>{labelText}</label>
-      <div style={{display:"flex",gap:6}}>
-        <select value={form[monedaKey]} onChange={e=>setForm({...form,[monedaKey]:e.target.value})}
-          style={{width:72,flexShrink:0}}>
-          <option value="USD">USD</option>
-          <option value="ARS">$ ARS</option>
-        </select>
-        <input type="number" value={form[montoKey]} onChange={e=>setForm({...form,[montoKey]:e.target.value})} placeholder="0"/>
-      </div>
-    </div>
-  );
+
 
   return(
     <div>
@@ -1753,11 +1776,11 @@ function DJView({data,save,showToast,blue}){
               {["Confirmado","Señado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}
             </select>
           </div>
-          <MonedaInput labelText="Cobro total" monedaKey="monedaCobro" montoKey="cobro"/>
-          <MonedaInput labelText="Costo total" monedaKey="monedaCosto" montoKey="costo"/>
+          <MonedaInput labelText="Cobro total" monedaKey="monedaCobro" montoKey="cobro" form={form} setForm={setForm}/>
+          <MonedaInput labelText="Costo total" monedaKey="monedaCosto" montoKey="costo" form={form} setForm={setForm}/>
           <div>
             <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Seña ({form.monedaCobro})</label>
-            <input type="number" value={form.sena} onChange={e=>setForm({...form,sena:e.target.value})} placeholder="0"/>
+            <input type="number" value={form.sena} onChange={e=>setForm(f=>({...f,sena:e.target.value}))} placeholder="0" inputMode="decimal"/>
           </div>
           <div style={{display:"flex",alignItems:"flex-end",paddingBottom:1}}>
             {showPreview&&(
@@ -2347,7 +2370,7 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
           <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"2rem",textAlign:"center"}}>
             <p style={{color:"var(--text-secondary)",fontSize:14,margin:0}}>Creá tu primer contenedor.</p>
           </div>
-        ):(data.contenedores||[]).map(c=>{
+        ):[...(data.contenedores||[])].sort((a,b)=>b.id.localeCompare(a.id)).map(c=>{
           const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
           const totalVCont=ventasCont.reduce((a,v)=>a+Number(v.usd||0),0);
           const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
@@ -2409,7 +2432,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
       </div>)}
       {(data.contenedores||[]).length===0&&!nuevo&&<p style={{color:"var(--color-text-secondary)",fontSize:14}}>No hay contenedores todavía.</p>}
       <div style={{display:"grid",gap:8}}>
-        {(data.contenedores||[]).map(c=>{
+        {[...(data.contenedores||[])].sort((a,b)=>b.id.localeCompare(a.id)).map(c=>{
           const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
           const costo=c.costoTotal||0;const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;const enG=costo>0&&cobUSD>costo;
           return(<div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px 1rem",cursor:"pointer"}} onClick={()=>{setContSel(c);setContTab("armado");}}>
@@ -3276,7 +3299,7 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
       {/* Por contenedor */}
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px 18px",marginBottom:"1.5rem",boxShadow:"var(--glass-shadow-sm)"}}>
         <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:12}}>Detalle por contenedor</div>
-        {(data.contenedores||[]).map(c=>{
+        {[...(data.contenedores||[])].sort((a,b)=>b.id.localeCompare(a.id)).map(c=>{
           const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
           const facturadoUSD=ventasCont.reduce((a,v)=>a+ventaUSD(v,tcActual),0);
           const costo=c.costoTotal||0;
