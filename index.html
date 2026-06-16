@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.4.0 · 2026-06-16 -->
+  <!-- v2.4.2 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.4.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.4.2</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.4.0";
+const APP_VERSION = "v2.4.2";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1786,6 +1786,12 @@ PARA RECIBO DJ necesitas: nombre cliente, evento, monto total USD, monto abonado
 
 Cuando tenes TODOS los datos, mostrar resumen breve y pedir confirmacion. Si el usuario confirma, responder con el JSON de accion DIRECTAMENTE en el texto, SIN backticks, SIN triple comillas, SIN formato markdown. Solo el JSON puro pegado al final del texto.
 
+Cuando el usuario adjunta un PDF o archivo:
+- Extraé la información clave (cliente, evento, fecha, salón, montos, concepto, saldo pendiente)
+- Hacé un resumen breve de lo que encontraste en 2-3 líneas
+- Preguntá qué quiere hacer: ¿registrar un pago? ¿confirmar el evento? ¿cargar los datos?
+- NO mostrés el texto crudo del documento, solo el resumen y la pregunta
+
 Cuando el cliente ACEPTA un presupuesto existente, usar accion:
 {"action":"CONFIRMAR_PRESUPUESTO","data":{"presupuestoId":"id_del_presupuesto_o_null","cliente":"nombre","precio":8200}}
 
@@ -1804,6 +1810,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
   const setMsgs = setExternalMsgs;
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [attachedFile,setAttachedFile]=useState(null);
   const [pendingAction, setPendingAction] = useState(null);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
@@ -2116,6 +2123,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         const updatedAction={...pendingAction,data:{...pendingAction.data,costoRaw,costoMoneda}};
         setMsgs(m=>[...m,{role:"user",content:text},{role:"assistant",content:"✓ Ejecutando..."}]);
         setInput("");
+      if(attachedFile) setAttachedFile(null);
         await executeAction(updatedAction);
         const costoStr=costoMoneda==="ARS"?"$"+costoRaw.toLocaleString('es-AR'):"USD "+costoRaw;
         setMsgs(m=>[...m.slice(0,-1),{role:"assistant",content:"✅ Evento confirmado. Costo registrado: "+costoStr+". Ganancia estimada: USD "+(Number(pendingAction.data.pres?.precio||0)-(costoMoneda==="ARS"?costoRaw/(blue||1450):costoRaw)).toFixed(0)+". Podés editarlo desde la sección Confirmados."}]);
@@ -2164,7 +2172,17 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
             model:"claude-sonnet-4-6",
             max_tokens:1000,
             system: systemPrompt,
-            messages: newMsgs.map(m=>({role:m.role,content:m.content}))
+            messages: newMsgs.map((m,i)=>{
+              // Attach file to the last user message
+              if(m.role==="user" && i===newMsgs.length-1 && attachedFile){
+                return {role:"user", content:[
+                  {type: attachedFile.mediaType==="application/pdf"?"document":"image",
+                   source:{type:"base64",media_type:attachedFile.mediaType,data:attachedFile.base64}},
+                  {type:"text",text:m.content||"Analizá este documento y extraé la información relevante para el sistema."}
+                ]};
+              }
+              return {role:m.role,content:m.content};
+            })
           })
         });
         clearTimeout(timeoutId);
@@ -2346,21 +2364,27 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         borderTop:"0.5px solid var(--glass-border)",flexShrink:0,
         display:"flex",gap:8,alignItems:"flex-end",
       }}>
-        <label style={{width:34,height:34,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0,color:"var(--text-secondary)"}}>
-          📎
-          <input type="file" accept=".html,.pdf,.txt" style={{display:"none"}} onChange={async e=>{
-            const file=e.target.files?.[0]; if(!file)return;
-            const text=await file.text();
-            // Try to identify document type
-            const isPresup=text.includes("PRESUPUESTO")||text.includes("EMD-")||text.includes("Presupuesto");
-            const isRecibo=text.includes("RECIBO")||text.includes("REC-")||text.includes("Recibo");
-            const isConf=text.includes("CONFIRMACIÓN")||text.includes("CC-")||text.includes("Confirmaci");
-            const tipo=isRecibo?"recibo":isConf?"confirmación":"presupuesto";
-            const fileMsg="📄 Archivo adjunto: "+file.name+" ("+tipo+")\n\n"+text.slice(0,2000);
-            sendMessage(fileMsg);
+        <label style={{width:34,height:34,borderRadius:"50%",border:"0.5px solid "+(attachedFile?"var(--border-info)":"var(--glass-border)"),background:attachedFile?"var(--bg-tint-blue)":"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0,color:attachedFile?"var(--text-info)":"var(--text-secondary)",position:"relative",title:attachedFile?attachedFile.name:"Adjuntar PDF"}}>
+          {attachedFile?<>📎<span style={{position:"absolute",top:-4,right:-4,width:10,height:10,background:"var(--text-info)",borderRadius:"50%",border:"1.5px solid var(--bg-base)"}}></span></>:"📎"}
+          <input type="file" accept=".pdf,image/png,image/jpeg,image/webp" style={{display:"none"}} onChange={async e=>{
+            const file=e.target.files?.[0]; if(!file) return;
+            const reader=new FileReader();
+            reader.onload=ev=>{
+              const b64=ev.target.result.split(",")[1];
+              const mediaType=file.type||"application/pdf";
+              setAttachedFile({name:file.name,base64:b64,mediaType});
+            };
+            reader.readAsDataURL(file);
             e.target.value="";
           }}/>
         </label>
+        {attachedFile&&(
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)",marginBottom:6,fontSize:11}}>
+            <span>📄</span>
+            <span style={{flex:1,color:"var(--text-info)",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{attachedFile.name}</span>
+            <button onClick={()=>setAttachedFile(null)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-secondary)",fontSize:14,padding:0,flexShrink:0}}>✕</button>
+          </div>
+        )}
         <textarea
           ref={inputRef}
           value={input}
@@ -3088,7 +3112,23 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
               </div>
             </div>
             {formPago.monto&&Number(formPago.monto)>0&&(
-              <div style={{padding:"8px 12px",background:"var(--bg-tint-green)",border:"0.5px solimodalConfirmar&&(
+              <div style={{padding:"8px 12px",background:"var(--bg-tint-green)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-md)"}}>
+                {formPago.moneda==="ARS"
+                  ?<>= <strong>{fmtUSD(Number(formPago.monto)/(blue||1450))}</strong> al TC ${fmt(blue||1450)}</>
+                  :<>= <strong>${fmt(Number(formPago.monto)*(blue||1450))}</strong> ARS</>
+                }
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>registrarPago(modalPago)} style={{flex:1,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:14}}>Registrar pago</button>
+              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:""});}} style={{padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm presupuesto modal */}
+      {modalConfirmar&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
           <div style={{background:"var(--bg-modal,#13132A)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:400,boxShadow:"0 24px 60px rgba(0,0,0,0.5)",maxHeight:"90vh",overflowY:"auto"}}>
             <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 2px",color:"var(--text-primary)"}}>Confirmar evento</h3>
