@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.5.4";
+const APP_VERSION = "v2.5.5";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -5144,8 +5144,12 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
 function DespachosView({data,save,showToast}){
   const [manual,setManual]=useState(false);
   const [form,setForm]=useState({cliente:"",dni:"",direccion:"",localidad:"",provincia:"",expreso:"",articulos:""});
-  const despachos=[...(data.despachos||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
-  const pendientes=despachos.filter(d=>d.estado==="Pendiente");
+  // Pendientes primero (newest first), luego despachados (newest first)
+  const _allDesp=[...(data.despachos||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const _pendDesp=_allDesp.filter(d=>d.estado==="Pendiente");
+  const _restDesp=_allDesp.filter(d=>d.estado!=="Pendiente");
+  const despachos=[..._pendDesp,..._restDesp];
+  const pendientes=_pendDesp;
   const agregarManual=()=>{
     if(!form.cliente)return;
     save({...data,despachos:[...(data.despachos||[]),{id:Date.now().toString(),fecha:hoy(),...form,estado:"Pendiente"}]});
@@ -5255,9 +5259,21 @@ function DespachosView({data,save,showToast}){
       </div>
     </div>)}
     {despachos.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:14}}>Sin despachos.</p>:(
-      <div style={{display:"grid",gap:8}}>
-        {despachos.map(d=>(
-          <div key={d.id} style={{background:"var(--color-background-primary)",border:d.estado==="Pendiente"?"1px solid #378ADD":"0.5px solid var(--color-border-tertiary)",borderRadius:"var(--border-radius-lg)",padding:"12px 1rem"}}>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {despachos.map((d,i)=>(
+          <React.Fragment key={d.id}>
+          {i===_pendDesp.length&&_pendDesp.length>0&&_restDesp.length>0&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,margin:"4px 0"}}>
+              <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+              <span style={{fontSize:10,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>Despachados / Retirados</span>
+              <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+            </div>
+          )}
+          <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",
+            border:d.estado==="Pendiente"?"1px solid #378ADD88":"0.5px solid var(--glass-border)",
+            boxShadow:d.estado==="Pendiente"?"0 0 12px #378ADD44":"none",
+            borderRadius:"var(--r-lg)",padding:"12px 1rem",
+            opacity:d.estado==="Pendiente"?1:0.75}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
               <div>
                 <div style={{fontWeight:500,fontSize:14}}>{d.cliente}</div>
@@ -5271,6 +5287,7 @@ function DespachosView({data,save,showToast}){
             <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{[d.direccion,d.localidad,d.provincia].filter(Boolean).join(" · ")+(d.dni?" · DNI "+d.dni:"")}</div>
             {d.articulos&&<div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:2}}>{d.articulos}</div>}
           </div>
+          </React.Fragment>
         ))}
       </div>
     )}
