@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v1.3.0 · 2026-06-16 -->
+  <!-- v1.4.0 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v1.3.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v1.4.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -649,7 +649,7 @@
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v1.3.0";
+const APP_VERSION = "v1.4.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -854,7 +854,8 @@ function App(){
   const [blue,setBlue]=useState(null);
   const [showPedido,setShowPedido]=useState(false);
   const [showSearch,setShowSearch]=useState(false);
-  const [showChat,setShowChat]=useState(false);
+  const [chatState,setChatState]=useState("closed"); // "closed"|"open"|"minimized"
+  const [chatMsgs,setChatMsgs]=useState([{role:"assistant",content:"¡Hola! Soy tu asistente. Puedo responder preguntas, cargar pedidos, generar presupuestos DJ y más. ¿Qué necesitás?"}]);
   const [theme,setTheme]=useState(()=>localStorage.getItem("eliel_theme")||"light");
   const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("eliel_theme",n);document.documentElement.setAttribute("data-theme",n);return n;});
   const logout=()=>{
@@ -868,8 +869,12 @@ function App(){
   useEffect(()=>{
     const handler=e=>{
       if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();setShowSearch(s=>!s);}
-      if((e.metaKey||e.ctrlKey)&&e.key==="j"){e.preventDefault();setShowChat(s=>!s);}
+      if((e.metaKey||e.ctrlKey)&&e.key==="j"){e.preventDefault();setChatState(s=>s==="open"?"minimized":"open");}
     };
+    const openChatHandler=()=>setChatState("open");
+    const closeChatHandler=()=>setChatState("closed");
+    window.addEventListener("openChat",openChatHandler);
+    window.addEventListener("closeChat",closeChatHandler);
     document.addEventListener("keydown",handler);
     return()=>document.removeEventListener("keydown",handler);
   },[]);
@@ -1029,8 +1034,8 @@ function App(){
       {showSearch&&<SearchModal data={data} onClose={()=>setShowSearch(false)} goModulo={goModulo} setView={setView}/>}
 
       {/* Floating AI button — desktop only */}
-      {!showChat&&(
-        <button onClick={()=>setShowChat(true)} className="fab-ai" style={{
+      {chatState==="closed"&&(
+        <button onClick={()=>setChatState("open")} className="fab-ai" style={{
           position:"fixed",bottom:32,right:24,zIndex:500,
           width:54,height:54,borderRadius:"50%",border:"none",cursor:"pointer",
           background:"linear-gradient(135deg,#F47920,#5BAD41)",
@@ -1045,7 +1050,7 @@ function App(){
         </button>
       )}
 
-      {showChat&&<ChatBot data={data} save={save} showToast={showToast} blue={blue} stockUni={stockUni} onClose={()=>setShowChat(false)}/>}
+      {chatState!=="closed"&&<ChatBot data={data} save={save} showToast={showToast} blue={blue} stockUni={stockUni} onClose={()=>setChatState("minimized")}/>}
 
       {/* TOP NAV ── desktop (hidden on mobile via CSS) */}
       <div className="top-nav" style={{
@@ -1202,7 +1207,7 @@ function App(){
       </div>
 
       {/* BOTTOM NAV ── mobile */}
-      <BottomNav modulos={modulos} modulo={modulo} goModulo={goModulo} toggleTheme={toggleTheme} theme={theme} blue={blue} fbReady={fbReady} logout={logout} onSearch={()=>setShowSearch(true)} onChat={()=>setShowChat(true)}/>
+      <BottomNav modulos={modulos} modulo={modulo} goModulo={goModulo} toggleTheme={toggleTheme} theme={theme} blue={blue} fbReady={fbReady} logout={logout} onSearch={()=>setShowSearch(true)} onChat={()=>setChatState("open")}/>
     </div>
   );
 }
@@ -1391,10 +1396,9 @@ Para generar confirmacion DJ responder con:
 {"action":"GENERAR_CONFIRMACION_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fechaEvento":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300","conTecnica":true,"paquete":"basica_inter","precioBase":8200,"opcionalesElegidos":[],"formaPago":"total","descuento":10}}`;
 }
 
-function ChatBot({data, save, showToast, blue, stockUni, onClose}){
-  const [msgs, setMsgs] = useState([
-    {role:"assistant", content:"¡Hola! Soy tu asistente. Puedo responder preguntas sobre tus datos, cargar pedidos, eventos DJ, gastos o despachos. ¿Qué necesitás?"}
-  ]);
+function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, externalMsgs, setExternalMsgs}){
+  const msgs = externalMsgs;
+  const setMsgs = setExternalMsgs;
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
@@ -1529,9 +1533,14 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
         save({...data,dj:{...data.dj,presupuestos:nuevosPresupuestos}});
         showToast("✓ Presupuesto generado y guardado");
         setPendingAction(null);
-        if(nuevoPres.pdfData){
-          const a=document.createElement("a");a.href=nuevoPres.pdfData;
-          a.download=`Presupuesto_${d.cliente.replace(/ /g,"_")}_${numDoc}.html`;a.click();
+        if(nuevoPres.pdfHtml){
+          const w=window.open("","_blank");
+          if(w){
+            w.document.open();
+            w.document.write(nuevoPres.pdfHtml);
+            w.document.close();
+            setTimeout(()=>{try{w.print();}catch(e){}},1200);
+          }
         }
       }
       else if(action.action==="GENERAR_RECIBO_DJ"){
@@ -1551,7 +1560,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
           let reciboHtml=res.content?.[0]?.text||"";
           reciboHtml=reciboHtml.replace(/^```html\s*/i,"").replace(/^```\s*/i,"").replace(/\s*```$/,"").trim();
           const w=window.open("","_blank");
-          if(w){w.document.write(reciboHtml);w.document.close();setTimeout(()=>w.print(),800);}
+          if(w){w.document.open();w.document.write(reciboHtml);w.document.close();setTimeout(()=>{try{w.print();}catch(e){}},1200);}
           // Also register payment in the matching event
           const evMatch=data.dj?.eventos?.find(e=>e.nombre.toLowerCase().includes(d.cliente.toLowerCase()));
           if(evMatch){
@@ -1584,7 +1593,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
           let confHtml=res.content?.[0]?.text||"";
           confHtml=confHtml.replace(/^```html\s*/i,"").replace(/^```\s*/i,"").replace(/\s*```$/,"").trim();
           const w=window.open("","_blank");
-          if(w){w.document.write(confHtml);w.document.close();setTimeout(()=>w.print(),800);}
+          if(w){w.document.open();w.document.write(confHtml);w.document.close();setTimeout(()=>{try{w.print();}catch(e){}},1200);}
           showToast("✓ Confirmación generada");
         }catch(err){showToast("Error al generar confirmación");console.error(err);}
         setPendingAction(null);
@@ -1742,9 +1751,32 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
     if(inputRef.current) inputRef.current.focus();
   };
 
+  // Minimized state: show floating pill
+  if(chatState==="minimized"){
+    return(
+      <div onClick={()=>{if(typeof onClose==="function")onClose();}} style={{
+        position:"fixed",bottom:90,right:20,zIndex:1500,
+        background:"linear-gradient(135deg,#F47920,#5BAD41)",
+        borderRadius:28,padding:"10px 16px",
+        display:"flex",alignItems:"center",gap:8,cursor:"pointer",
+        boxShadow:"0 8px 28px rgba(244,121,32,0.45)",
+        animation:"fadeIn .2s ease",
+      }}
+      onClick={()=>setChatState&&window.dispatchEvent(new CustomEvent("openChat"))}>
+        <span style={{fontSize:18}}>🤖</span>
+        <div>
+          <div style={{fontSize:11,fontWeight:700,color:"#fff",lineHeight:1}}>Asistente IA</div>
+          <div style={{fontSize:9,color:"rgba(255,255,255,0.8)",marginTop:1}}>{msgs.length>1?msgs.length-1+" mens.":"listo"}</div>
+        </div>
+        <span style={{fontSize:12,color:"rgba(255,255,255,0.8)"}}>▲</span>
+      </div>
+    );
+  }
+
   return(
     <div style={{position:"fixed",inset:0,zIndex:2000,display:"flex",flexDirection:"column",
-      background:"var(--bg-base)"}}>
+      background:"var(--bg-base)"}}
+    onClick={(e)=>{if(e.target===e.currentTarget)onClose();}}>
       {/* Header */}
       <div style={{
         background:"var(--bg-nav)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",
@@ -1758,7 +1790,8 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
           <div style={{fontSize:11,color:ANTHROPIC_KEY?"var(--text-success)":"var(--text-warning)",fontWeight:500}}>"● Conectado · Claude Sonnet"</div>
         </div>
         
-        <button onClick={onClose} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",color:"var(--text-secondary)"}}>✕</button>
+        <button onClick={onClose} title="Minimizar" style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,cursor:"pointer",color:"var(--text-secondary)",marginRight:6}}>▼</button>
+        <button onClick={()=>window.dispatchEvent(new CustomEvent("closeChat"))} title="Cerrar sesión de chat" style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",color:"var(--text-secondary)"}}>✕</button>
       </div>
 
 
@@ -1821,6 +1854,21 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
         borderTop:"0.5px solid var(--glass-border)",flexShrink:0,
         display:"flex",gap:8,alignItems:"flex-end",
       }}>
+        <label style={{width:34,height:34,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0,color:"var(--text-secondary)"}}>
+          📎
+          <input type="file" accept=".html,.pdf,.txt" style={{display:"none"}} onChange={async e=>{
+            const file=e.target.files?.[0]; if(!file)return;
+            const text=await file.text();
+            // Try to identify document type
+            const isPresup=text.includes("PRESUPUESTO")||text.includes("EMD-")||text.includes("Presupuesto");
+            const isRecibo=text.includes("RECIBO")||text.includes("REC-")||text.includes("Recibo");
+            const isConf=text.includes("CONFIRMACIÓN")||text.includes("CC-")||text.includes("Confirmaci");
+            const tipo=isRecibo?"recibo":isConf?"confirmación":"presupuesto";
+            const fileMsg="📄 Archivo adjunto: "+file.name+" ("+tipo+")\n\n"+text.slice(0,2000);
+            sendMessage(fileMsg);
+            e.target.value="";
+          }}/>
+        </label>
         <textarea
           ref={inputRef}
           value={input}
@@ -2522,8 +2570,8 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
                     <div style={{fontSize:13,fontWeight:600,color:"var(--text-success)"}}>USD {p.precio}</div>
                     <div style={{display:"flex",gap:6}}>
                       {p.pdfData&&<button onClick={()=>{
-                        const link=document.createElement("a");link.href=p.pdfData;
-                        link.download=`Presupuesto_${p.cliente}_${p.fecha}.pdf`;link.click();
+                        if(p.pdfHtml){const w=window.open("","_blank");if(w){w.document.open();w.document.write(p.pdfHtml);w.document.close();setTimeout(()=>{try{w.print();}catch(e){}},1200);}}
+                        else if(p.pdfData){const a=document.createElement("a");a.href=p.pdfData;a.download="Presupuesto_"+p.cliente+".html";a.click();}
                       }} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer"}}>⬇ PDF</button>}
                       {p.estado==="Pendiente"&&<>
                         <button onClick={()=>confirmarPresupuesto(p)} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",cursor:"pointer",fontWeight:600}}>✓ Confirmar</button>
