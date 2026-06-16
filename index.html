@@ -643,7 +643,7 @@ const EMPTY = {
   contenedores:[], ventas:[], pagos:[], retiros:[], despachos:[],
   clientes:{},          // persistente en Firebase
   bh:{ despachos:[], cobros:[] },
-  dj:{ eventos:[] },
+  dj:{ eventos:[], presupuestos:[] },
   fin:{ gastos:[], presupuestos:{} },
   _v:10
 };
@@ -869,6 +869,7 @@ function App(){
             ...EMPTY,...remote,
             clientes: remote.clientes||{},
             bh: {...(remote.bh||{}), cobros:(remote.bh?.cobros||[])},
+            dj: {...(remote.dj||{}), eventos:(remote.dj?.eventos||[]), presupuestos:(remote.dj?.presupuestos||[])},
             fin: {...(remote.fin||{}), presupuestos:(remote.fin?.presupuestos||{})},
             _v:10
           } : EMPTY;
@@ -1339,7 +1340,28 @@ REGLAS IMPORTANTES:
 - Cuando tenés todo, mostrá un resumen y pedí confirmación
 - Hablá siempre en español, de forma directa y concisa
 - Usás los datos reales para responder, no inventés números
-- Si el cliente ya existe en el sistema, usás sus datos guardados automáticamente`;
+- Si el cliente ya existe en el sistema, usás sus datos guardados automáticamente
+
+DOCUMENTOS DJ — ELIEL MIZRAHI DJ:
+Podés generar 3 tipos de documentos PDF profesionales:
+
+PARA PRESUPUESTO DJ necesitás: nombre cliente, fecha evento, salon/venue, tipo evento (casamiento/cumpleanos/etc), invitados (aprox), con tecnica o sin, precio USD, recepcionistas (incluidas/opcionales/sin).
+Si falta CUALQUIER dato → preguntar todo en un solo mensaje antes de generar.
+
+PARA CONFIRMACION DJ necesitas del presupuesto original + opcionales elegidos + forma de pago (total con 10pct descuento o 2 cuotas 50/50).
+
+PARA RECIBO DJ necesitas: nombre cliente, evento, monto total USD, monto abonado USD, concepto (sena/anticipo/cuota/pago total), medio de pago (default efectivo).
+
+Cuando tenes TODOS los datos, mostrar resumen breve y pedir confirmacion. Si el usuario confirma, responder con JSON de accion.
+
+Para generar presupuesto DJ responder con:
+{"action":"GENERAR_PRESUPUESTO_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fecha":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300 personas","conTecnica":true,"paquete":"basica_inter","precio":8200,"precio_str":"8.200","recepcionistas":"opcionales","opcionales":[],"formaPago":"cuotas"}}
+
+Para generar recibo DJ responder con:
+{"action":"GENERAR_RECIBO_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fechaEvento":"15 de agosto de 2026","salon":"Nombre salon","montoTotal":8200,"montoAbonado":4100,"concepto":"Sena","medioPago":"Efectivo","observaciones":null}}
+
+Para generar confirmacion DJ responder con:
+{"action":"GENERAR_CONFIRMACION_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fechaEvento":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300","conTecnica":true,"paquete":"basica_inter","precioBase":8200,"opcionalesElegidos":[],"formaPago":"total","descuento":10}}`;
 }
 
 function ChatBot({data, save, showToast, blue, stockUni, onClose}){
@@ -1426,6 +1448,109 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
         };
         save({...data,fin:{...data.fin,gastos:[...(data.fin?.gastos||[]),gasto]}});
         showToast("✓ Gasto registrado");
+        setPendingAction(null);
+      }
+      else if(action.action==="GENERAR_PRESUPUESTO_DJ"){
+        // Generate PDF via API call and save as presupuesto
+        const d=action.data;
+        const presId=Date.now().toString();
+        const numDoc="#EMD-"+new Date(d.fecha.split(" de ").reverse().join("-")||Date.now()).getFullYear()+"-"+Math.floor(Math.random()*170+180);
+        const nuevoPres={
+          id:presId,
+          cliente:d.cliente,tipoEvento:d.tipoEvento,fecha:d.fecha,
+          salon:d.salon,invitados:d.invitados,
+          conTecnica:d.conTecnica,paquete:d.paquete||null,
+          precio:d.precio,precio_str:d.precio_str||String(d.precio),
+          opcionales:d.opcionales||[],
+          recepcionistas:d.recepcionistas||"sin",
+          formaPago:d.formaPago||"cuotas",
+          numeroDoc:numDoc,
+          estado:"Pendiente",
+          creadoEn:new Date().toISOString(),
+          pdfData:null, // will be set after generation
+        };
+        // Request PDF generation from backend
+        try{
+          const pdfResp=await fetch("https://api.anthropic.com/v1/messages",{
+            method:"POST",
+            headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+            body:JSON.stringify({
+              model:"claude-sonnet-4-6",max_tokens:4000,
+              system:`Sos un generador de HTML para PDFs de presupuestos DJ. Generás un HTML completo con el diseño premium de ELIEL MIZRAHI DJ (fondo #080810, dorado #C9A84C, blanco). El HTML debe ser auto-contenido, imprimible. Devolvé SOLO el HTML, sin explicaciones.`,
+              messages:[{role:"user",content:`Generá el HTML del presupuesto con estos datos: ${JSON.stringify(nuevoPres)}. Incluí: header con logo textual "ELIEL MIZRAHI DJ / BUENOS AIRES, ARGENTINA", banda dorada con "${numDoc}", datos del evento, servicios, precio USD ${d.precio_str||d.precio}, condiciones de pago (50/50 o total con 10% desc), footer con @ElielMizrahi / 1153488044.`}]
+            })
+          });
+          const pdfResult=await pdfResp.json();
+          const pdfHtml=pdfResult.content?.[0]?.text||"";
+          // Convert HTML to data URL for download
+          const blob=new Blob([pdfHtml],{type:"text/html"});
+          const url=URL.createObjectURL(blob);
+          nuevoPres.pdfData=url;
+          nuevoPres.pdfHtml=pdfHtml;
+        }catch(pdfErr){console.warn("PDF gen failed:",pdfErr);}
+        
+        const nuevosPresupuestos=[...(data.dj?.presupuestos||[]),nuevoPres];
+        save({...data,dj:{...data.dj,presupuestos:nuevosPresupuestos}});
+        showToast("✓ Presupuesto generado y guardado");
+        setPendingAction(null);
+        if(nuevoPres.pdfData){
+          const a=document.createElement("a");a.href=nuevoPres.pdfData;
+          a.download=`Presupuesto_${d.cliente.replace(/ /g,"_")}_${numDoc}.html`;a.click();
+        }
+      }
+      else if(action.action==="GENERAR_RECIBO_DJ"){
+        const d=action.data;
+        const numDoc="#REC-"+new Date().getFullYear()+"-"+Math.floor(Math.random()*170+180);
+        try{
+          const pdfResp=await fetch("https://api.anthropic.com/v1/messages",{
+            method:"POST",
+            headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+            body:JSON.stringify({
+              model:"claude-sonnet-4-6",max_tokens:3000,
+              system:`Sos un generador de HTML para recibos de pago de ELIEL MIZRAHI DJ. Diseño premium: fondo #080810, dorado #C9A84C, texto blanco. HTML auto-contenido imprimible. Devolvé SOLO el HTML.`,
+              messages:[{role:"user",content:`Generá el HTML del recibo ${numDoc}: Cliente: ${d.cliente}, Evento: ${d.tipoEvento} en ${d.salon||""} el ${d.fechaEvento||""}, Total evento: USD ${d.montoTotal}, Abonado: USD ${d.montoAbonado}, Saldo: USD ${d.montoTotal-d.montoAbonado}, Concepto: ${d.concepto}, Medio de pago: ${d.medioPago||"Efectivo"}${d.observaciones?", Obs: "+d.observaciones:""}. Footer: @ElielMizrahi / 1153488044`}]
+            })
+          });
+          const res=await pdfResp.json();
+          const reciboHtml=res.content?.[0]?.text||"";
+          const blob=new Blob([reciboHtml],{type:"text/html"});
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement("a");a.href=url;
+          a.download=`Recibo_${d.cliente.replace(/ /g,"_")}_${numDoc}.html`;a.click();
+          // Also register payment in the matching event
+          const evMatch=data.dj?.eventos?.find(e=>e.nombre.toLowerCase().includes(d.cliente.toLowerCase()));
+          if(evMatch){
+            const nuevosSena=Number(evMatch.sena||0)+d.montoAbonado;
+            const nuevoSaldo=Math.max(0,Number(evMatch.cobroUSD||0)-nuevosSena);
+            const nuevosEv=data.dj.eventos.map(e=>e.id===evMatch.id?{...e,sena:nuevosSena,senaUSD:nuevosSena,saldo:nuevoSaldo}:e);
+            save({...data,dj:{...data.dj,eventos:nuevosEv}});
+          }
+          showToast("✓ Recibo generado");
+        }catch(err){showToast("Error al generar recibo");console.error(err);}
+        setPendingAction(null);
+      }
+      else if(action.action==="GENERAR_CONFIRMACION_DJ"){
+        const d=action.data;
+        const numDoc="#CC-"+new Date(d.fechaEvento?.split(" de ").reverse().join("-")||Date.now()).getFullYear()+"-"+Math.floor(Math.random()*170+180);
+        const totalFinal=d.formaPago==="total"?Math.round(d.precioBase*(1-((d.descuento||10)/100))):d.precioBase;
+        try{
+          const pdfResp=await fetch("https://api.anthropic.com/v1/messages",{
+            method:"POST",
+            headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+            body:JSON.stringify({
+              model:"claude-sonnet-4-6",max_tokens:4000,
+              system:`Sos un generador de HTML para confirmaciones de contratación de ELIEL MIZRAHI DJ. Diseño premium: fondo #080810, dorado #C9A84C, texto blanco. HTML auto-contenido imprimible. Devolvé SOLO el HTML.`,
+              messages:[{role:"user",content:`Generá la confirmación ${numDoc}: ${JSON.stringify({...d,totalFinal,numDoc})}. Incluí servicios contratados (si conTecnica, listar servicios de ${d.paquete}), opcionales elegidos: ${JSON.stringify(d.opcionalesElegidos||[])}, forma de pago: ${d.formaPago==="total"?"Pago total con "+d.descuento+"% descuento = USD "+totalFinal:"2 cuotas de USD "+(totalFinal/2)+" c/u"}, footer: @ElielMizrahi / 1153488044`}]
+            })
+          });
+          const res=await pdfResp.json();
+          const confHtml=res.content?.[0]?.text||"";
+          const blob=new Blob([confHtml],{type:"text/html"});
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement("a");a.href=url;
+          a.download=`Confirmacion_${d.cliente.replace(/ /g,"_")}_${numDoc}.html`;a.click();
+          showToast("✓ Confirmación generada");
+        }catch(err){showToast("Error al generar confirmación");console.error(err);}
         setPendingAction(null);
       }
       else if(action.action==="CARGAR_DESPACHO"){
@@ -1619,7 +1744,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
       {/* Quick actions + input — only if key set */}
       {ANTHROPIC_KEY&&<>
       <div style={{padding:"0 1rem 8px",display:"flex",gap:6,overflowX:"auto",flexShrink:0}}>
-        {["¿Cuánto stock queda?","¿Quién me debe?","Resumen del mes","Cargar pedido","Cargar evento DJ"].map(q=>(
+        {["¿Cuánto stock queda?","¿Quién me debe?","Presupuesto DJ","Recibo DJ","Cargar pedido"].map(q=>(
           <button key={q} onClick={()=>sendMessage(q)} style={{
             fontSize:11,padding:"6px 12px",borderRadius:"var(--r-pill)",
             border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",
@@ -2119,45 +2244,42 @@ function MonedaInput({labelText,monedaKey,montoKey,form,setForm}){
   );
 }
 
-function DJView({data,save,showToast,blue}){
+function DJView({data,save,showToast,blue,onGenerarDoc}){
   const tc=blue||1450;
   const initForm={nombre:"",fecha:hoy(),estado:"Confirmado",
-    monedaCobro:"USD",cobro:"",
-    monedaCosto:"ARS",costo:"",
-    sena:"",notas:""};
+    monedaCobro:"USD",cobro:"",monedaCosto:"ARS",costo:"",sena:"",notas:""};
   const [form,setForm]=useState(initForm);
   const [editId,setEditId]=useState(null);
+  const [tab,setTab]=useState("presupuestos"); // presupuestos | confirmados | realizados
 
   const eventos=data.dj?.eventos||[];
-  const realizados=eventos.filter(e=>e.estado==="Realizado");
-  const ganTotal=realizados.reduce((a,e)=>a+Number(e.gananciaUSD||0),0);
-  const cobroTotal=realizados.reduce((a,e)=>a+Number(e.cobroUSD||0),0);
-  const proximos=eventos.filter(e=>e.estado==="Confirmado"||e.estado==="Señado");
-  const saldoTotal=eventos.filter(e=>e.saldo>0&&e.estado!=="Cancelado").reduce((a,e)=>a+Number(e.saldo||0),0);
+  const presupuestos=[...(data.dj?.presupuestos||[])].sort((a,b)=>b.id.localeCompare(a.id));
+  const confirmados=[...eventos.filter(e=>e.estado==="Confirmado"||e.estado==="Señado")].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const realizados=[...eventos.filter(e=>e.estado==="Realizado"||e.estado==="Cancelado")].sort((a,b)=>b.fecha.localeCompare(a.fecha));
 
-  // Compute preview values (plain JS, not inside JSX)
-  const previewCobroUSD = form.monedaCobro==="ARS" ? Number(form.cobro||0)/tc : Number(form.cobro||0);
-  const previewCostoUSD = form.monedaCosto==="ARS" ? Number(form.costo||0)/tc : Number(form.costo||0);
-  const previewGanUSD   = previewCobroUSD - previewCostoUSD;
-  const showPreview     = Number(form.cobro||0)>0 || Number(form.costo||0)>0;
+  const ganTotal=realizados.filter(e=>e.estado==="Realizado").reduce((a,e)=>a+Number(e.gananciaUSD||0),0);
+  const cobroTotal=realizados.filter(e=>e.estado==="Realizado").reduce((a,e)=>a+Number(e.cobroUSD||0),0);
+  const saldoTotal=confirmados.filter(e=>e.saldo>0).reduce((a,e)=>a+Number(e.saldo||0),0);
 
-  const guardar=()=>{
+  const previewCobroUSD=form.monedaCobro==="ARS"?Number(form.cobro||0)/tc:Number(form.cobro||0);
+  const previewCostoUSD=form.monedaCosto==="ARS"?Number(form.costo||0)/tc:Number(form.costo||0);
+  const previewGanUSD=previewCobroUSD-previewCostoUSD;
+  const showPreview=Number(form.cobro||0)>0||Number(form.costo||0)>0;
+
+  const guardarEvento=()=>{
     if(!form.nombre.trim())return;
-    const cobroRaw=Number(form.cobro||0);
-    const costoRaw=Number(form.costo||0);
-    const senaRaw =Number(form.sena||0);
+    const cobroRaw=Number(form.cobro||0),costoRaw=Number(form.costo||0),senaRaw=Number(form.sena||0);
     const cobroUSD=form.monedaCobro==="ARS"?cobroRaw/tc:cobroRaw;
     const costoUSD=form.monedaCosto==="ARS"?costoRaw/tc:costoRaw;
-    const senaUSD =form.monedaCobro==="ARS"?senaRaw/tc:senaRaw;
+    const senaUSD=form.monedaCobro==="ARS"?senaRaw/tc:senaRaw;
     const gananciaUSD=cobroUSD-costoUSD;
     const saldo=Math.max(0,cobroUSD-senaUSD);
     const evento={
-      id:editId||Date.now().toString(),
-      nombre:form.nombre,fecha:form.fecha,estado:form.estado,
+      id:editId||Date.now().toString(),nombre:form.nombre,fecha:form.fecha,estado:form.estado,
       monedaCobro:form.monedaCobro,cobro:cobroRaw,cobroUSD,
       monedaCosto:form.monedaCosto,costo:costoRaw,costoUSD,
-      sena:senaRaw,senaUSD,saldo,
-      gananciaUSD,margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
+      sena:senaRaw,senaUSD,saldo,gananciaUSD,
+      margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
       notas:form.notas,tcUsado:tc,
     };
     const nuevos=editId?eventos.map(e=>e.id===editId?evento:e):[...eventos,evento];
@@ -2171,128 +2293,213 @@ function DJView({data,save,showToast,blue}){
     monedaCobro:e.monedaCobro||"USD",cobro:String(e.cobro||""),
     monedaCosto:e.monedaCosto||"ARS",costo:String(e.costo||""),
     sena:String(e.sena||""),notas:e.notas||"",
-  });};
-  const eliminar=id=>save({...data,dj:{...data.dj,eventos:eventos.filter(e=>e.id!==id)}});
+  });setTab("confirmados");};
+
+  const eliminarEvento=id=>save({...data,dj:{...data.dj,eventos:eventos.filter(e=>e.id!==id)}});
   const actualizarEstado=(id,estado)=>save({...data,dj:{...data.dj,eventos:eventos.map(x=>x.id===id?{...x,estado}:x)}});
 
-  const stColor={Realizado:"var(--text-success)",Confirmado:"var(--text-info)",Señado:"var(--text-warning)",Cancelado:"var(--text-danger)"};
-  const stBg   ={Realizado:"var(--bg-tint-green)",Confirmado:"var(--bg-tint-blue)",Señado:"var(--bg-tint-amber)",Cancelado:"var(--bg-tint-red)"};
+  // Confirmar desde presupuesto: crea evento confirmado
+  const confirmarPresupuesto=(p)=>{
+    const evento={
+      id:Date.now().toString(),nombre:p.nombre,fecha:p.fecha,estado:"Confirmado",
+      monedaCobro:"USD",cobro:Number(p.precio||0),cobroUSD:Number(p.precio||0),
+      monedaCosto:"ARS",costo:0,costoUSD:0,
+      sena:0,senaUSD:0,saldo:Number(p.precio||0),
+      gananciaUSD:Number(p.precio||0),margen:100,notas:"",tcUsado:tc,
+      presupuestoId:p.id,
+    };
+    const nuevosEventos=[...eventos,evento];
+    const nuevosPresupuestos=(data.dj?.presupuestos||[]).map(x=>x.id===p.id?{...x,estado:"Confirmado"}:x);
+    save({...data,dj:{...data.dj,eventos:nuevosEventos,presupuestos:nuevosPresupuestos}});
+    showToast("✓ Evento confirmado");setTab("confirmados");
+  };
 
+  const rechazarPresupuesto=(id)=>{
+    const nuevos=(data.dj?.presupuestos||[]).map(x=>x.id===id?{...x,estado:"Rechazado"}:x);
+    save({...data,dj:{...data.dj,presupuestos:nuevos}});showToast("Presupuesto cancelado");
+  };
 
+  const eliminarPresupuesto=(id)=>{
+    if(!window.confirm("¿Eliminar este presupuesto?"))return;
+    save({...data,dj:{...data.dj,presupuestos:(data.dj?.presupuestos||[]).filter(p=>p.id!==id)}});
+    showToast("Presupuesto eliminado");
+  };
+
+  const stColor={Realizado:"var(--text-success)",Confirmado:"var(--text-info)",Señado:"var(--text-warning)",Cancelado:"var(--text-danger)",Rechazado:"var(--text-danger)",Pendiente:"var(--text-secondary)"};
+  const stBg={Realizado:"var(--bg-tint-green)",Confirmado:"var(--bg-tint-blue)",Señado:"var(--bg-tint-amber)",Cancelado:"var(--bg-tint-red)",Rechazado:"var(--bg-tint-red)",Pendiente:"rgba(120,120,128,0.1)"};
+
+  // Tab nav style
+  const TabBtn=({id,label,count})=>(
+    <button onClick={()=>setTab(id)} style={{
+      flex:1,padding:"8px 4px",border:"none",borderRadius:"var(--r-md)",cursor:"pointer",
+      fontSize:11,fontWeight:tab===id?700:400,
+      background:tab===id?"var(--bg-card)":"transparent",
+      color:tab===id?"var(--text-primary)":"var(--text-secondary)",
+      boxShadow:tab===id?"var(--glass-shadow-sm)":"none",transition:"all .15s",
+    }}>
+      {label}{count>0&&<span style={{marginLeft:5,fontSize:10,background:tab===id?"var(--bg-tint-blue)":"rgba(120,120,128,0.15)",color:tab===id?"var(--text-info)":"var(--text-secondary)",padding:"1px 5px",borderRadius:"var(--r-pill)"}}>{count}</span>}
+    </button>
+  );
 
   return(
     <div>
-      <div style={{marginBottom:"1.5rem"}}>
+      <div style={{marginBottom:"1.25rem"}}>
         <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:"0 0 4px",color:"var(--text-primary)"}}>DJ</h2>
-        <p style={{fontSize:13,color:"var(--text-secondary)",margin:0}}>Gestión de eventos en USD o ARS</p>
+        <p style={{fontSize:13,color:"var(--text-secondary)",margin:0}}>Gestión bimonetaria de eventos</p>
       </div>
 
       {/* Métricas */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.5rem"}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:"1.25rem"}}>
         {[
-          {l:"Realizados",v:realizados.length},
-          {l:"Próximos",v:proximos.length},
-          {l:"Cobrado USD",v:fmtUSD(cobroTotal),info:true},
-          {l:"Ganancia neta USD",v:fmtUSD(ganTotal),green:ganTotal>0},
+          {l:"Presupuestados",v:presupuestos.filter(p=>p.estado==="Pendiente").length},
+          {l:"Confirmados",v:confirmados.length,info:true},
+          {l:"Cobrado USD",v:fmtUSD(cobroTotal),green:cobroTotal>0},
+          {l:"Ganancia USD",v:fmtUSD(ganTotal),green:ganTotal>0},
           ...(saldoTotal>0?[{l:"Saldo pendiente",v:fmtUSD(saldoTotal),warn:true}]:[]),
         ].map(x=>(
-          <div key={x.l} style={{
-            background:x.green?"var(--bg-tint-green)":x.warn?"var(--bg-tint-amber)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.10)",
-            border:"0.5px solid "+(x.green?"var(--border-success)":x.warn?"rgba(244,121,32,.3)":x.info?"var(--border-info)":"var(--glass-border)"),
-            borderRadius:"var(--r-lg)",padding:"12px 14px",
-            backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
-          }}>
+          <div key={x.l} style={{background:x.green?"var(--bg-tint-green)":x.warn?"var(--bg-tint-amber)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.10)",border:"0.5px solid "+(x.green?"var(--border-success)":x.warn?"rgba(244,121,32,.3)":x.info?"var(--border-info)":"var(--glass-border)"),borderRadius:"var(--r-lg)",padding:"12px 14px",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
             <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:x.green?"var(--text-success)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-secondary)",marginBottom:4}}>{x.l}</div>
-            <div style={{fontSize:18,fontWeight:700,letterSpacing:"-.02em",color:x.green?"var(--text-success)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-primary)"}}>{x.v}</div>
+            <div style={{fontSize:16,fontWeight:700,color:x.green?"var(--text-success)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-primary)"}}>{x.v}</div>
           </div>
         ))}
       </div>
 
-      {/* Formulario */}
-      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px 18px",marginBottom:"1.5rem",boxShadow:"var(--glass-shadow-sm)"}}>
-        <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:12}}>
-          {editId?"Editar evento":"Nuevo evento"}
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-          <div style={{gridColumn:"1/-1"}}>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nombre del evento</label>
-            <input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} placeholder="Casamiento García — Salón XYZ"/>
-          </div>
-          <div>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label>
-            <input type="date" value={form.fecha} onChange={e=>setForm({...form,fecha:e.target.value})}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Estado</label>
-            <select value={form.estado} onChange={e=>setForm({...form,estado:e.target.value})}>
-              {["Confirmado","Señado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <MonedaInput labelText="Cobro total" monedaKey="monedaCobro" montoKey="cobro" form={form} setForm={setForm}/>
-          <MonedaInput labelText="Costo total" monedaKey="monedaCosto" montoKey="costo" form={form} setForm={setForm}/>
-          <div>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Seña ({form.monedaCobro})</label>
-            <input type="number" value={form.sena} onChange={e=>setForm(f=>({...f,sena:e.target.value}))} placeholder="0" inputMode="decimal"/>
-          </div>
-          <div style={{display:"flex",alignItems:"flex-end",paddingBottom:1}}>
-            {showPreview&&(
-              <div style={{width:"100%",padding:"9px 11px",background:previewGanUSD>=0?"var(--bg-tint-green)":"var(--bg-tint-red)",border:"0.5px solid "+(previewGanUSD>=0?"var(--border-success)":"var(--border-danger)"),borderRadius:"var(--r-md)",fontSize:12}}>
-                <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:previewGanUSD>=0?"var(--text-success)":"var(--text-danger)",marginBottom:3}}>Ganancia estimada</div>
-                <div style={{fontWeight:700,color:previewGanUSD>=0?"var(--text-success)":"var(--text-danger)"}}>{fmtUSD(previewGanUSD)}</div>
-                <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>≈ ${fmt(previewGanUSD*tc)} ARS</div>
-              </div>
-            )}
-          </div>
-          <div style={{gridColumn:"1/-1"}}>
-            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Notas</label>
-            <input value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})} placeholder="Rider, detalles, observaciones..."/>
-          </div>
-        </div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={guardar} style={{fontSize:13,padding:"9px 20px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer",boxShadow:"0 4px 14px rgba(24,95,165,0.35)"}}>
-            {editId?"Actualizar":"Guardar evento"}
-          </button>
-          {editId&&<button onClick={()=>{setEditId(null);setForm(initForm);}} style={{fontSize:13,padding:"9px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>}
-        </div>
+      {/* IA hint */}
+      <div style={{background:"linear-gradient(135deg,rgba(244,121,32,0.1),rgba(91,173,65,0.1))",border:"0.5px solid rgba(244,121,32,0.25)",borderRadius:"var(--r-lg)",padding:"10px 14px",marginBottom:"1.25rem",display:"flex",alignItems:"center",gap:10}}>
+        <span style={{fontSize:20}}>🤖</span>
+        <div style={{fontSize:12,color:"var(--text-secondary)"}}>Usá el asistente IA para generar presupuestos PDF, confirmar eventos y registrar pagos con lenguaje natural.</div>
       </div>
 
-      {/* Lista */}
-      {eventos.length===0
-        ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin eventos. Cargá el primero.</div>
-        :<div style={{display:"grid",gap:10}}>
-          {[...eventos].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(e=>(
+      {/* Tabs */}
+      <div style={{display:"flex",gap:4,background:"rgba(120,120,128,0.1)",borderRadius:"var(--r-lg)",padding:4,marginBottom:"1.25rem"}}>
+        <TabBtn id="presupuestos" label="Presupuestos" count={presupuestos.filter(p=>p.estado==="Pendiente").length}/>
+        <TabBtn id="confirmados"  label="Confirmados"  count={confirmados.length}/>
+        <TabBtn id="nuevo"        label="+ Evento"     count={0}/>
+        <TabBtn id="realizados"   label="Historial"    count={realizados.length}/>
+      </div>
+
+      {/* ── TAB: PRESUPUESTOS ── */}
+      {tab==="presupuestos"&&(
+        <div>
+          {presupuestos.length===0
+            ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)"}}>
+              Sin presupuestos. Usá el asistente IA para generar uno.
+            </div>
+            :<div style={{display:"grid",gap:10}}>
+              {presupuestos.map(p=>(
+                <div key={p.id} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:14,color:"var(--text-primary)",marginBottom:2}}>{p.cliente}</div>
+                      <div style={{fontSize:11,color:"var(--text-secondary)"}}>{p.tipoEvento} · {p.fecha} · {p.salon}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                      <span style={{fontSize:11,padding:"2px 9px",borderRadius:"var(--r-pill)",fontWeight:600,background:stBg[p.estado]||"rgba(120,120,128,0.1)",color:stColor[p.estado]||"var(--text-secondary)"}}>{p.estado}</span>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:13,fontWeight:600,color:"var(--text-success)"}}>USD {p.precio}</div>
+                    <div style={{display:"flex",gap:6}}>
+                      {p.pdfData&&<button onClick={()=>{
+                        const link=document.createElement("a");link.href=p.pdfData;
+                        link.download=`Presupuesto_${p.cliente}_${p.fecha}.pdf`;link.click();
+                      }} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer"}}>⬇ PDF</button>}
+                      {p.estado==="Pendiente"&&<>
+                        <button onClick={()=>confirmarPresupuesto(p)} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",cursor:"pointer",fontWeight:600}}>✓ Confirmar</button>
+                        <button onClick={()=>rechazarPresupuesto(p.id)} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-danger)",background:"var(--bg-tint-red)",color:"var(--text-danger)",cursor:"pointer"}}>✕ Rechazar</button>
+                      </>}
+                      <button onClick={()=>eliminarPresupuesto(p.id)} style={{fontSize:11,padding:"5px 8px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>🗑</button>
+                    </div>
+                  </div>
+                  {p.invitados&&<div style={{fontSize:10,color:"var(--text-secondary)",marginTop:4}}>{p.invitados} · {p.conTecnica?"Con técnica":"Sin técnica"}{p.numeroDoc?" · "+p.numeroDoc:""}</div>}
+                </div>
+              ))}
+            </div>
+          }
+        </div>
+      )}
+
+      {/* ── TAB: CONFIRMADOS ── */}
+      {tab==="confirmados"&&(
+        <div style={{display:"grid",gap:10}}>
+          {/* Nuevo evento form aquí también */}
+          {confirmados.length===0&&!editId&&<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)"}}>Sin eventos confirmados.</div>}
+          {confirmados.map(e=>(
             <div key={e.id} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                 <div>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                    <span style={{fontWeight:600,fontSize:14,color:"var(--text-primary)"}}>{e.nombre}</span>
+                    <span style={{fontWeight:700,fontSize:14,color:"var(--text-primary)"}}>{e.nombre}</span>
                     <span style={{fontSize:10,fontWeight:600,padding:"2px 9px",borderRadius:"var(--r-pill)",background:stBg[e.estado]||"rgba(120,120,128,0.1)",color:stColor[e.estado]||"var(--text-secondary)"}}>{e.estado}</span>
                   </div>
-                  <div style={{fontSize:12,color:"var(--text-secondary)"}}>{e.fecha}</div>
+                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>{e.fecha}</div>
                 </div>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
                   <select value={e.estado} onChange={ev=>actualizarEstado(e.id,ev.target.value)} style={{fontSize:11,padding:"3px 6px",borderRadius:6,width:"auto"}}>
                     {["Confirmado","Señado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}
                   </select>
                   <button onClick={()=>editar(e)} style={{border:"none",background:"none",cursor:"pointer",fontSize:14,padding:"2px 4px"}}>✏️</button>
-                  <button onClick={()=>{if(window.confirm("¿Borrar este evento?"))eliminar(e.id);}} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:14,padding:"2px 4px"}}>✕</button>
+                  <button onClick={()=>{if(window.confirm("¿Eliminar?"))eliminarEvento(e.id);}} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:14}}>✕</button>
                 </div>
               </div>
               <div style={{display:"flex",gap:12,fontSize:12,flexWrap:"wrap"}}>
                 <span style={{color:"var(--text-secondary)"}}>Cobro: <strong style={{color:"var(--text-primary)"}}>{e.monedaCobro==="ARS"?"$"+fmt(e.cobro):fmtUSD(e.cobro||e.cobroUSD||0)}</strong></span>
-                <span style={{color:"var(--text-secondary)"}}>Costo: <strong style={{color:"var(--text-primary)"}}>{e.monedaCosto==="ARS"?"$"+fmt(e.costo):fmtUSD(e.costo||e.costoUSD||0)}</strong></span>
+                {e.costo>0&&<span style={{color:"var(--text-secondary)"}}>Costo: <strong>{e.monedaCosto==="ARS"?"$"+fmt(e.costo):fmtUSD(e.costo)}</strong></span>}
                 {e.sena>0&&<span style={{color:"var(--text-success)"}}>Seña: <strong>{e.monedaCobro==="ARS"?"$"+fmt(e.sena):fmtUSD(e.sena)}</strong></span>}
-                {e.saldo>0&&<span style={{color:"var(--text-warning)",fontWeight:600}}>Saldo: {fmtUSD(e.saldo)}</span>}
-                <span style={{color:(e.gananciaUSD||0)>=0?"var(--text-success)":"var(--text-danger)",fontWeight:600}}>
-                  Gan: {fmtUSD(e.gananciaUSD||0)}
-                </span>
-                {e.cobroUSD>0&&<span style={{color:"var(--text-secondary)"}}>Margen: {fmtPct(e.margen||0)}</span>}
+                {e.saldo>0&&<span style={{color:"var(--text-warning)",fontWeight:700}}>Saldo: {fmtUSD(e.saldo)}</span>}
+                <span style={{color:(e.gananciaUSD||0)>=0?"var(--text-success)":"var(--text-danger)",fontWeight:600}}>Gan: {fmtUSD(e.gananciaUSD||0)}</span>
               </div>
-              {e.notas&&<div style={{fontSize:11,color:"var(--text-secondary)",marginTop:6}}>{e.notas}</div>}
+              {e.notas&&<div style={{fontSize:11,color:"var(--text-secondary)",marginTop:6,fontStyle:"italic"}}>{e.notas}</div>}
             </div>
           ))}
         </div>
-      }
+      )}
+
+      {/* ── TAB: NUEVO EVENTO (manual) ── */}
+      {tab==="nuevo"&&(
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px 18px",boxShadow:"var(--glass-shadow-sm)"}}>
+          <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:12}}>{editId?"Editar evento":"Nuevo evento manual"}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nombre del evento</label><input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Casamiento García — Salón XYZ"/></div>
+            <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm(f=>({...f,fecha:e.target.value}))}/></div>
+            <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Estado</label><select value={form.estado} onChange={e=>setForm(f=>({...f,estado:e.target.value}))}>{["Confirmado","Señado","Realizado","Cancelado"].map(s=><option key={s}>{s}</option>)}</select></div>
+            <MonedaInput labelText="Cobro total" monedaKey="monedaCobro" montoKey="cobro" form={form} setForm={setForm}/>
+            <MonedaInput labelText="Costo total" monedaKey="monedaCosto" montoKey="costo" form={form} setForm={setForm}/>
+            <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Seña ({form.monedaCobro})</label><input type="number" value={form.sena} onChange={e=>setForm(f=>({...f,sena:e.target.value}))} placeholder="0" inputMode="decimal"/></div>
+            <div style={{display:"flex",alignItems:"flex-end"}}>
+              {showPreview&&<div style={{width:"100%",padding:"9px 11px",background:previewGanUSD>=0?"var(--bg-tint-green)":"var(--bg-tint-red)",border:"0.5px solid "+(previewGanUSD>=0?"var(--border-success)":"var(--border-danger)"),borderRadius:"var(--r-md)",fontSize:12}}>
+                <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:previewGanUSD>=0?"var(--text-success)":"var(--text-danger)",marginBottom:3}}>Ganancia estimada</div>
+                <div style={{fontWeight:700,color:previewGanUSD>=0?"var(--text-success)":"var(--text-danger)"}}>{fmtUSD(previewGanUSD)}</div>
+                <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>≈ ${fmt(previewGanUSD*tc)} ARS</div>
+              </div>}
+            </div>
+            <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Notas</label><input value={form.notas} onChange={e=>setForm(f=>({...f,notas:e.target.value}))} placeholder="Rider, detalles..."/></div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={guardarEvento} style={{fontSize:13,padding:"9px 20px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer",boxShadow:"0 4px 14px rgba(24,95,165,0.35)"}}>{editId?"Actualizar":"Guardar evento"}</button>
+            {editId&&<button onClick={()=>{setEditId(null);setForm(initForm);setTab("confirmados");}} style={{fontSize:13,padding:"9px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: HISTORIAL ── */}
+      {tab==="realizados"&&(
+        <div style={{display:"grid",gap:8}}>
+          {realizados.length===0&&<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)"}}>Sin historial aún.</div>}
+          {realizados.map(e=>(
+            <div key={e.id} style={{background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",opacity:e.estado==="Cancelado"?0.6:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <span style={{fontWeight:600,fontSize:13,color:"var(--text-primary)",marginRight:8}}>{e.nombre}</span>
+                  <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:"var(--r-pill)",background:stBg[e.estado]||"rgba(120,120,128,0.1)",color:stColor[e.estado]||"var(--text-secondary)"}}>{e.estado}</span>
+                </div>
+                <div style={{fontSize:12,fontWeight:600,color:e.gananciaUSD>=0?"var(--text-success)":"var(--text-danger)"}}>{fmtUSD(e.gananciaUSD||0)}</div>
+              </div>
+              <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:3}}>{e.fecha} · Cobro: {e.monedaCobro==="ARS"?"$"+fmt(e.cobro):fmtUSD(e.cobro)} · Costo: {e.monedaCosto==="ARS"?"$"+fmt(e.costo):fmtUSD(e.costo)}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
