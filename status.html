@@ -500,19 +500,16 @@
   <!-- Session guard -->
   <script>
     (function(){
-      var VALID_TOKENS = ["ELsys_7x9k2mQpR","ELstat_4nTwJvKs"];
-      var exp = Date.now();
-      function checkKey(key){
-        try{
-          var raw=localStorage.getItem(key); if(!raw) return false;
-          var auth=JSON.parse(raw);
-          return VALID_TOKENS.includes(auth.token) && auth.exp > exp;
-        }catch(e){return false;}
-      }
-      // Accept either the main session or the status-specific session
-      if(!checkKey("eliel_session") && !checkKey("eliel_status_session")){
-        window.location.replace("login.html");
-      }
+      var VALID_TOKEN = "ELstat_4nTwJvKs";
+      try {
+        var raw = localStorage.getItem("eliel_status_session");
+        if(!raw) { window.location.replace("login.html"); return; }
+        var auth = JSON.parse(raw);
+        if(auth.token !== VALID_TOKEN || Date.now() > auth.exp) {
+          localStorage.removeItem("eliel_status_session");
+          window.location.replace("login.html"); return;
+        }
+      } catch(e) { window.location.replace("login.html"); }
     })();
   </script>
   <div id="loading">
