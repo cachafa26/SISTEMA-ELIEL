@@ -203,14 +203,16 @@
       const val = input.value.trim();
       const target = CREDS[val];
       if(target){
+        // Clear any old session formats
+        localStorage.removeItem("eliel_session");
         // Set auth token with 24h expiry - each key only grants its own page
         const authData = JSON.stringify({token: TOKENS[target], exp: Date.now() + 86400000});
         if(target === "index.html"){
           localStorage.setItem("eliel_sys_session", authData);
-          localStorage.removeItem("eliel_status_session"); // clear other
+          localStorage.removeItem("eliel_status_session");
         } else {
           localStorage.setItem("eliel_status_session", authData);
-          localStorage.removeItem("eliel_sys_session"); // clear other
+          localStorage.removeItem("eliel_sys_session");
         }
         showSuccess(target);
       } else {
