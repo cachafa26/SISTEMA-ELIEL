@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.4.2";
+const APP_VERSION = "v2.5.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2168,7 +2168,15 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         const confirmMsg = {role:"assistant",content:"✓ Ejecutando..."};
         setMsgs(m=>[...m,userMsg,confirmMsg]);
         setInput("");
+        const prevAction = pendingAction;
         await executeAction(pendingAction);
+        // Si executeAction cambió pendingAction (ej: _PAGO_PEDIDO_), no sobreescribir
+        if(prevAction.action==="CARGAR_PEDIDO"){
+          // El mensaje de pago ya fue seteado dentro de executeAction
+          setLoading(false);
+          if(inputRef.current) inputRef.current.focus();
+          return;
+        }
         setMsgs(m=>[...m.slice(0,-1),{role:"assistant",content:"✅ ¡Listo! Los datos fueron guardados correctamente."}]);
         return;
       } else if(lower.includes("no")||lower.includes("cancel")){
