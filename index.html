@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.5.0";
+const APP_VERSION = "v2.5.1";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1230,7 +1230,8 @@ function bhSueldoMes(despachosMes, mes){
   const total=despachosMes.reduce((a,d)=>a+d.total,0);
   const base=160000;
   const esAguinaldo=mes===5||mes===11;
-  return{total,base,aguinaldo:esAguinaldo,sueldo:(total+base)*(esAguinaldo?1.5:1)};
+  const aguinaldoMonto=esAguinaldo?base*0.5:0; // aguinaldo = 50% de la BASE solamente
+  return{total,base,aguinaldo:esAguinaldo,aguinaldoMonto,sueldo:total+base+aguinaldoMonto};
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -1365,7 +1366,17 @@ function App(){
   const clienteIdx=buildClienteIndex(data.ventas,data.despachos,data.clientes);
 
   // Calculos BH globales
-  const bhTotalAnio=(data.bh?.despachos||[]).reduce((a,d)=>a+d.total,0);
+  // BH total devengado = suma de sueldos por mes (despachos + base + aguinaldo si aplica)
+  const bhTotalAnio=(()=>{
+    const despachos=data.bh?.despachos||[];
+    const meses=[...new Set(despachos.map(d=>d.mes))];
+    // Include current month even if no despachos
+    if(!meses.includes(new Date().getMonth())) meses.push(new Date().getMonth());
+    return meses.reduce((a,mes)=>{
+      const dm=despachos.filter(d=>d.mes===mes);
+      return a+bhSueldoMes(dm,mes).sueldo;
+    },0);
+  })();
   const mesActual=new Date().getMonth();
   const bhDespachosMes=(data.bh?.despachos||[]).filter(d=>d.mes===mesActual);
   const bhSueldo=bhSueldoMes(bhDespachosMes,mesActual).sueldo;
@@ -2749,8 +2760,12 @@ function BHTradeView({data,save,showToast,blue}){
   };
   const eliminar=id=>save({...data,bh:{...data.bh,despachos:despachos.filter(d=>d.id!==id)}});
 
-  const bhTotalAnio=despachos.reduce((a,d)=>a+d.total,0);
+  // Total devengado = sum of sueldo por mes (despachos + base $160k + aguinaldo si aplica)
   const mesesConData=[...new Set(despachos.map(d=>d.mes))];
+  const bhTotalAnio=(()=>{
+    const meses=[...new Set([...mesesConData,new Date().getMonth()])];
+    return meses.reduce((a,mes)=>a+bhSueldoMes(despachos.filter(d=>d.mes===mes),mes).sueldo,0);
+  })();
   const mesesMostrar=[...new Set([...mesesConData,new Date().getMonth()])].sort((a,b)=>a-b);
   const despMes=[...despachos.filter(d=>d.mes===mesActivo)].sort((a,b)=>b.id.localeCompare(a.id));
   const s=bhSueldoMes(despMes,mesActivo);
@@ -2765,10 +2780,10 @@ function BHTradeView({data,save,showToast,blue}){
       {/* Métricas anuales */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1.5rem"}}>
         {[
-          {l:"Total acumulado 2026",v:"$"+fmt(bhTotalAnio),sub:despachos.length+" despachos"},
-          {l:"Cobrado 2026",v:"$"+fmt(cobradoTotal),sub:"de lo devengado"},
-          {l:"A cobrar "+MESES[mesActivo]+(s.aguinaldo?" ✦":""),v:"$"+fmt(s.sueldo),sub:s.aguinaldo?"Con aguinaldo ×1.5":"Total + $"+fmt(s.base),green:true},
-          {l:"Despachos "+MESES[mesActivo],v:despMes.length,sub:"$"+fmt(s.total)+" en despachos"},
+          {l:"Total devengado 2026",v:"$"+fmt(bhTotalAnio),sub:despachos.length+" despachos"},
+          {l:"Cobrado 2026",v:"$"+fmt(cobradoTotal),sub:cobros.length+" pagos registrados"},
+          {l:"Pendiente de cobro",v:"$"+fmt(Math.max(0,bhTotalAnio-cobradoTotal)),sub:"Total − cobrado",green:true},
+          {l:"Devengado "+MESES[mesActivo]+(s.aguinaldo?" ✦":""),v:"$"+fmt(s.sueldo),sub:s.aguinaldo?"Incl. aguinaldo $"+fmt(s.aguinaldoMonto||0):"Despachos + base $160k"},
         ].map(x=>(
           <div key={x.l} style={{background:x.green?"var(--color-background-success)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
             <div style={{fontSize:11,color:x.green?"var(--color-text-success)":"var(--color-text-secondary)",marginBottom:4}}>{x.l}</div>
