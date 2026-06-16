@@ -1875,12 +1875,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         if(pres){
           // Ask for cost before confirming — store pres in pending
           setPendingAction({action:"_EJECUTAR_CONFIRMACION_PRES",data:{pres,costoMoneda:"ARS"}});
-          setMsgs(m=>[...m,{role:"assistant",content:
-            "✓ Encontré el presupuesto de "+pres.cliente+" — "+pres.tipoEvento+" ("+pres.salon+"), "+pres.fecha+".
-
-Cobro: USD "+pres.precio+"
-
-¿Cuál fue tu costo para este evento? Indicá el monto y la moneda (ej: $150.000 ARS o USD 800). Si no lo sabés todavía escribí 0."}]);
+          setMsgs(m=>[...m,{role:"assistant",content:"✓ Encontré el presupuesto de "+pres.cliente+" — "+pres.tipoEvento+" ("+pres.salon+"), "+pres.fecha+".\n\nCobro: USD "+pres.precio+"\n\n¿Cuál fue tu costo para este evento? Indicá el monto y la moneda (ej: $150.000 ARS o USD 800). Si no sabés todavía, escribí 0."}]);
           setLoading(false); return;
         } else {
           setMsgs(m=>[...m,{role:"assistant",content:"No encontré el presupuesto. Podés confirmarlo tocando el botón ✓ Confirmar en la sección Presupuestos."}]);
