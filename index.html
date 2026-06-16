@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.5.3";
+const APP_VERSION = "v2.5.4";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4437,28 +4437,98 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
         <button onClick={registrar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>Registrar</button>
       </div>
       {ventasCont.length>0&&(
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Fecha","Artículo","Cant","Cliente","$","Cobrado","Estado",""].map(h=><th key={h} style={{padding:"5px 7px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
-            <tbody>{[...ventasCont].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).map(v=>{
-              const cobV=pagadoVenta(v,data.pagos);const saldo=Number(v.total||0)-cobV;
-              return(<tr key={v.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                <td style={{padding:"5px 7px",color:"var(--color-text-secondary)",fontSize:10}}>{v.fecha}</td>
-                <td style={{padding:"5px 7px"}}>{v.articulo}</td><td style={{padding:"5px 7px"}}>{v.cantidad}</td>
-                <td style={{padding:"5px 7px"}}>{v.cliente}</td>
-                <td style={{padding:"5px 7px",color:"var(--color-text-secondary)"}}>${fmt(v.total)}</td>
-                <td style={{padding:"5px 7px",color:saldo>0?"var(--color-text-warning)":saldo<0?"var(--color-text-info)":"var(--color-text-success)",fontSize:10,whiteSpace:"nowrap"}}>{saldo>0?"Debe $"+fmt(saldo):saldo<0?"Favor $"+fmt(Math.abs(saldo)):"✓"}</td>
-                <td style={{padding:"5px 7px"}}><select value={v.estado||"Retirado"} onChange={e=>actualizarEstado(v.id,e.target.value)} style={{fontSize:10,padding:"2px 4px",borderRadius:4}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select></td>
-                <td style={{padding:"5px 7px"}}><button onClick={()=>eliminar(v.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:12}}>✕</button></td>
-              </tr>);
-            })}</tbody>
-          </table>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {(()=>{
+            // Group by pedidoId, sort newest first
+            const PEND=["A despachar","A retirar Ezeiza","A retirar Once"];
+            const pMap=new Map();
+            ventasCont.forEach(v=>{
+              const pid=v.pedidoId||v.id;
+              if(!pMap.has(pid)) pMap.set(pid,{pid,fecha:v.fecha,cliente:v.cliente,lineas:[],totalARS:0,estado:v.estado});
+              const p=pMap.get(pid);
+              p.lineas.push(v);
+              p.totalARS+=Number(v.total||0);
+              if(v.fecha>p.fecha){p.fecha=v.fecha;p.estado=v.estado;}
+            });
+            const sorted=[...pMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+            const pend=sorted.filter(p=>PEND.includes(p.estado));
+            const done=sorted.filter(p=>!PEND.includes(p.estado));
+            const all=[...pend,...done];
+            return all.map((p,idx)=>{
+              const isPend=PEND.includes(p.estado);
+              const showSep=idx===pend.length&&pend.length>0&&done.length>0;
+              const glowColor=p.estado==="A despachar"?"#F47920":p.estado==="A retirar Ezeiza"?"#5BAD41":"#2E86C1";
+              return(<React.Fragment key={p.pid}>
+                {showSep&&(
+                  <div style={{display:"flex",alignItems:"center",gap:8,margin:"4px 0"}}>
+                    <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+                    <span style={{fontSize:10,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>Despachados / Retirados</span>
+                    <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+                  </div>
+                )}
+                <div style={{
+                  background:"var(--bg-card)",backdropFilter:"blur(16px)",
+                  borderRadius:"var(--r-lg)",padding:"12px 14px",
+                  border: isPend?"1px solid "+glowColor+"88":"0.5px solid var(--glass-border)",
+                  boxShadow: isPend?"0 0 12px "+glowColor+"44,inset 0 0 0 0.5px "+glowColor+"33":"none",
+                  opacity:isPend?1:0.75,
+                  transition:"all .2s",
+                }}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
+                        <span style={{fontSize:13,fontWeight:600,color:"var(--text-primary)"}}>{p.cliente}</span>
+                        <span style={{fontSize:10,color:"var(--text-secondary)"}}>{p.fecha}</span>
+                        {isPend&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:10,fontWeight:600,
+                          background:glowColor+"22",color:glowColor,border:"0.5px solid "+glowColor+"66"}}>
+                          {p.estado}
+                        </span>}
+                      </div>
+                      {p.lineas.length===1
+                        ?<div style={{fontSize:11,color:"var(--text-secondary)"}}>{p.lineas[0].articulo} × {p.lineas[0].cantidad}</div>
+                        :<details style={{fontSize:11}}>
+                          <summary style={{cursor:"pointer",color:"var(--text-secondary)",listStyle:"none"}}>
+                            ▶ {p.lineas.length} artículos
+                          </summary>
+                          <div style={{marginTop:4,display:"flex",flexDirection:"column",gap:2,paddingLeft:8}}>
+                            {p.lineas.map(v=>(
+                              <div key={v.id} style={{display:"flex",gap:6,alignItems:"center"}}>
+                                <span style={{color:"var(--text-secondary)"}}>{v.articulo}</span>
+                                <span style={{color:"var(--text-primary)",fontWeight:500}}>×{v.cantidad}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      }
+                      <div style={{fontSize:12,fontWeight:600,color:"var(--text-success)",marginTop:4}}>${p.totalARS.toLocaleString("es-AR")}</div>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:4,alignItems:"flex-end",flexShrink:0}}>
+                      <select
+                        value={p.estado}
+                        onChange={e=>{
+                          const nuevoEstado=e.target.value;
+                          p.lineas.forEach(v=>actualizarEstado(v.id,nuevoEstado));
+                        }}
+                        style={{fontSize:11,padding:"3px 6px",borderRadius:6,
+                          border:"0.5px solid var(--glass-border)",
+                          background:"var(--bg-card)",color:"var(--text-primary)"}}>
+                        {ESTADOS.map(s=><option key={s}>{s}</option>)}
+                      </select>
+                      <button onClick={()=>{if(window.confirm("¿Eliminar pedido?"))p.lineas.forEach(v=>eliminar(v.id));}}
+                        style={{fontSize:10,padding:"2px 7px",borderRadius:6,
+                          border:"0.5px solid var(--border-danger)",
+                          background:"var(--bg-tint-red)",color:"var(--text-danger)",cursor:"pointer"}}>✕</button>
+                    </div>
+                  </div>
+                </div>
+              </React.Fragment>);
+            });
+          })()}
         </div>
       )}
     </div>
   );
 }
-
 function StockView({stockUni,data}){
   const stockPapel={}, stockTinta={};
   let totalPapel=0, totalTinta=0;
@@ -5087,7 +5157,8 @@ function DespachosView({data,save,showToast}){
     // Parsea "30GR x5, TINTA NEGRO x3" -> [{nombre,cantidad,esTinta}]
     if(!d.articulos)return[{...d,bultoLabel:"",bultoNum:1,bultoTotal:1}];
     const items=d.articulos.split(",").map(s=>{
-      const m=s.trim().match(/^(.+?)\s*[xX×]\s*(\d+)$/);
+      // Greedy: match nombre up to last " x N" at end
+      const m=s.trim().match(/^(.+)\s+[xX×]\s*(\d+)$/);
       if(!m)return null;
       const nombre=m[1].trim();const cantidad=parseInt(m[2]);
       const esTinta=nombre.includes("TINTA");
