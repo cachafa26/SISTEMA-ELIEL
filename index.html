@@ -1740,9 +1740,7 @@ ${deudoresStr||'Ninguno'}
 EVENTOS DJ:
 ${eventos||'Sin eventos'}
 
-RETIROS PENDIENTES:
-- Mi 30% SC: pendiente $\${Math.round((pendienteRetiro||0)*(tc||1450)).toLocaleString('es-AR')} ARS
-- BH Trade: pendiente $\${Math.round(bhPendienteCobro||0).toLocaleString('es-AR')} ARS
+RETIROS PENDIENTES:\n- Mi 30% SC: pendiente $${_sc30Pesos.toLocaleString('es-AR')} ARS\n- BH Trade: pendiente $${_bhPendPesos.toLocaleString('es-AR')} ARS\n- TOTAL a retirar: $${_totalRetiro.toLocaleString('es-AR')} ARS
 - TOTAL a retirar: $\${Math.round(((pendienteRetiro||0)*(tc||1450))+(bhPendienteCobro||0)).toLocaleString('es-AR')} ARS
 
 CLIENTES REGISTRADOS (primeros 30):
@@ -2064,7 +2062,13 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           descuentoPagoTotal: "10%",
           numeroDoc: numDoc,
         };
-        const pdfHtml = window.generarPresupuestoHTML(_pdfData2, blue);
+        let pdfHtml = "";
+        try {
+          pdfHtml = window.generarPresupuestoHTML(_pdfData2, blue);
+        } catch(pdfErr) {
+          console.error("PDF generation error:", pdfErr);
+          // Don't fail the whole action just because PDF failed
+        }
         nuevoPres.pdfHtml = pdfHtml||"";
         if(pdfHtml && pdfHtml.length > 100){
           const _pw = window.open("","_blank");
@@ -2117,7 +2121,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
             method:"POST",
             headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
             body:JSON.stringify({
-              model:"claude-sonnet-4-6",max_tokens:4000,
+              model:"claude-sonnet-4-6",max_tokens:2000,
               system:`Sos un generador de HTML para confirmaciones de contratación de ELIEL MIZRAHI DJ. Diseño premium: fondo #080810, dorado #C9A84C, texto blanco. HTML auto-contenido imprimible. IMPORTANTE: devolvé ÚNICAMENTE el HTML puro comenzando con <!DOCTYPE html>, sin backticks, sin markdown, sin explicaciones.`,
               messages:[{role:"user",content:`Generá la confirmación ${numDoc}: ${JSON.stringify({...d,totalFinal,numDoc})}. Incluí servicios contratados (si conTecnica, listar servicios de ${d.paquete}), opcionales elegidos: ${JSON.stringify(d.opcionalesElegidos||[])}, forma de pago: ${d.formaPago==="total"?"Pago total con "+d.descuento+"% descuento = USD "+totalFinal:"2 cuotas de USD "+(totalFinal/2)+" c/u"}, footer: @ElielMizrahi / 1153488044`}]
             })
@@ -5046,7 +5050,7 @@ function DespachosView({data,save,showToast}){
       "<div class='row'><div class='t'>Localidad</div><div class='v'>"+(b.localidad||"—")+"</div></div>"+
       "<div class='row'><div class='t'>Provincia</div><div class='v'>"+(b.provincia||"—")+"</div></div>"+
       "<div class='row'><div class='t'>Expreso</div><div class='v'>"+(b.expreso||"—")+"</div></div>"+
-      (b.bultoLabel?"<div class='bulto'><span>"+b.bultoLabel+"</span><span class='bnum'>"+num+"/"+total+"</span></div>":"")+
+      ((b.bultoLabel||b.articulos)?"<div class='bulto'><span>"+(b.bultoLabel||b.articulos||"")+"</span>"+(total>1?"<span class='bnum'>"+num+"/"+total+"</span>":"")+"</div>":"")+
       "</div>";
   };
   const abrirPDF=(etiquetas,titulo)=>{
