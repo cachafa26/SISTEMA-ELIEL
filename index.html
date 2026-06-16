@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.5.5";
+const APP_VERSION = "v2.5.6";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4621,7 +4621,11 @@ function VentasView({data,save,showToast}){
     // Use most recent state
     if(v.fecha>p.fecha)p.fecha=v.fecha;
   }
-  const pedidos=[...pedidosMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const PEND_EST=["A despachar","A retirar Ezeiza","A retirar Once"];
+  const _pedSorted=[...pedidosMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const _pedPend=_pedSorted.filter(p=>PEND_EST.includes(p.estado));
+  const _pedDone=_pedSorted.filter(p=>!PEND_EST.includes(p.estado));
+  const pedidos=[..._pedPend,..._pedDone];
   const stBg={"Retirado":"var(--bg-tint-green)","A despachar":"var(--bg-tint-blue)","Despachado":"var(--bg-tint-blue)","A retirar Ezeiza":"var(--bg-tint-amber)","A retirar Once":"var(--bg-tint-amber)"};
   const stCol={"Retirado":"var(--text-success)","A despachar":"var(--text-info)","Despachado":"var(--text-info)","A retirar Ezeiza":"var(--text-warning)","A retirar Once":"var(--text-warning)"};
 
@@ -4658,70 +4662,159 @@ function VentasView({data,save,showToast}){
       {/* PEDIDOS VIEW */}
       {vistaMode==="pedidos"&&(
         pedidos.length===0?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin pedidos.</div>:
-        <div style={{display:"grid",gap:8}}>
-          {pedidos.map(p=>(
-            <div key={p.id} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {pedidos.map((p,pidx)=>{
+            const isPend=PEND_EST.includes(p.estado);
+            const glowColor=p.estado==="A despachar"?"#F47920":p.estado==="A retirar Ezeiza"?"#5BAD41":"#2E86C1";
+            const showSep=pidx===_pedPend.length&&_pedPend.length>0&&_pedDone.length>0;
+            return(<React.Fragment key={p.id}>
+              {showSep&&(
+                <div style={{display:"flex",alignItems:"center",gap:8,margin:"4px 0"}}>
+                  <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+                  <span style={{fontSize:10,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>Despachados / Retirados</span>
+                  <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+                </div>
+              )}
+              <div style={{
+                background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+                border:isPend?"1px solid "+glowColor+"88":"0.5px solid var(--glass-border)",
+                boxShadow:isPend?"0 0 12px "+glowColor+"44":"var(--glass-shadow-sm)",
+                borderRadius:"var(--r-lg)",padding:"14px 16px",
+                opacity:isPend?1:0.75,
+              }}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                 <div>
-                  <div style={{fontWeight:600,fontSize:14,color:"var(--text-primary)",marginBottom:2}}>{p.cliente}</div>
-                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>{p.fecha}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <div style={{fontWeight:600,fontSize:14,color:"var(--text-primary)"}}>{p.cliente}</div>
+                    {isPend&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:10,fontWeight:600,
+                      background:glowColor+"22",color:glowColor,border:"0.5px solid "+glowColor+"66"}}>
+                      {p.estado}
+                    </span>}
+                  </div>
+                  <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{p.fecha}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontWeight:700,fontSize:14,color:"var(--text-primary)"}}>${fmt(p.totalARS)}</div>
+                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>{fmtUSD(p.totalUSD)}</div>
+                </div>
+              </div>              </div>
+            </React.Fragment>);
+          })}
+        </div>
+      )Toast}){
+  const [desde,setDesde]=useState("");
+  const [hasta,setHasta]=useState("");
+  const [vistaMode,setVistaMode]=useState("pedidos"); // "pedidos" | "lineas"
+  const [filtroArt,setFiltroArt]=useState("");
+  const [filtroCli,setFiltroCli]=useState("");
+
+  const ARTS_UNICOS=[...new Set((data.ventas||[]).map(v=>v.articulo))].filter(Boolean).sort();
+  const CLIENTES_UNICOS=[...new Set((data.ventas||[]).map(v=>v.cliente))].filter(Boolean).sort();
+
+  const ventasFilt=[...(data.ventas||[])]
+    .filter(v=>{
+      if(desde&&v.fecha<desde)return false;
+      if(hasta&&v.fecha>hasta)return false;
+      if(filtroArt&&v.articulo!==filtroArt)return false;
+      if(filtroCli&&v.cliente!==filtroCli)return false;
+      return true;
+    })
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+  const totalUSD=ventasFilt.reduce((a,v)=>a+Number(v.usd||0),0);
+  const eliminar=id=>{save({...data,ventas:data.ventas.filter(v=>v.id!==id)});showToast("Eliminada");};
+  const actualizarEstado=(id,estado)=>save({...data,ventas:data.ventas.map(v=>v.id===id?{...v,estado}:v)});
+  const hayFiltros=desde||hasta||filtroArt||filtroCli;
+
+  // Group by pedidoId for "pedidos" view
+  const pedidosMap=new Map();
+  for(const v of ventasFilt){
+    const pid=v.pedidoId||v.id;
+    if(!pedidosMap.has(pid))pedidosMap.set(pid,{id:pid,fecha:v.fecha,cliente:v.cliente,lineas:[],totalARS:0,totalUSD:0,estado:v.estado});
+    const p=pedidosMap.get(pid);
+    p.lineas.push(v);
+    p.totalARS+=Number(v.total||0);
+    p.totalUSD+=Number(v.usd||0);
+    // Use most recent state
+    if(v.fecha>p.fecha)p.fecha=v.fecha;
+  }
+  const PEND_EST=["A despachar","A retirar Ezeiza","A retirar Once"];
+  const _pedSorted=[...pedidosMap.values()].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const _pedPend=_pedSorted.filter(p=>PEND_EST.includes(p.estado));
+  const _pedDone=_pedSorted.filter(p=>!PEND_EST.includes(p.estado));
+  const pedidos=[..._pedPend,..._pedDone];
+  const stBg={"Retirado":"var(--bg-tint-green)","A despachar":"var(--bg-tint-blue)","Despachado":"var(--bg-tint-blue)","A retirar Ezeiza":"var(--bg-tint-amber)","A retirar Once":"var(--bg-tint-amber)"};
+  const stCol={"Retirado":"var(--text-success)","A despachar":"var(--text-info)","Despachado":"var(--text-info)","A retirar Ezeiza":"var(--text-warning)","A retirar Once":"var(--text-warning)"};
+
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+        <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:0,color:"var(--text-primary)"}}>Ventas</h2>
+        <span style={{fontSize:11,color:"var(--text-secondary)"}}>{fmtUSD(totalUSD)}</span>
+      </div>
+
+      {/* Vista toggle */}
+      <div style={{display:"flex",gap:4,marginBottom:"1rem",background:"rgba(120,120,128,0.1)",borderRadius:"var(--r-pill)",padding:3,width:"fit-content"}}>
+        {[["pedidos","Por pedido"],["lineas","Por línea"]].map(([mode,label])=>(
+          <button key={mode} onClick={()=>setVistaMode(mode)} style={{padding:"5px 16px",borderRadius:"var(--r-pill)",border:"none",cursor:"pointer",fontSize:12,fontWeight:vistaMode===mode?600:400,background:vistaMode===mode?"var(--bg-card)":"transparent",color:vistaMode===mode?"var(--text-primary)":"var(--text-secondary)",boxShadow:vistaMode===mode?"var(--glass-shadow-sm)":"none",transition:"all .15s"}}>{label}</button>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",marginBottom:"1rem",boxShadow:"var(--glass-shadow-sm)"}}>
+        <FiltroFechas desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <div>
+            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Artículo</label>
+            <select value={filtroArt} onChange={e=>setFiltroArt(e.target.value)}><option value="">Todos</option>{ARTS_UNICOS.map(a=><option key={a} value={a}>{a}</option>)}</select>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Cliente</label>
+            <select value={filtroCli} onChange={e=>setFiltroCli(e.target.value)}><option value="">Todos</option>{CLIENTES_UNICOS.map(c=><option key={c} value={c}>{c}</option>)}</select>
+          </div>
+        </div>
+        {hayFiltros&&<button onClick={()=>{setDesde("");setHasta("");setFiltroArt("");setFiltroCli("");}} style={{marginTop:8,fontSize:11,padding:"4px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>✕ Limpiar filtros</button>}
+      </div>
+
+      {/* PEDIDOS VIEW */}
+      {vistaMode==="pedidos"&&(
+        pedidos.length===0?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin pedidos.</div>:
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {pedidos.map((p,pidx)=>{
+            const isPend=PEND_EST.includes(p.estado);
+            const glowColor=p.estado==="A despachar"?"#F47920":p.estado==="A retirar Ezeiza"?"#5BAD41":"#2E86C1";
+            const showSep=pidx===_pedPend.length&&_pedPend.length>0&&_pedDone.length>0;
+            return(<React.Fragment key={p.id}>
+              {showSep&&(
+                <div style={{display:"flex",alignItems:"center",gap:8,margin:"4px 0"}}>
+                  <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+                  <span style={{fontSize:10,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>Despachados / Retirados</span>
+                  <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+                </div>
+              )}
+              <div style={{
+                background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+                border:isPend?"1px solid "+glowColor+"88":"0.5px solid var(--glass-border)",
+                boxShadow:isPend?"0 0 12px "+glowColor+"44":"var(--glass-shadow-sm)",
+                borderRadius:"var(--r-lg)",padding:"14px 16px",
+                opacity:isPend?1:0.75,
+              }}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <div style={{fontWeight:600,fontSize:14,color:"var(--text-primary)"}}>{p.cliente}</div>
+                    {isPend&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:10,fontWeight:600,
+                      background:glowColor+"22",color:glowColor,border:"0.5px solid "+glowColor+"66"}}>
+                      {p.estado}
+                    </span>}
+                  </div>
+                  <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{p.fecha}</div>
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontWeight:700,fontSize:14,color:"var(--text-primary)"}}>${fmt(p.totalARS)}</div>
                   <div style={{fontSize:11,color:"var(--text-secondary)"}}>{fmtUSD(p.totalUSD)}</div>
                 </div>
               </div>
-              {/* Lines */}
-              <div style={{borderTop:"0.5px solid var(--glass-border)",paddingTop:8}}>
-                {p.lineas.map((l,i)=>(
-                  <div key={l.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",fontSize:12}}>
-                    <div style={{display:"flex",gap:8,alignItems:"center",flex:1}}>
-                      <span style={{color:"var(--text-primary)",fontWeight:500}}>{l.articulo}</span>
-                      <span style={{color:"var(--text-secondary)"}}>×{l.cantidad}</span>
-                      <span style={{fontSize:10,padding:"1px 6px",borderRadius:"var(--r-pill)",background:stBg[l.estado]||"rgba(120,120,128,0.1)",color:stCol[l.estado]||"var(--text-secondary)"}}>{l.estado||"—"}</span>
-                    </div>
-                    <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                      <span style={{color:"var(--text-secondary)"}}>${fmt(l.total)}</span>
-                      <select value={l.estado||"Retirado"} onChange={e=>actualizarEstado(l.id,e.target.value)} style={{fontSize:10,padding:"2px 4px",borderRadius:4,width:"auto"}}>
-                        {ESTADOS.map(s=><option key={s}>{s}</option>)}
-                      </select>
-                      <button onClick={()=>eliminar(l.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:12,padding:"0 2px"}}>✕</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* LÍNEAS VIEW */}
-      {vistaMode==="lineas"&&(
-        ventasFilt.length===0?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin ventas.</div>:
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",overflow:"hidden",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{overflowX:"auto"}}>
-            <table>
-              <thead><tr>{["Fecha","Cont","Artículo","Cant","Cliente","USD","Estado",""].map(h=><th key={h}>{h}</th>)}</tr></thead>
-              <tbody>{ventasFilt.map(v=>{
-                const cont=data.contenedores.find(c=>c.id===v.contId);
-                return(<tr key={v.id}>
-                  <td style={{fontSize:11,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{v.fecha}</td>
-                  <td style={{fontSize:10,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{cont?.nombre?.split(" ")[0]||"—"}</td>
-                  <td style={{fontWeight:500}}>{v.articulo}</td>
-                  <td style={{color:"var(--text-secondary)"}}>{v.cantidad}</td>
-                  <td>{v.cliente}</td>
-                  <td style={{color:"var(--text-secondary)"}}>{fmtUSD(v.usd)}</td>
-                  <td><select value={v.estado||"Retirado"} onChange={e=>actualizarEstado(v.id,e.target.value)} style={{fontSize:10,padding:"2px 4px",borderRadius:4,width:"auto"}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select></td>
-                  <td><button onClick={()=>eliminar(v.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:12}}>✕</button></td>
-                </tr>);
-              })}</tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function CuentasView({data,save,showToast}){
   const [modal,setModal]=useState(null);
