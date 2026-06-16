@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.3.1 · 2026-06-16 -->
+  <!-- v2.3.2 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.3.1</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.3.2</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -948,8 +948,19 @@ function generarPresupuestoHTML(d, blue){
   const fechaParts=d.fecha?d.fecha.match(/(\d{4})/):null;
   const yearDoc=fechaParts?fechaParts[1]:hoy.getFullYear();
   const numDoc=d.numeroDoc||('#EMD-'+yearDoc+'-'+(180+Math.floor(Math.random()*170)));
-  const servicios=d.servicios||[];
-  const splitIdx=d.seccionTecnicaDesde??null;
+  // Support both pre-built servicios array OR conTecnica+paquete
+  const conTec=d.conTecnica||false;
+  const servicios=d.servicios||(conTec
+    ? obtenerServiciosPaquete(d.paquete||"basica_inter")
+    : [
+        ["Realización de timing","Planificación y armado del cronograma del evento"],
+        ["Servicio de DJ","Musicalización completa y dirección artística"],
+        ["Coordinación general","Conducción integral del flujo del evento"],
+        ["Comunicación por handies UHF","Canal interno exclusivo para el equipo de trabajo"],
+        ["Reunión técnica previa","Encuentro de planificación y alineación de detalles"],
+      ]);
+  const splitIdx=conTec?(d.seccionTecnicaDesde??5):(d.seccionTecnicaDesde??null);
+  const notaPrecioFinal=d.notaPrecio||(conTec?null:"* Sin técnica incluida");
   let svcsHTML='';
   servicios.forEach((svc,i)=>{
     if(splitIdx!==null&&i===splitIdx) svcsHTML+=`<tr><td colspan="2"><div class="sub-eyebrow">EQUIPAMIENTO TÉCNICO</div></td></tr>`;
@@ -966,7 +977,7 @@ function generarPresupuestoHTML(d, blue){
     });
   }
   const descHTML=d.descuentoPagoTotal?`<div class="pago-opt p2"><div class="pago-tag">Opción 2 · Descuento ${d.descuentoPagoTotal}</div><div class="pago-title">Pago total anticipado</div><div class="pago-body">Abono del total antes del ${fmtD(venc)}. Incluye un ${d.descuentoPagoTotal} de descuento sobre el precio total.</div></div>`:'';
-  const notaHTML=d.notaPrecio?`<div class="p-nota">${d.notaPrecio}</div>`:'';
+  const notaHTML=notaPrecioFinal?`<div class="p-nota">${notaPrecioFinal}</div>`:'';
   return PRESUPUESTO_TEMPLATE
     .replace('{{FECHA_EMISION}}',fmtD(hoy))
     .replace(/{{FECHA_VENCIMIENTO}}/g,fmtD(venc))
@@ -1030,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.3.1";
+const APP_VERSION = "v2.3.2";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1984,23 +1995,12 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           pdfData:null, // will be set after generation
         };
         // Generate PDF using globally exposed function
-        const _conTec2 = d.conTecnica||false;
-        const _svcs2 = _conTec2
-          ? window.obtenerServiciosPaquete(d.paquete||"basica_inter")
-          : [
-              ["Realización de timing","Planificación y armado del cronograma del evento"],
-              ["Servicio de DJ","Musicalización completa y dirección artística"],
-              ["Coordinación general","Conducción integral del flujo del evento"],
-              ["Comunicación por handies UHF","Canal interno exclusivo para el equipo de trabajo"],
-              ["Reunión técnica previa","Encuentro de planificación y alineación de detalles"],
-            ];
         const _pdfData2 = {
           cliente: d.cliente, tipoEvento: d.tipoEvento, fecha: d.fecha,
           salon: d.salon, invitados: d.invitados||null,
-          servicios: _svcs2,
-          seccionTecnicaDesde: _conTec2?5:null,
+          conTecnica: d.conTecnica||false,
+          paquete: d.paquete||"basica_inter",
           precio: d.precio_str||String(d.precio),
-          notaPrecio: _conTec2?null:"* Sin técnica incluida",
           opcionales: d.opcionales||[],
           descuentoPagoTotal: "10%",
           numeroDoc: numDoc,
