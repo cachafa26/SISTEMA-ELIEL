@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2026-06-15-003 -->
+  <!-- v1.1.0 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v003</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v1.1.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -649,6 +649,9 @@
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
+const APP_VERSION = "v1.1.0";
+const APP_BUILD   = "2026-06-16";
+
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
 const ESTADOS = ["A despachar","Despachado","A retirar Ezeiza","A retirar Once","Retirado"];
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -1064,7 +1067,7 @@ function App(){
             <div style={{fontSize:13,fontWeight:700,letterSpacing:"-.01em",lineHeight:1.1,
               background:"linear-gradient(135deg,#F47920,#5BAD41,#2E86C1)",
               WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>Sistema</div>
-            <div style={{fontSize:9,fontWeight:600,color:"var(--text-secondary)",letterSpacing:".06em",textTransform:"uppercase"}}>Eliel</div>
+            <div style={{fontSize:9,fontWeight:600,color:"var(--text-secondary)",letterSpacing:".06em",textTransform:"uppercase"}}>Eliel <span style={{color:"var(--text-info)",fontWeight:500,letterSpacing:0,textTransform:"none"}}>{APP_VERSION}</span></div>
           </div>
         </div>
 
@@ -1376,7 +1379,7 @@ PARA CONFIRMACION DJ necesitas del presupuesto original + opcionales elegidos + 
 
 PARA RECIBO DJ necesitas: nombre cliente, evento, monto total USD, monto abonado USD, concepto (sena/anticipo/cuota/pago total), medio de pago (default efectivo).
 
-Cuando tenes TODOS los datos, mostrar resumen breve y pedir confirmacion. Si el usuario confirma, responder con JSON de accion.
+Cuando tenes TODOS los datos, mostrar resumen breve y pedir confirmacion. Si el usuario confirma, responder con el JSON de accion DIRECTAMENTE en el texto, SIN backticks, SIN ```json, SIN formato markdown. Solo el JSON puro pegado al final del texto.
 
 Para generar presupuesto DJ responder con:
 {"action":"GENERAR_PRESUPUESTO_DJ","data":{"cliente":"nombre","tipoEvento":"Casamiento","fecha":"15 de agosto de 2026","salon":"Nombre salon","invitados":"300 personas","conTecnica":true,"paquete":"basica_inter","precio":8200,"precio_str":"8.200","recepcionistas":"opcionales","opcionales":[],"formaPago":"cuotas"}}
@@ -1412,14 +1415,19 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
         const total = d.cantidad * d.precioVenta;
         const usd = total / (d.tipoCambioUsado||tc);
         const pedidoId = Date.now().toString();
-        const venta = {
+        // Force correct estado based on entrega type
+          const entregaTipo = d.entrega||"Retira";
+          const estadoVenta = entregaTipo.toLowerCase().includes("expreso")||entregaTipo.toLowerCase().includes("despachar")
+            ? "A despachar"
+            : (d.estado||"A retirar Ezeiza");
+          const venta = {
           id: pedidoId+"v1", contId: cont.id, cliente: d.cliente,
           articulo: d.articulo, cantidad: Number(d.cantidad),
           precioVenta: Number(d.precioVenta), total, usd,
           tipoCambioUsado: d.tipoCambioUsado||tc,
           fecha: new Date().toISOString().split("T")[0],
-          estado: d.estado||"A despachar",
-          entrega: d.entrega||"Retira",
+          estado: estadoVenta,
+          entrega: entregaTipo,
           pago: 0, pedidoId
         };
         // Save client if we have info
@@ -1646,38 +1654,61 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose}){
 
       const result = await response.json();
       console.log("API response status:", response.status, "body:", JSON.stringify(result).slice(0,200));
-      if(result.error){
-        const errMsg = result.error.message||JSON.stringify(result.error);
-        // Check if it's an auth error (no key configured)
-        if(result.error.type==="authentication_error"||response.status===401){
-          setMsgs(m=>[...m,{role:"assistant",content:"⚠ API key inválida o no configurada. Abrí el chat 🤖, tocá el engranaje ⚙ para ingresar tu key de Anthropic."}]);
-          setLoading(false); return;
+      if(!response.ok || result.error){
+        const status = response.status;
+        const errMsg = result.error?.message||JSON.stringify(result.error||{});
+        console.error("API error:",status, errMsg);
+        if(status===401||result.error?.type==="authentication_error"){
+          setMsgs(m=>[...m,{role:"assistant",content:"⚠ API key inválida (error 401). Tocá ⚙ arriba para ingresar tu key correctamente.\n\nKey actual (primeros 12 chars): "+(ANTHROPIC_KEY.slice(0,12)||"(vacía)")}]);
+        } else if(status===0||!response.ok){
+          setMsgs(m=>[...m,{role:"assistant",content:"⚠ Error de red (status "+status+"). Verificá tu conexión a internet o intentá desde otra red.\n\nDetalle: "+errMsg}]);
+        } else {
+          setMsgs(m=>[...m,{role:"assistant",content:"Error "+status+": "+errMsg}]);
         }
-        setMsgs(m=>[...m,{role:"assistant",content:"Error de API: "+errMsg}]);
         setLoading(false); return;
       }
       const reply = result.content?.[0]?.text||"Sin respuesta";
 
-      // Extract JSON action - strip it from display completely
-      const jsonMatch = reply.match(/\{[\s\S]*?"action"[\s\S]*?\}/);
-      if(jsonMatch){
-        try{
-          const action = JSON.parse(jsonMatch[0]);
-          setPendingAction(action);
-          // Show reply without JSON block - just the conversational part
-          let cleanReply = reply.replace(jsonMatch[0],"").trim();
-          // Remove any trailing/leading code fences
-          cleanReply = cleanReply.replace(/```[^`]*```/g,"").trim();
-          if(!cleanReply) cleanReply = "Listo para ejecutar. ¿Confirmás?";
-          // Add confirm prompt only once, at the end
-          if(!cleanReply.includes("Confirmás") && !cleanReply.includes("confirmar") && !cleanReply.includes("Sí") && !cleanReply.includes("sí")){
-            cleanReply += "\n\n¿Confirmás? (sí / no)";
-          }
-          setMsgs(m=>[...m,{role:"assistant",content:cleanReply}]);
-        }catch{
-          setMsgs(m=>[...m,{role:"assistant",content:reply}]);
+      // Extract JSON action - handle ```json fences and nested objects
+      let actionFound = false;
+      // First strip code fences from the full reply
+      const replyStripped = reply.replace(/```json\s*/gi,"").replace(/```\s*/g,"");
+      // Find JSON by locating "action" key and extracting balanced braces
+      const actionIdx = replyStripped.indexOf('"action"');
+      if(actionIdx >= 0){
+        // Walk back to find the opening {
+        let startIdx = actionIdx;
+        while(startIdx > 0 && replyStripped[startIdx] !== "{") startIdx--;
+        // Walk forward counting braces to find matching }
+        let depth = 0, endIdx = startIdx;
+        for(let i = startIdx; i < replyStripped.length; i++){
+          if(replyStripped[i]==="{") depth++;
+          else if(replyStripped[i]==="}"){depth--; if(depth===0){endIdx=i;break;}}
         }
-      } else {
+        if(endIdx > startIdx){
+          try{
+            const jsonStr = replyStripped.slice(startIdx, endIdx+1);
+            const action = JSON.parse(jsonStr);
+            if(action.action){
+              setPendingAction(action);
+              // Clean reply: remove everything from first ``` or { of JSON
+              let cleanReply = reply
+                .replace(/```json[\s\S]*?```/gi,"")
+                .replace(/```[\s\S]*?```/g,"")
+                .trim();
+              // Also remove any bare JSON block left
+              if(cleanReply.includes(jsonStr.slice(0,30))){
+                cleanReply = cleanReply.slice(0, cleanReply.indexOf(jsonStr.slice(0,30))).trim();
+              }
+              if(!cleanReply) cleanReply = "Tengo todo listo.";
+              if(!cleanReply.match(/[?¿]/)) cleanReply += "\n\n¿Confirmás? (sí / no)";
+              setMsgs(m=>[...m,{role:"assistant",content:cleanReply}]);
+              actionFound = true;
+            }
+          }catch(parseErr){console.warn("JSON parse error:",parseErr);}
+        }
+      }
+      if(!actionFound){
         setMsgs(m=>[...m,{role:"assistant",content:reply}]);
       }
     } catch(err){
@@ -2507,6 +2538,13 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
                       {p.estado==="Pendiente"&&<>
                         <button onClick={()=>confirmarPresupuesto(p)} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",cursor:"pointer",fontWeight:600}}>✓ Confirmar</button>
                         <button onClick={()=>rechazarPresupuesto(p.id)} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-danger)",background:"var(--bg-tint-red)",color:"var(--text-danger)",cursor:"pointer"}}>✕ Rechazar</button>
+                      </>}
+                      {p.estado==="Rechazado"&&<>
+                        <button onClick={()=>{
+                          const nuevos=(data.dj?.presupuestos||[]).map(x=>x.id===p.id?{...x,estado:"Pendiente"}:x);
+                          save({...data,dj:{...data.dj,presupuestos:nuevos}});showToast("Presupuesto reactivado");
+                        }} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer",fontWeight:600}}>↩ Reactivar</button>
+                        <button onClick={()=>confirmarPresupuesto(p)} style={{fontSize:11,padding:"5px 10px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",cursor:"pointer",fontWeight:600}}>✓ Confirmar igual</button>
                       </>}
                       <button onClick={()=>eliminarPresupuesto(p.id)} style={{fontSize:11,padding:"5px 8px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>🗑</button>
                     </div>
