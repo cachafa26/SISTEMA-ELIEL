@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.5.9";
+const APP_VERSION = "v2.6.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1869,7 +1869,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           : "A retirar Ezeiza";
         // Auto-select container using distribuir() priority logic
         const distRes = distribuir(
-          [{nombre:d.articulo, cantidad:Number(d.cantidad), precioVenta:Number(d.precioVenta)}],
+          [{nombre:d.articulo, cantidad:Number(d.cantidad), precioUnitario:Number(d.precioVenta), precioVenta:Number(d.precioVenta)}],
           data.contenedores||[], data.ventas||[]
         );
         if(distRes.errores.length>0){showToast("⚠ "+distRes.errores[0]);setPendingAction(null);return;}
@@ -4181,7 +4181,7 @@ function ContenedorDetail({cont,data,save,tab,setTab,onBack,showToast,blue}){
       <div style={{display:"flex",gap:4,marginBottom:"1rem",background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:4}}>
         {["armado","costos","ventas","stock"].map(t=>(
           <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"7px 4px",border:"none",borderRadius:"var(--border-radius-md)",cursor:"pointer",fontSize:12,background:tab===t?"var(--color-background-primary)":"transparent",color:tab===t?"var(--color-text-primary)":"var(--color-text-secondary)",fontWeight:tab===t?500:400}}>
-            {t==="armado"?"Armado":t==="costos"?"Costos":"Ventas"}
+            {t==="armado"?"Armado":t==="costos"?"Costos":t==="ventas"?"Ventas":"Stock"}
           </button>
         ))}
       </div>
@@ -4273,7 +4273,11 @@ function ComboInput({value,onChange,options,placeholder,type,storageKey}){
 }
 
 function TabArmado({cont,updateCont,showToast}){
-  const [form,setForm]=useState({nombre:ARTS[0],gramaje:"30",ancho:"1.60",largo:"600",cantidad:"",precio:"",moneda:"RMB"});
+  const [form,setForm]=useState(()=>{
+    const _n=ARTS[0];
+    const _m=_n.match(/^(\d+)GR[\s]+([\d,.]+)[xX](\d+)$/);
+    return {nombre:_n,gramaje:_m?_m[1]:"",ancho:_m?_m[2].replace(",","."):"",largo:_m?_m[3]:"",cantidad:"",precio:"",moneda:"RMB"};
+  });
   const [editId,setEditId]=useState(null);
   const LIMITE=25500;
   const esTinta=n=>n.includes("TINTA");
