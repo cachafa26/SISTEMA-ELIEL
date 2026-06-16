@@ -919,7 +919,7 @@ function App(){
     mi30Total+=gananciaCont*0.3;
   }
   // Ventas sin contenedor (edge case)
-  const contIds=new Set([...(data.contenedores||[]).sort((a,b)=>b.id.localeCompare(a.id)).map(c=>c.id));
+  const contIds=new Set((data.contenedores||[]).map(c=>c.id));
   const ventasHuerfanas=(data.ventas||[]).filter(v=>!contIds.has(v.contId));
   totalVentaUSD+=ventasHuerfanas.reduce((a,v)=>a+ventaUSD(v,tcForCalc),0);
   totalCobUSD+=ventasHuerfanas.reduce((a,v)=>a+ventaCobradoUSD(v,data.pagos,tcForCalc),0);
