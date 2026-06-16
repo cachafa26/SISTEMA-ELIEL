@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v1.9.1 · 2026-06-16 -->
+  <!-- v2.0.0 · 2026-06-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -596,7 +596,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v1.9.1</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.0.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1024,7 +1024,7 @@ function abrirPDF(htmlContent){
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v1.9.1";
+const APP_VERSION = "v2.0.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1893,7 +1893,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         const evento={
           id:Date.now().toString(),
           nombre:pres.cliente+' — '+pres.tipoEvento+(pres.salon?' ('+pres.salon+')':''),
-          fecha:pres.fecha||'',estado:'Confirmado',
+          fecha:fechaEspToISO(pres.fecha)||'',estado:'Confirmado',
           monedaCobro:'USD',cobro:cobroUSD,cobroUSD,
           monedaCosto:costoMoneda||'ARS',costo:costoN,costoUSD,
           sena:0,senaUSD:0,saldo:cobroUSD,
@@ -1958,11 +1958,12 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           nuevoPres.pdfHtml = pdfHtml;
         }catch(pdfErr){console.warn("PDF gen failed:",pdfErr);}
         
+        // Open PDF first (before async state changes, to avoid popup blocker)
+        if(nuevoPres.pdfHtml){ abrirPDF(nuevoPres.pdfHtml); }
         const nuevosPresupuestos=[...(data.dj?.presupuestos||[]),nuevoPres];
         save({...data,dj:{...data.dj,presupuestos:nuevosPresupuestos}});
         showToast("✓ Presupuesto guardado");
         setPendingAction(null);
-        if(nuevoPres.pdfHtml){ abrirPDF(nuevoPres.pdfHtml); }
       }
       else if(action.action==="GENERAR_RECIBO_DJ"){
         const d=action.data;
@@ -2784,6 +2785,21 @@ function MonedaInput({labelText,monedaKey,montoKey,form,setForm}){
   );
 }
 
+function fechaEspToISO(fechaEsp){
+  if(!fechaEsp) return '';
+  // Already ISO format
+  if(/^\d{4}-\d{2}-\d{2}$/.test(fechaEsp)) return fechaEsp;
+  const meses={enero:'01',febrero:'02',marzo:'03',abril:'04',mayo:'05',junio:'06',
+    julio:'07',agosto:'08',septiembre:'09',octubre:'10',noviembre:'11',diciembre:'12'};
+  const m=fechaEsp.match(/(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/i);
+  if(m){
+    const dia=m[1].padStart(2,'0');
+    const mes=meses[m[2].toLowerCase()]||'01';
+    return m[3]+'-'+mes+'-'+dia;
+  }
+  return fechaEsp;
+}
+
 function DJView({data,save,showToast,blue,onGenerarDoc}){
   const tc=blue||1450;
   const initForm={nombre:"",fecha:hoy(),estado:"Confirmado",
@@ -2862,7 +2878,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     const evento={
       id:Date.now().toString(),
       nombre:p.cliente+" — "+p.tipoEvento+(p.salon?" ("+p.salon+")":""),
-      fecha:p.fecha,estado:"Confirmado",
+      fecha:fechaEspToISO(p.fecha),estado:"Confirmado",
       monedaCobro:"USD",cobro:cobroUSD,cobroUSD,
       monedaCosto:monedaCostoConf,costo:costoRaw,costoUSD,
       sena:0,senaUSD:0,saldo:cobroUSD,
