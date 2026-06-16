@@ -544,6 +544,8 @@
     /* Nav */
     html[data-theme="light"] .glass-nav{background:rgba(255,255,255,0.82)!important}
     html[data-theme="dark"] .glass-nav{background:rgba(18,18,20,0.88)!important}
+
+    @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
 </style>
 </head>
 <body>
@@ -552,11 +554,18 @@
     (function(){
       var VALID_TOKEN = "ELsys_7x9k2mQpR";
       try {
+        // Check new key format
         var raw = localStorage.getItem("eliel_sys_session");
+        // Also accept old format (migration)
+        if(!raw) raw = localStorage.getItem("eliel_session");
         if(!raw) { window.location.replace("login.html"); return; }
         var auth = JSON.parse(raw);
-        if(auth.token !== VALID_TOKEN || Date.now() > auth.exp) {
+        // Old format was just the token string directly
+        var token = typeof auth === "string" ? auth : auth.token;
+        var exp   = typeof auth === "object" ? auth.exp : Infinity;
+        if(token !== VALID_TOKEN || Date.now() > exp) {
           localStorage.removeItem("eliel_sys_session");
+          localStorage.removeItem("eliel_session");
           window.location.replace("login.html"); return;
         }
       } catch(e) { window.location.replace("login.html"); }
@@ -820,6 +829,7 @@ function App(){
   const [blue,setBlue]=useState(null);
   const [showPedido,setShowPedido]=useState(false);
   const [showSearch,setShowSearch]=useState(false);
+  const [showChat,setShowChat]=useState(false);
   const [theme,setTheme]=useState(()=>localStorage.getItem("eliel_theme")||"light");
   const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("eliel_theme",n);document.documentElement.setAttribute("data-theme",n);return n;});
   const logout=()=>{
@@ -831,7 +841,10 @@ function App(){
     document.documentElement.setAttribute("data-theme",theme);
   },[theme]);
   useEffect(()=>{
-    const handler=e=>{if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();setShowSearch(s=>!s);}};
+    const handler=e=>{
+      if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();setShowSearch(s=>!s);}
+      if((e.metaKey||e.ctrlKey)&&e.key==="j"){e.preventDefault();setShowChat(s=>!s);}
+    };
     document.addEventListener("keydown",handler);
     return()=>document.removeEventListener("keydown",handler);
   },[]);
@@ -988,6 +1001,7 @@ function App(){
 
       {showPedido&&<PedidoModal data={data} save={save} blue={blue} onClose={()=>setShowPedido(false)} showToast={showToast} clienteIdx={clienteIdx}/>}
       {showSearch&&<SearchModal data={data} onClose={()=>setShowSearch(false)} goModulo={goModulo} setView={setView}/>}
+      {showChat&&<ChatBot data={data} save={save} showToast={showToast} blue={blue} stockUni={stockUni} onClose={()=>setShowChat(false)}/>}
 
       {/* TOP NAV ── desktop (hidden on mobile via CSS) */}
       <div className="top-nav" style={{
@@ -1044,13 +1058,8 @@ function App(){
           }}>
             {fbReady?"● sync":"⚠ local"}
           </div>
-          <button onClick={()=>setShowSearch(true)} style={{
-            width:30,height:30,borderRadius:"50%",
-            border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",
-            backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:14,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)",
-          }} title="Buscar (⌘K)">🔍</button>
+          <button onClick={()=>setShowSearch(true)} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)"}} title="Buscar (⌘K)">🔍</button>
+          <button onClick={()=>setShowChat(true)} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"linear-gradient(135deg,rgba(244,121,32,0.15),rgba(91,173,65,0.15))",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)"}} title="Asistente IA">🤖</button>
           <button onClick={toggleTheme} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)"}}>
             {theme==="dark"?"☀️":"🌙"}
           </button>
@@ -1149,7 +1158,7 @@ function App(){
       </div>
 
       {/* BOTTOM NAV ── mobile */}
-      <BottomNav modulos={modulos} modulo={modulo} goModulo={goModulo} toggleTheme={toggleTheme} theme={theme} blue={blue} fbReady={fbReady} logout={logout} onSearch={()=>setShowSearch(true)}/>
+      <BottomNav modulos={modulos} modulo={modulo} goModulo={goModulo} toggleTheme={toggleTheme} theme={theme} blue={blue} fbReady={fbReady} logout={logout} onSearch={()=>setShowSearch(true)} onChat={()=>setShowChat(true)}/>
     </div>
   );
 }
@@ -1158,7 +1167,7 @@ function App(){
 // ══════════════════════════════════════════════════════════════════════════
 // BOTTOM NAV — Liquid Glass pill selector
 // ══════════════════════════════════════════════════════════════════════════
-function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady,logout,onSearch}){
+function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady,logout,onSearch,onChat}){
   const trackRef = useRef(null);
   const [pillStyle,setPillStyle] = useState({left:0,width:0});
   const activeIdx = modulos.findIndex(m=>m.id===modulo);
@@ -1205,6 +1214,10 @@ function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady,logou
           <span style={{fontSize:8,fontWeight:500,color:"var(--text-secondary)"}}>Buscar</span>
         </button>
         {/* Theme */}
+        <button onClick={onChat} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:"var(--r-md)"}}>
+          <span style={{fontSize:17}}>{"🤖"}</span>
+          <span style={{fontSize:8,fontWeight:500,color:"var(--text-secondary)"}}>{"IA"}</span>
+        </button>
         <button onClick={toggleTheme} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:"var(--r-md)"}}>
           <span style={{fontSize:17}}>{theme==="dark"?"☀️":"🌙"}</span>
           <span style={{fontSize:8,fontWeight:500,color:"var(--text-secondary)"}}>Tema</span>
@@ -1232,6 +1245,428 @@ function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady,logou
   );
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// CHATBOT IA — Asistente de Sistema Eliel
+// ══════════════════════════════════════════════════════════════════════════
+const ANTHROPIC_KEY = localStorage.getItem("eliel_ai_key")||"";
+
+function buildSystemPrompt(data, blue, stockUni){
+  const tc = blue||1450;
+  const conts = (data.contenedores||[]).map(c=>{
+    const vs = (data.ventas||[]).filter(v=>v.contId===c.id);
+    const fact = vs.reduce((a,v)=>a+Number(v.usd||0),0);
+    const stock = {};
+    (c.articulos||[]).forEach(art=>{
+      const vendido = vs.filter(v=>v.articulo===art.nombre).reduce((a,v)=>a+Number(v.cantidad),0);
+      stock[art.nombre] = Math.max(0, art.cantidad - vendido);
+    });
+    return `- ${c.nombre}: costo USD ${c.costoTotal||0}, facturado USD ${fact.toFixed(0)}, stock: ${JSON.stringify(stock)}`;
+  }).join('\n');
+
+  const stockResumen = Object.entries(stockUni).filter(([,v])=>v>0)
+    .map(([k,v])=>`${k}: ${v} u`).join(', ');
+
+  const ventasRecientes = [...(data.ventas||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,10)
+    .map(v=>`${v.fecha} ${v.cliente} ${v.articulo} x${v.cantidad} $${v.total} USD${v.usd||0}`).join('\n');
+
+  const deudores = {};
+  (data.ventas||[]).forEach(v=>{
+    const pag = Number(v.pago||0)+(data.pagos||[]).filter(p=>p.ventaId===v.id).reduce((a,p)=>a+Number(p.monto),0);
+    const saldo = Number(v.total||0)-pag;
+    if(saldo>0){ deudores[v.cliente]=(deudores[v.cliente]||0)+saldo; }
+  });
+  const deudoresStr = Object.entries(deudores).map(([k,v])=>`${k}: $${Math.round(v)}`).join(', ');
+
+  const eventos = (data.dj?.eventos||[]).map(e=>`${e.fecha} ${e.nombre} ${e.estado} cobro:${e.monedaCobro||'USD'}${e.cobro} costo:${e.monedaCosto||'ARS'}${e.costo}`).join('\n');
+
+  const clientes = Object.keys({...CLIENTES_BASE,...(data.clientes||{})}).slice(0,30).join(', ');
+  const arts = ARTS.join(', ');
+
+  return `Sos el asistente IA del Sistema de Gestión de Eliel. Tenés acceso completo a sus datos en tiempo real.
+
+DATOS ACTUALES:
+Dólar blue: $${tc}
+Stock disponible total: ${stockResumen}
+
+CONTENEDORES:
+${conts||'Sin contenedores'}
+
+ÚLTIMAS VENTAS:
+${ventasRecientes||'Sin ventas'}
+
+CLIENTES CON DEUDA:
+${deudoresStr||'Ninguno'}
+
+EVENTOS DJ:
+${eventos||'Sin eventos'}
+
+CLIENTES REGISTRADOS (primeros 30):
+${clientes}
+
+ARTÍCULOS DISPONIBLES:
+${arts}
+
+ESTADOS DE ENTREGA: A despachar, Despachado, A retirar Ezeiza, A retirar Once, Retirado
+ESTADOS DJ: Confirmado, Señado, Realizado, Cancelado
+
+TU ROL:
+1. Respondés preguntas sobre el negocio con los datos reales
+2. Cuando el usuario quiere CARGAR DATOS (pedido, evento, retiro, gasto, despacho), recopilás TODA la información necesaria preguntando lo que falta, y cuando tenés todo generás un JSON de acción
+3. Siempre confirmás antes de ejecutar cualquier acción
+
+ACCIONES QUE PODÉS EJECUTAR (responder con JSON exacto cuando tenés todos los datos):
+Para cargar un PEDIDO:
+{"action":"CARGAR_PEDIDO","data":{"contId":"id_contenedor","cliente":"nombre","articulo":"nombre_articulo","cantidad":N,"precioVenta":N,"estado":"A despachar","entrega":"tipo","tipoCambioUsado":TC}}
+
+Para cargar EVENTO DJ:
+{"action":"CARGAR_EVENTO_DJ","data":{"nombre":"nombre evento","fecha":"YYYY-MM-DD","estado":"Confirmado","monedaCobro":"USD","cobro":N,"monedaCosto":"ARS","costo":N,"sena":0,"notas":""}}
+
+Para RETIRO Mi30:
+{"action":"CARGAR_RETIRO","data":{"moneda":"ARS","monto":N,"tcRetiro":TC,"nota":"","fecha":"YYYY-MM-DD"}}
+
+Para GASTO personal:
+{"action":"CARGAR_GASTO","data":{"desc":"descripción","monto":N,"cat":"Alimentación","fecha":"YYYY-MM-DD","moneda":"ARS"}}
+
+Para DESPACHO:
+{"action":"CARGAR_DESPACHO","data":{"cliente":"nombre","articulos":"descripción bultos","dni":"","direccion":"","localidad":"","provincia":"","expreso":"","fecha":"YYYY-MM-DD"}}
+
+REGLAS IMPORTANTES:
+- Si falta información para ejecutar una acción, preguntá ESPECÍFICAMENTE qué falta
+- Para pedidos: necesitás contenedor, artículo, cantidad, precio, cliente, tipo entrega
+- Para DJ: necesitás nombre evento, fecha, moneda cobro, monto cobro, moneda costo, monto costo
+- Para despachos: necesitás cliente, artículos, provincia/localidad, expreso
+- Cuando tenés todo, mostrá un resumen y pedí confirmación
+- Hablá siempre en español, de forma directa y concisa
+- Usás los datos reales para responder, no inventés números
+- Si el cliente ya existe en el sistema, usás sus datos guardados automáticamente`;
+}
+
+function ChatBot({data, save, showToast, blue, stockUni, onClose}){
+  const [msgs, setMsgs] = useState([
+    {role:"assistant", content:"¡Hola! Soy tu asistente. Puedo responder preguntas sobre tus datos, cargar pedidos, eventos DJ, gastos o despachos. ¿Qué necesitás?"}
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const bottomRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(()=>{
+    if(bottomRef.current) bottomRef.current.scrollIntoView({behavior:"smooth"});
+  },[msgs]);
+
+  const executeAction = (action) => {
+    const d = action.data;
+    const tc = blue||1450;
+    try {
+      if(action.action==="CARGAR_PEDIDO"){
+        const cont = (data.contenedores||[]).find(c=>c.id===d.contId||c.nombre.toLowerCase().includes((d.contId||"").toLowerCase()));
+        if(!cont){showToast("Contenedor no encontrado");return;}
+        const total = d.cantidad * d.precioVenta;
+        const usd = total / (d.tipoCambioUsado||tc);
+        const pedidoId = Date.now().toString();
+        const venta = {
+          id: pedidoId+"v1", contId: cont.id, cliente: d.cliente,
+          articulo: d.articulo, cantidad: Number(d.cantidad),
+          precioVenta: Number(d.precioVenta), total, usd,
+          tipoCambioUsado: d.tipoCambioUsado||tc,
+          fecha: new Date().toISOString().split("T")[0],
+          estado: d.estado||"A despachar",
+          entrega: d.entrega||"Retira",
+          pago: 0, pedidoId
+        };
+        // Save client if we have info
+        const clienteData = {...CLIENTES_BASE,...(data.clientes||{})};
+        const cInfo = clienteData[d.cliente]||{};
+        const newClientes = {...(data.clientes||{})};
+        if(d.cliente) newClientes[d.cliente] = {...cInfo, nombre:d.cliente};
+        save({...data, ventas:[...(data.ventas||[]),venta], clientes:newClientes});
+        showToast("✓ Pedido cargado");
+        setPendingAction(null);
+      }
+      else if(action.action==="CARGAR_EVENTO_DJ"){
+        const cobroN = Number(d.cobro||0);
+        const costoN = Number(d.costo||0);
+        const cobroUSD = d.monedaCobro==="ARS"?cobroN/tc:cobroN;
+        const costoUSD = d.monedaCosto==="ARS"?costoN/tc:costoN;
+        const gananciaUSD = cobroUSD - costoUSD;
+        const evento = {
+          id: Date.now().toString(),
+          nombre: d.nombre, fecha: d.fecha, estado: d.estado||"Confirmado",
+          monedaCobro: d.monedaCobro||"USD", cobro: cobroN, cobroUSD,
+          monedaCosto: d.monedaCosto||"ARS", costo: costoN, costoUSD,
+          sena: Number(d.sena||0), senaUSD: 0,
+          saldo: Math.max(0,cobroUSD-Number(d.sena||0)),
+          gananciaUSD, margen: cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
+          notas: d.notas||"", tcUsado: tc
+        };
+        save({...data,dj:{...data.dj,eventos:[...(data.dj?.eventos||[]),evento]}});
+        showToast("✓ Evento DJ cargado");
+        setPendingAction(null);
+      }
+      else if(action.action==="CARGAR_RETIRO"){
+        const montoN = Number(d.monto||0);
+        const tcR = Number(d.tcRetiro||tc);
+        const montoUSD = d.moneda==="ARS"?montoN/tcR:montoN;
+        const retiro = {
+          id: Date.now().toString(), fecha: d.fecha||new Date().toISOString().split("T")[0],
+          nota: d.nota||"", montoUSD, montoPesos: d.moneda==="ARS"?montoN:null,
+          moneda: d.moneda||"ARS", tcRetiro: tcR
+        };
+        save({...data,retiros:[...(data.retiros||[]),retiro]});
+        showToast("✓ Retiro registrado");
+        setPendingAction(null);
+      }
+      else if(action.action==="CARGAR_GASTO"){
+        const gasto = {
+          id: Date.now().toString(), desc: d.desc, monto: Number(d.monto),
+          cat: d.cat||"Otros", fecha: d.fecha||new Date().toISOString().split("T")[0],
+          moneda: "ARS", montoOriginal: Number(d.monto), cotiz: null, fuente:"Otros"
+        };
+        save({...data,fin:{...data.fin,gastos:[...(data.fin?.gastos||[]),gasto]}});
+        showToast("✓ Gasto registrado");
+        setPendingAction(null);
+      }
+      else if(action.action==="CARGAR_DESPACHO"){
+        const clienteData = {...CLIENTES_BASE,...(data.clientes||{})};
+        const cInfo = clienteData[d.cliente]||{};
+        const desp = {
+          id: Date.now().toString(),
+          pedidoId: Date.now().toString(),
+          cliente: d.cliente,
+          articulos: d.articulos||"",
+          dni: d.dni||cInfo.dni||"",
+          direccion: d.direccion||cInfo.direccion||"",
+          localidad: d.localidad||cInfo.localidad||"",
+          provincia: d.provincia||cInfo.provincia||"",
+          expreso: d.expreso||cInfo.expreso||"",
+          fecha: d.fecha||new Date().toISOString().split("T")[0],
+          estado: "Pendiente"
+        };
+        save({...data,despachos:[...(data.despachos||[]),desp]});
+        showToast("✓ Despacho cargado");
+        setPendingAction(null);
+      }
+    } catch(err) {
+      showToast("Error al ejecutar acción");
+      console.error(err);
+    }
+  };
+
+  const sendMessage = async (text) => {
+    if(!text.trim()||loading) return;
+
+    // If there's a pending action and user confirms
+    if(pendingAction){
+      const lower = text.toLowerCase();
+      if(lower.includes("si")||lower.includes("sí")||lower.includes("ok")||lower.includes("confirma")||lower.includes("dale")||lower.includes("carga")){
+        const userMsg = {role:"user",content:text};
+        const confirmMsg = {role:"assistant",content:"✓ Ejecutando..."};
+        setMsgs(m=>[...m,userMsg,confirmMsg]);
+        setInput("");
+        executeAction(pendingAction);
+        setMsgs(m=>[...m.slice(0,-1),{role:"assistant",content:"✅ ¡Listo! Los datos fueron guardados correctamente."}]);
+        return;
+      } else if(lower.includes("no")||lower.includes("cancel")){
+        setMsgs(m=>[...m,{role:"user",content:text},{role:"assistant",content:"Cancelado. ¿Qué más necesitás?"}]);
+        setInput("");
+        setPendingAction(null);
+        return;
+      }
+    }
+
+    const newMsgs = [...msgs, {role:"user",content:text}];
+    setMsgs(newMsgs);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const systemPrompt = buildSystemPrompt(data, blue, stockUni);
+      const response = await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "x-api-key": ANTHROPIC_KEY,
+          "anthropic-version":"2023-06-01",
+          "anthropic-dangerous-direct-browser-access":"true",
+        },
+        body: JSON.stringify({
+          model:"claude-sonnet-4-6",
+          max_tokens:1000,
+          system: systemPrompt,
+          messages: newMsgs.map(m=>({role:m.role,content:m.content}))
+        })
+      });
+
+      const result = await response.json();
+      const reply = result.content?.[0]?.text||"Sin respuesta";
+
+      // Try to extract JSON action from reply
+      const jsonMatch = reply.match(/\{[\s\S]*"action"[\s\S]*\}/);
+      if(jsonMatch){
+        try{
+          const action = JSON.parse(jsonMatch[0]);
+          setPendingAction(action);
+          // Show reply without the raw JSON
+          const cleanReply = reply.replace(jsonMatch[0],"").trim();
+          setMsgs(m=>[...m,{role:"assistant",content:cleanReply||reply,action}]);
+        }catch{
+          setMsgs(m=>[...m,{role:"assistant",content:reply}]);
+        }
+      } else {
+        setMsgs(m=>[...m,{role:"assistant",content:reply}]);
+      }
+    } catch(err){
+      setMsgs(m=>[...m,{role:"assistant",content:"Error al conectar con el asistente. Verificá tu conexión."}]);
+      console.error(err);
+    }
+    setLoading(false);
+    if(inputRef.current) inputRef.current.focus();
+  };
+
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:2000,display:"flex",flexDirection:"column",
+      background:"var(--bg-base)"}}>
+      {/* Header */}
+      <div style={{
+        background:"var(--bg-nav)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",
+        borderBottom:"0.5px solid var(--glass-border)",
+        padding:"12px 16px",display:"flex",alignItems:"center",gap:12,
+        boxShadow:"var(--glass-shadow-sm)",flexShrink:0,
+      }}>
+        <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#F47920,#5BAD41,#2E86C1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🤖</div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)",letterSpacing:"-.01em"}}>Asistente IA</div>
+          <div style={{fontSize:11,color:ANTHROPIC_KEY?"var(--text-success)":"var(--text-warning)",fontWeight:500}}>{ANTHROPIC_KEY?"● Conectado · Claude Sonnet":"⚠ Sin API key configurada"}</div>
+        </div>
+        <button onClick={onClose} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",color:"var(--text-secondary)"}}>✕</button>
+      </div>
+
+      {/* API Key setup — shown only if no key */}
+      {!ANTHROPIC_KEY&&(
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"2rem",gap:16}}>
+          <div style={{fontSize:40}}>🔑</div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:16,fontWeight:600,color:"var(--text-primary)",marginBottom:6}}>Configurar API Key</div>
+            <div style={{fontSize:13,color:"var(--text-secondary)",maxWidth:300,lineHeight:1.5}}>Ingresá tu API key de Anthropic. Se guarda solo en este dispositivo, nunca en el código.</div>
+          </div>
+          <div style={{width:"100%",maxWidth:360}}>
+            <input
+              type="password"
+              id="ai-key-input"
+              placeholder="sk-ant-api03-..."
+              style={{marginBottom:10}}
+            />
+            <button onClick={()=>{
+              const k=document.getElementById("ai-key-input").value.trim();
+              if(k.startsWith("sk-ant-")){
+                localStorage.setItem("eliel_ai_key",k);
+                window.location.reload();
+              } else {
+                alert("Key inválida. Debe empezar con sk-ant-");
+              }
+            }} style={{width:"100%",padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#F47920,#5BAD41)",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"}}>
+              Guardar y conectar
+            </button>
+          </div>
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" style={{fontSize:12,color:"var(--text-info)"}}>Obtener API key en console.anthropic.com →</a>
+        </div>
+      )}
+
+      {/* Messages — only if key is set */}
+      {ANTHROPIC_KEY&&<div style={{flex:1,overflowY:"auto",padding:"1rem",display:"flex",flexDirection:"column",gap:10}}>
+        {msgs.map((m,i)=>(
+          <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start",gap:8,alignItems:"flex-end"}}>
+            {m.role==="assistant"&&(
+              <div style={{width:28,height:28,borderRadius:8,background:"linear-gradient(135deg,#F47920,#5BAD41)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0,marginBottom:2}}>🤖</div>
+            )}
+            <div style={{
+              maxWidth:"80%",padding:"10px 14px",borderRadius:m.role==="user"?"18px 18px 4px 18px":"18px 18px 18px 4px",
+              background:m.role==="user"?"linear-gradient(135deg,#2E86C1,#185FA5)":"var(--bg-card)",
+              backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+              border:m.role==="user"?"none":"0.5px solid var(--glass-border)",
+              boxShadow:"var(--glass-shadow-sm)",
+              fontSize:13,lineHeight:1.5,
+              color:m.role==="user"?"#fff":"var(--text-primary)",
+              whiteSpace:"pre-wrap",wordBreak:"break-word",
+            }}>
+              {m.content}
+              {m.action&&(
+                <div style={{marginTop:8,padding:"8px 10px",background:"rgba(91,173,65,0.15)",borderRadius:8,border:"0.5px solid var(--border-success)"}}>
+                  <div style={{fontSize:11,color:"var(--text-success)",fontWeight:600,marginBottom:4}}>Acción lista para ejecutar</div>
+                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>Respondé <strong style={{color:"var(--text-success)"}}>sí</strong> para confirmar o <strong style={{color:"var(--text-danger)"}}>no</strong> para cancelar</div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {loading&&(
+          <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+            <div style={{width:28,height:28,borderRadius:8,background:"linear-gradient(135deg,#F47920,#5BAD41)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>🤖</div>
+            <div style={{padding:"10px 14px",borderRadius:"18px 18px 18px 4px",background:"var(--bg-card)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)"}}>
+              <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                {[0,1,2].map(i=>(
+                  <div key={i} style={{width:6,height:6,borderRadius:"50%",background:"var(--text-secondary)",animation:`bounce 1.2s ease-in-out ${i*0.2}s infinite`}}/>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef}/>
+      </div>}
+
+      {/* Quick actions + input — only if key set */}
+      {ANTHROPIC_KEY&&<div style={{padding:"0 1rem 8px",display:"flex",gap:6,overflowX:"auto",flexShrink:0}}>
+        {["¿Cuánto stock queda?","¿Quién me debe?","Resumen del mes","Cargar pedido","Cargar evento DJ"].map(q=>(
+          <button key={q} onClick={()=>sendMessage(q)} style={{
+            fontSize:11,padding:"6px 12px",borderRadius:"var(--r-pill)",
+            border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",
+            backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",
+            color:"var(--text-primary)",cursor:"pointer",whiteSpace:"nowrap",
+            flexShrink:0,boxShadow:"var(--glass-shadow-sm)",
+          }}>{q}</button>
+        ))}
+      </div>
+
+      {/* Input */}
+      <div style={{
+        padding:"8px 12px calc(8px + env(safe-area-inset-bottom))",
+        background:"var(--bg-nav)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",
+        borderTop:"0.5px solid var(--glass-border)",flexShrink:0,
+        display:"flex",gap:8,alignItems:"flex-end",
+      }}>
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={e=>{setInput(e.target.value);e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,120)+"px";}}
+          onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage(input);}}}
+          placeholder="Escribí acá... (Enter para enviar)"
+          rows={1}
+          style={{
+            flex:1,resize:"none",border:"0.5px solid var(--glass-border)",
+            borderRadius:18,padding:"10px 14px",fontSize:14,
+            background:"var(--bg-input)",color:"var(--text-primary)",
+            outline:"none",fontFamily:"inherit",lineHeight:1.4,
+            maxHeight:120,overflow:"auto",
+          }}
+        />
+        <button
+          onClick={()=>sendMessage(input)}
+          disabled={!input.trim()||loading}
+          style={{
+            width:40,height:40,borderRadius:"50%",border:"none",flexShrink:0,
+            background:input.trim()&&!loading?"linear-gradient(135deg,#F47920,#5BAD41)":"rgba(120,120,128,0.2)",
+            color:input.trim()&&!loading?"#fff":"var(--text-secondary)",
+            cursor:input.trim()&&!loading?"pointer":"not-allowed",
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
+            transition:"all .15s",boxShadow:input.trim()&&!loading?"0 4px 12px rgba(244,121,32,0.4)":"none",
+          }}
+        >➤</button>
+      </div>}
+    </div>
+  );
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 // BÚSQUEDA GLOBAL
