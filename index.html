@@ -550,14 +550,13 @@
   <!-- Session guard: redirect to login if no valid session -->
   <script>
     (function(){
-      var SESSION_KEY = "eliel_session";
       var VALID_TOKEN = "ELsys_7x9k2mQpR";
       try {
-        var raw = localStorage.getItem(SESSION_KEY);
+        var raw = localStorage.getItem("eliel_sys_session");
         if(!raw) { window.location.replace("login.html"); return; }
         var auth = JSON.parse(raw);
         if(auth.token !== VALID_TOKEN || Date.now() > auth.exp) {
-          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem("eliel_sys_session");
           window.location.replace("login.html"); return;
         }
       } catch(e) { window.location.replace("login.html"); }
@@ -824,7 +823,7 @@ function App(){
   const [theme,setTheme]=useState(()=>localStorage.getItem("eliel_theme")||"light");
   const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("eliel_theme",n);document.documentElement.setAttribute("data-theme",n);return n;});
   const logout=()=>{
-    localStorage.removeItem("eliel_session");
+    localStorage.removeItem("eliel_sys_session");
     localStorage.removeItem("eliel_status_session");
     window.location.replace("login.html");
   };
@@ -1055,6 +1054,14 @@ function App(){
           <button onClick={toggleTheme} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)"}}>
             {theme==="dark"?"☀️":"🌙"}
           </button>
+          <button onClick={()=>{
+            // Grant status access then open it
+            const authData=JSON.stringify({token:"ELstat_4nTwJvKs",exp:Date.now()+86400000});
+            localStorage.setItem("eliel_status_session",authData);
+            window.open("status.html","_blank");
+          }} title="Ver Status" style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)",color:"var(--text-secondary)"}}>
+            📊
+          </button>
           <button onClick={logout} title="Cerrar sesión" style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,cursor:"pointer",flexShrink:0,boxShadow:"var(--glass-shadow-sm)",color:"var(--text-secondary)"}}>
             ⏻
           </button>
@@ -1208,6 +1215,14 @@ function BottomNav({modulos,modulo,goModulo,toggleTheme,theme,blue,fbReady,logou
           <span style={{fontSize:8,fontWeight:500,color:"var(--text-secondary)"}}>{fbReady?"sync":"local"}</span>
         </div>
         {/* Logout */}
+        <button onClick={()=>{
+            const authData=JSON.stringify({token:"ELstat_4nTwJvKs",exp:Date.now()+86400000});
+            localStorage.setItem("eliel_status_session",authData);
+            window.open("status.html","_blank");
+          }} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:"var(--r-md)"}}>
+          <span style={{fontSize:17}}>📊</span>
+          <span style={{fontSize:8,fontWeight:500,color:"var(--text-secondary)"}}>Status</span>
+        </button>
         <button onClick={logout} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:1,background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:"var(--r-md)"}}>
           <span style={{fontSize:17}}>🔐</span>
           <span style={{fontSize:8,fontWeight:500,color:"var(--text-secondary)"}}>Salir</span>
