@@ -4381,7 +4381,7 @@ function PedidoCard({p,onEstado,onDelete,blue}){
           {esMulti&&expanded&&(
             <div style={{marginTop:6,display:"flex",flexDirection:"column",gap:3}}>
               {p.lineas.map(v=>(
-                <div key={v.id} style={{fontSize:11,color:"var(--text-secondary)",display:"flex",gap:8"}}>
+                <div key={v.id} style={{fontSize:11,color:"var(--text-secondary)",display:"flex",gap:8}}>
                   <span>{v.articulo}</span><span style={{color:"var(--text-primary)",fontWeight:500}}>×{v.cantidad}</span>
                   <span style={{color:"var(--text-success)"}}>${v.total?.toLocaleString('es-AR')}</span>
                 </div>
