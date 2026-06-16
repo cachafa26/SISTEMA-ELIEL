@@ -203,12 +203,14 @@
       const val = input.value.trim();
       const target = CREDS[val];
       if(target){
-        // Set auth token with 24h expiry
+        // Set auth token with 24h expiry - each key only grants its own page
         const authData = JSON.stringify({token: TOKENS[target], exp: Date.now() + 86400000});
-        localStorage.setItem(SESSION_KEY, authData);
-        // If logging in as main system, also grant status access
         if(target === "index.html"){
-          localStorage.setItem("eliel_status_session", JSON.stringify({token:"ELstat_4nTwJvKs", exp: Date.now() + 86400000}));
+          localStorage.setItem("eliel_sys_session", authData);
+          localStorage.removeItem("eliel_status_session"); // clear other
+        } else {
+          localStorage.setItem("eliel_status_session", authData);
+          localStorage.removeItem("eliel_sys_session"); // clear other
         }
         showSuccess(target);
       } else {
