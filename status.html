@@ -503,10 +503,14 @@
       var VALID_TOKEN = "ELstat_4nTwJvKs";
       try {
         var raw = localStorage.getItem("eliel_status_session");
+        if(!raw) raw = localStorage.getItem("eliel_session");
         if(!raw) { window.location.replace("login.html"); return; }
         var auth = JSON.parse(raw);
-        if(auth.token !== VALID_TOKEN || Date.now() > auth.exp) {
+        var token = typeof auth === "string" ? auth : auth.token;
+        var exp   = typeof auth === "object" ? auth.exp : Infinity;
+        if(token !== VALID_TOKEN || Date.now() > exp) {
           localStorage.removeItem("eliel_status_session");
+          localStorage.removeItem("eliel_session");
           window.location.replace("login.html"); return;
         }
       } catch(e) { window.location.replace("login.html"); }
