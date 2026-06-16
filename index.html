@@ -1746,7 +1746,7 @@ RETIROS PENDIENTES:\n- Mi 30% SC: pendiente $${_sc30Pesos.toLocaleString('es-AR'
 CLIENTES REGISTRADOS (primeros 30):
 ${clientes}
 
-ARTÍCULOS DISPONIBLES:
+ARTÍCULOS DISPONIBLES (usar EXACTAMENTE estos nombres en contId y articulo):
 ${arts}
 
 ESTADOS DE ENTREGA: A despachar, Despachado, A retirar Ezeiza, A retirar Once, Retirado
@@ -1763,7 +1763,7 @@ REGLAS ESTRICTAS:
 
 ACCIONES QUE PODÉS EJECUTAR (responder con JSON exacto cuando tenés todos los datos):
 Para cargar un PEDIDO:
-{"action":"CARGAR_PEDIDO","data":{"contId":"15VO CONTENEDOR","cliente":"nombre","articulo":"29GR 1,60x600","cantidad":N,"precioVenta":N,"entrega":"Expreso","tipoCambioUsado":TC,"dni":"","direccion":"","localidad":"","provincia":"","expreso":"nombre del transporte","pagoCliente":0}}
+{"action":"CARGAR_PEDIDO","data":{"contId":"15VO CONTENEDOR","cliente":"nombre","articulo":"nombre EXACTO del artículo como aparece en ARTÍCULOS DISPONIBLES, ej: 29GR 1,60x600","cantidad":N,"precioVenta":N,"entrega":"Expreso","tipoCambioUsado":TC,"dni":"","direccion":"","localidad":"","provincia":"","expreso":"nombre del transporte","pagoCliente":0}}
 
 Para cargar EVENTO DJ:
 {"action":"CARGAR_EVENTO_DJ","data":{"nombre":"nombre evento","fecha":"YYYY-MM-DD","estado":"Confirmado","monedaCobro":"USD","cobro":N,"monedaCosto":"ARS","costo":N,"sena":0,"notas":""}}
@@ -5000,10 +5000,17 @@ function DespachosView({data,save,showToast}){
   const calcularBultos=d=>{
     // Parsea "30GR x5, TINTA NEGRO x3" -> [{nombre,cantidad,esTinta}]
     if(!d.articulos)return[{...d,bultoLabel:"",bultoNum:1,bultoTotal:1}];
+    // Enrich partial names like "60x500" with full ARTS name
+    const enrichNombre=(n)=>{
+      const found=ARTS.find(a=>a.toLowerCase().includes(n.toLowerCase())||n.toLowerCase().includes(a.toLowerCase().split(' ').slice(-1)[0]));
+      return found||n;
+    };
     const items=d.articulos.split(",").map(s=>{
       const m=s.trim().match(/^(.+?)\s*[xX×]\s*(\d+)$/);
       if(!m)return null;
-      const nombre=m[1].trim();const cantidad=parseInt(m[2]);
+      const nombreRaw=m[1].trim();
+      const nombre=enrichNombre(nombreRaw);
+      const cantidad=parseInt(m[2]);
       const esTinta=nombre.includes("TINTA");
       return{nombre,cantidad,esTinta};
     }).filter(Boolean);
@@ -5013,7 +5020,7 @@ function DespachosView({data,save,showToast}){
     // 1 etiqueta por cada rollo individual
     rollos.forEach(r=>{
       for(let i=0;i<r.cantidad;i++){
-        bultos.push({tipo:"rollo",desc:r.nombre+" (1 rollo)"});
+        bultos.push({tipo:"rollo",desc:r.nombre});
       }
     });
     // Tintas: hasta 20 unidades por bulto
