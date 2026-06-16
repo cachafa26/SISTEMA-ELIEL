@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.5.7";
+const APP_VERSION = "v2.5.8";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1858,25 +1858,32 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
     const tc = blue||1450;
     try {
       if(action.action==="CARGAR_PEDIDO"){
-        const cont = (data.contenedores||[]).find(c=>c.id===d.contId||c.nombre.toLowerCase().includes((d.contId||"").toLowerCase()));
-        if(!cont){showToast("Contenedor no encontrado");setPendingAction(null);return;}
-        const total = d.cantidad * d.precioVenta;
-        const usd = total / (d.tipoCambioUsado||tc);
         const pedidoId = Date.now().toString();
         const entregaTipo = d.entrega||"Retira Ezeiza";
         const _et = entregaTipo.toLowerCase();
         const estadoVenta = _et.includes("expreso") ? "A despachar"
           : _et.includes("once") ? "A retirar Once"
           : "A retirar Ezeiza";
-        const venta = {
-          id: pedidoId+"v1", contId: cont.id, cliente: d.cliente,
-          articulo: d.articulo, cantidad: Number(d.cantidad),
-          precioVenta: Number(d.precioVenta), total, usd,
-          tipoCambioUsado: d.tipoCambioUsado||tc,
-          fecha: new Date().toISOString().split("T")[0],
-          estado: estadoVenta, entrega: entregaTipo,
-          pago: 0, pedidoId
-        };
+        // Auto-select container using distribuir() priority logic
+        const distRes = distribuir(
+          [{nombre:d.articulo, cantidad:Number(d.cantidad), precioVenta:Number(d.precioVenta)}],
+          data.contenedores||[], data.ventas||[]
+        );
+        if(distRes.errores.length>0){showToast("⚠ "+distRes.errores[0]);setPendingAction(null);return;}
+        const ventasNuevas = distRes.resultado.map((r,i)=>{
+          const subtotal=r.subtotal||r.cantidad*Number(d.precioVenta);
+          return {
+            id:pedidoId+"v"+i, contId:r.contId, cliente:d.cliente,
+            articulo:r.artNombre, cantidad:r.cantidad,
+            precioVenta:Number(d.precioVenta), total:subtotal,
+            usd:subtotal/(d.tipoCambioUsado||tc),
+            tipoCambioUsado:d.tipoCambioUsado||tc,
+            fecha:new Date().toISOString().split("T")[0],
+            estado:estadoVenta, entrega:entregaTipo, pago:0, pedidoId
+          };
+        });
+        const total = ventasNuevas.reduce((a,v)=>a+v.total,0);
+        const venta = ventasNuevas[0];
         const clienteData = {...CLIENTES_BASE,...(data.clientes||{})};
         const cInfo = clienteData[d.cliente]||{};
         const newClientes = {...(data.clientes||{})};
@@ -1904,7 +1911,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           }];
         }
         // Guardar pedido y preguntar si pagó
-        save({...data, ventas:[...(data.ventas||[]),venta], clientes:newClientes, despachos:newDespachos});
+        save({...data, ventas:[...(data.ventas||[]),...ventasNuevas], clientes:newClientes, despachos:newDespachos});
         showToast("✓ Pedido cargado"+(estadoVenta==="A despachar"?" · Despacho creado":""));
         // Preguntar pago
         setPendingAction({action:"_PAGO_PEDIDO_", data:{ventaId: pedidoId+"v1", total}});
@@ -4169,7 +4176,7 @@ function ContenedorDetail({cont,data,save,tab,setTab,onBack,showToast,blue}){
         <h2 style={{fontSize:15,fontWeight:500,margin:0}}>{c.nombre}</h2>
       </div>
       <div style={{display:"flex",gap:4,marginBottom:"1rem",background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:4}}>
-        {["armado","costos","ventas"].map(t=>(
+        {["armado","costos","ventas","stock"].map(t=>(
           <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"7px 4px",border:"none",borderRadius:"var(--border-radius-md)",cursor:"pointer",fontSize:12,background:tab===t?"var(--color-background-primary)":"transparent",color:tab===t?"var(--color-text-primary)":"var(--color-text-secondary)",fontWeight:tab===t?500:400}}>
             {t==="armado"?"Armado":t==="costos"?"Costos":"Ventas"}
           </button>
@@ -4178,6 +4185,35 @@ function ContenedorDetail({cont,data,save,tab,setTab,onBack,showToast,blue}){
       {tab==="armado"&&<TabArmado cont={c} updateCont={updateCont} showToast={showToast}/>}
       {tab==="costos"&&<TabCostos cont={c} updateCont={updateCont} showToast={showToast} blue={blue}/>}
       {tab==="ventas"&&<TabVentasCont cont={c} ventasCont={ventasCont} data={data} save={save} showToast={showToast} blue={blue}/>}
+      {tab==="stock"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)",marginBottom:4}}>Stock disponible</div>
+          {(c.articulos||[]).length===0
+            ?<div style={{color:"var(--text-secondary)",fontSize:13}}>Sin artículos cargados.</div>
+            :(c.articulos||[]).map(art=>{
+              const vendido=(data.ventas||[]).filter(v=>v.contId===c.id&&v.articulo===art.nombre).reduce((a,v)=>a+Number(v.cantidad),0);
+              const disponible=Math.max(0,Number(art.cantidad)-vendido);
+              const pct=Number(art.cantidad)>0?disponible/Number(art.cantidad):0;
+              const color=pct>0.5?"var(--text-success)":pct>0.2?"var(--text-warning)":"var(--text-danger)";
+              return(
+                <div key={art.id||art.nombre} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 16px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art.nombre}</div>
+                    <div style={{fontSize:18,fontWeight:700,color}}>{disponible} <span style={{fontSize:11,fontWeight:400,color:"var(--text-secondary)"}}>/ {art.cantidad} u</span></div>
+                  </div>
+                  <div style={{height:6,borderRadius:3,background:"rgba(120,120,128,0.15)",overflow:"hidden"}}>
+                    <div style={{height:"100%",width:(pct*100)+"%",background:color,borderRadius:3,transition:"width .3s"}}/>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontSize:10,color:"var(--text-secondary)"}}>
+                    <span>Vendido: {vendido} u</span>
+                    <span>{Math.round(pct*100)}% disponible</span>
+                  </div>
+                </div>
+              );
+            })
+          }
+        </div>
+      )}
     </div>
   );
 }
@@ -4277,7 +4313,16 @@ function TabArmado({cont,updateCont,showToast}){
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>{editId?"Editar artículo":"Agregar artículo"}</p>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-          <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} style={{width:"100%",marginTop:2}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
+          <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.nombre} onChange={e=>{
+              const nombre=e.target.value;
+              // Auto-parse: "33GR 1,60x500" → gramaje=33, ancho=1.60, largo=500
+              const m=nombre.match(/^(\d+)GR\s+([\d,]+)x(\d+)$/);
+              if(m){
+                setForm({...form,nombre,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]});
+              } else {
+                setForm({...form,nombre});
+              }
+            }} style={{width:"100%",marginTop:2}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
           {!isT&&(<>
             <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Gramaje (g/m²)</label><div style={{marginTop:2}}><ComboInput value={form.gramaje} onChange={v=>setForm({...form,gramaje:v})} options={GRAMAJES_PRESET} placeholder="ej: 45" storageKey="gramaje"/></div></div>
             <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Ancho (m)</label><div style={{marginTop:2}}><ComboInput value={form.ancho} onChange={v=>setForm({...form,ancho:v})} options={ANCHOS_PRESET} placeholder="ej: 1.60" storageKey="ancho"/></div></div>
@@ -4312,12 +4357,13 @@ function TabArmado({cont,updateCont,showToast}){
 
 function TabCostos({cont,updateCont,showToast,blue}){
   const tcDef=blue?String(Math.round(blue)):(cont.costos?.tipoCambio||"1450");
-  const [form,setForm]=useState({tipoCambio:tcDef,costoChina:"",costoMoneda:"USD",despacho:"",naviera:"",despachante:"",losPrincipes:"",deposito:"",terminal:"",otros:"",...cont.costos});
+  const [form,setForm]=useState({tipoCambio:tcDef,costoChina:"",costoMoneda:"USD",despacho:"",mDespacho:"ARS",naviera:"",mNaviera:"ARS",despachante:"",mDespachante:"USD",losPrincipes:"",mLosPrincipes:"ARS",deposito:"",mDeposito:"ARS",terminal:"",mTerminal:"ARS",otros:"",mOtros:"USD",...cont.costos});
   const [tcPesos,setTcPesos]=useState(tcDef);
   const tc=Number(form.tipoCambio)||1450;
   const toUSD=p=>Number(p||0)/tc;
   const chinaUSD=form.costoMoneda==="USD"?Number(form.costoChina||0):toUSD(form.costoChina);
-  const totalUSD=chinaUSD+toUSD(form.despacho)+toUSD(form.naviera)+Number(form.despachante||0)+toUSD(form.losPrincipes)+toUSD(form.deposito)+toUSD(form.terminal)+Number(form.otros||0);
+  const toUSDf=(val,mon)=>mon==="USD"?Number(val||0):Number(val||0)/tc;
+  const totalUSD=chinaUSD+toUSDf(form.despacho,form.mDespacho)+toUSDf(form.naviera,form.mNaviera)+toUSDf(form.despachante,form.mDespachante)+toUSDf(form.losPrincipes,form.mLosPrincipes)+toUSDf(form.deposito,form.mDeposito)+toUSDf(form.terminal,form.mTerminal)+toUSDf(form.otros,form.mOtros);
   const calcular=()=>{
     const fobTot=(cont.articulos||[]).reduce((a,x)=>a+Number(x.precio||0)*Number(x.cantidad),0);
     const artsCosto=(cont.articulos||[]).map(art=>{const tot=Number(art.precio||0)*Number(art.cantidad);const pct=fobTot>0?tot/fobTot:0;return{...art,pct:pct*100,costoProporcional:totalUSD*pct,costoUnitario:art.cantidad>0?(totalUSD*pct)/art.cantidad:0};});
@@ -4332,7 +4378,7 @@ function TabCostos({cont,updateCont,showToast,blue}){
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Tipo de cambio Blue ($/USD)</label><input type="number" value={form.tipoCambio} onChange={e=>setForm({...form,tipoCambio:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Costo China</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form.costoChina||""} onChange={e=>setForm({...form,costoChina:e.target.value})} style={{flex:1,boxSizing:"border-box"}}/><select value={form.costoMoneda||"ARS"} onChange={e=>setForm({...form,costoMoneda:e.target.value})} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>
-          {campos.map(c=>(<div key={c.k}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{c.l}</label><input type="number" value={form[c.k]||""} onChange={e=>setForm({...form,[c.k]:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>))}
+          {campos.map(c=>(<div key={c.k}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{c.l}</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form[c.k]||""} onChange={e=>setForm({...form,[c.k]:e.target.value})} style={{flex:1,boxSizing:"border-box"}}/><select value={form[c.m||"m"+c.k]||"ARS"} onChange={e=>setForm({...form,[c.m||"m"+c.k]:e.target.value})} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>))}
         </div>
         <div style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:10}}>
           <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Total costo estimado</div>
