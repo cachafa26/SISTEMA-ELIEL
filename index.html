@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.6.0";
+const APP_VERSION = "v2.6.1";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4089,12 +4089,14 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
           </div>
         ):[...(data.contenedores||[])].sort((a,b)=>b.id.localeCompare(a.id)).map(c=>{
           const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
-          const totalVCont=ventasCont.reduce((a,v)=>a+Number(v.usd||0),0);
-          const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+          const ventasContFiltered=(data.ventas||[]).filter(v=>v.contId===c.id);
+          const totalVCont=ventasContFiltered.reduce((a,v)=>a+Number(v.usd||0),0);
+          const cobUSD=ventasContFiltered.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
           const costo=c.costoTotal||0;
-          const pct=costo>0?Math.min(100,(totalVCont/costo)*100):0;
-          const enG=costo>0&&totalVCont>=costo;
-          const mi30C=Math.max(0,totalVCont-costo)*0.3;
+          // Progress basado en cobrado (igual que pestaña Contenedores)
+          const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;
+          const enG=costo>0&&cobUSD>=costo;
+          const mi30C=Math.max(0,cobUSD-costo)*0.3;
           return(
             <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",boxShadow:"var(--glass-shadow-sm)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?6:0}}>
