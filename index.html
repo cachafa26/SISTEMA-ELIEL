@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.5.8";
+const APP_VERSION = "v2.5.9";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1108,8 +1108,11 @@ function distribuir(items,contenedores,ventas){
       const costo=c.costoTotal||0;const enG=costo>0&&vUSD>costo;const pct=costo>0?vUSD/costo:0;
       return{c,sd,enG,pct};
     }).sort((a,b)=>{
+      // 1. Containers in profit first
       if(a.enG!==b.enG)return b.enG-a.enG;
-      if(a.enG&&b.enG)return a.c.id.localeCompare(b.c.id);
+      // 2. Both in profit: oldest first (lowest id = created first)
+      if(a.enG&&b.enG)return Number(a.c.id)-Number(b.c.id)||a.c.id.localeCompare(b.c.id);
+      // 3. Neither in profit: closest to profit first (highest pct)
       return b.pct-a.pct;
     });
     const total=cs.reduce((a,x)=>a+x.sd,0);
@@ -4316,11 +4319,11 @@ function TabArmado({cont,updateCont,showToast}){
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.nombre} onChange={e=>{
               const nombre=e.target.value;
               // Auto-parse: "33GR 1,60x500" → gramaje=33, ancho=1.60, largo=500
-              const m=nombre.match(/^(\d+)GR\s+([\d,]+)x(\d+)$/);
+              const m=nombre.match(/^(\d+)GR[\s]+([\d,\.]+)[xX](\d+)$/);
               if(m){
-                setForm({...form,nombre,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]});
+                setForm(f=>({...f,nombre,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]}));
               } else {
-                setForm({...form,nombre});
+                setForm(f=>({...f,nombre}));
               }
             }} style={{width:"100%",marginTop:2}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
           {!isT&&(<>
