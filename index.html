@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.8.6";
+const APP_VERSION = "v2.8.7";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1415,7 +1415,8 @@ function App(){
   // Calculos Finanzas
   const totalGastos=(data.fin?.gastos||[]).reduce((a,g)=>a+g.monto,0);
   const totalRetSCPesos=(data.retiros||[]).reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0);
-  const totalIngresos=totalRetSCPesos+bhTotalAnio+djCobrado;
+  // Ingresos ARS: solo lo efectivamente cobrado/retirado en pesos
+  const totalIngresos=totalRetSCPesos+bhCobradoTotal; // SC retirado + BH cobrado; DJ no entra (es USD)
 
   // Módulos de navegación superior
   const modulos=[
@@ -1591,9 +1592,9 @@ function App(){
           <DashboardCentral
             data={data} blue={blue}
             mi30Total={mi30Total} pendienteRetiro={pendienteRetiro} totalRetirado={totalRetirado}
-            bhTotalAnio={bhTotalAnio} bhSueldo={bhSueldo}
+            bhTotalAnio={bhTotalAnio} bhSueldo={bhSueldo} bhCobradoTotal={bhCobradoTotal}
             djGanancia={djGanancia} djCobrado={djCobrado} djEventos={djEventos} djGananciaUSD={djGananciaUSD} djCobradoUSD={djCobradoUSD} djRealizados={djRealizados}
-            totalGastos={totalGastos} totalIngresos={totalIngresos}
+            totalGastos={totalGastos} totalIngresos={totalIngresos} totalRetSCPesos={totalRetSCPesos}
             totalVentaUSD={totalVentaUSD} totalCobUSD={totalCobUSD}
             stockUni={stockUni}
             goModulo={goModulo}
@@ -1626,7 +1627,7 @@ function App(){
           <FinanzasView
             data={data} save={save} showToast={showToast} blue={blue}
             totalIngresos={totalIngresos} totalGastos={totalGastos}
-            bhTotalAnio={bhTotalAnio} djCobrado={djCobrado} totalRetSCPesos={totalRetSCPesos}
+            bhTotalAnio={bhTotalAnio} bhCobradoTotal={bhCobradoTotal} djCobrado={djCobrado} totalRetSCPesos={totalRetSCPesos}
             bhSueldo={bhSueldo} pendienteRetiro={pendienteRetiro}
           />
         )}
@@ -2685,7 +2686,7 @@ function SearchModal({data,onClose,goModulo,setView}){
 // ══════════════════════════════════════════════════════════════════════════
 // DASHBOARD CENTRAL
 // ══════════════════════════════════════════════════════════════════════════
-function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,djGanancia,djCobrado,djEventos,djGananciaUSD,djCobradoUSD,djRealizados,totalGastos,totalIngresos,totalVentaUSD,totalCobUSD,stockUni,goModulo}){
+function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,bhCobradoTotal,djGanancia,djCobrado,djEventos,djGananciaUSD,djCobradoUSD,djRealizados,totalGastos,totalIngresos,totalRetSCPesos,totalVentaUSD,totalCobUSD,stockUni,goModulo}){
   const tcActual=blue||1450;
   const balance=totalIngresos-totalGastos;
   const djSaldoPendiente=(djEventos||[]).filter(e=>e.estado==="Confirmado").reduce((a,e)=>a+Number(e.saldo||0),0);
@@ -2743,9 +2744,8 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
 
   const tcBar=blue||1450;
   const fuentes=[
-    {n:"Super Coating",v:totalRetirado*tcBar,c:"var(--text-success)",sub:"USD "+fmtUSD(totalRetirado)},
-    {n:"BH Trade",v:bhTotalAnio,c:"var(--text-info)"},
-    {n:"DJ",v:djCobrado*tcBar,c:"var(--text-warning)",sub:"USD "+fmtUSD(djCobrado)},
+    {n:"Super Coating",v:totalRetSCPesos,c:"var(--text-success)"},
+    {n:"BH Trade",v:bhCobradoTotal,c:"var(--text-info)"},
   ];
   const maxBar=Math.max(...fuentes.map(f=>f.v),1);
 
@@ -3776,7 +3776,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 // ══════════════════════════════════════════════════════════════════════════
 // FINANZAS PERSONALES
 // ══════════════════════════════════════════════════════════════════════════
-function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTotalAnio,djCobrado,totalRetSCPesos,bhSueldo,pendienteRetiro}){
+function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTotalAnio,bhCobradoTotal,djCobrado,totalRetSCPesos,bhSueldo,pendienteRetiro}){
   const tcBlue=blue||1450;
   const initForm={desc:"",moneda:"ARS",monto:"",cotiz:String(Math.round(tcBlue)),cat:"Alimentación",fecha:hoy(),fuente:"Otros"};
   const [form,setForm]=useState(initForm);
@@ -3830,8 +3830,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
   // Por fuente
   const fuentes=[
     {n:"Super Coating",v:totalRetSCPesos,c:"var(--color-text-success)"},
-    {n:"BH Trade",v:bhTotalAnio,c:"var(--color-text-info)"},
-    {n:"DJ",v:djCobrado,c:"var(--color-text-warning)"},
+    {n:"BH Trade",v:bhCobradoTotal,c:"var(--color-text-info)"},
   ];
   const maxFuente=Math.max(...fuentes.map(f=>f.v),1);
 
