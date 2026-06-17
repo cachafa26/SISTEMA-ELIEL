@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.0.2 · 2026-06-17 -->
+  <!-- v3.0.3 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.2</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.3</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.0.2";
+const APP_VERSION = "v3.0.3";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -5413,18 +5413,20 @@ function VentasView({data,save,showToast}){
   // Abrir modal edición
   const abrirEdicion=(p)=>{
     setEditPedido(p);
-    setEditLineas(p.lineas.map(l=>({...l,precioVenta:l.precioVenta||0,cantidad:l.cantidad||0})));
+    // Use same TC for all lines (take from first line)
+    const tcPedido=p.lineas[0]?.tipoCambioUsado||1450;
+    setEditLineas(p.lineas.map(l=>({...l,precioVenta:l.precioVenta||0,cantidad:l.cantidad||0,tipoCambioUsado:l.tipoCambioUsado||tcPedido})));
   };
 
   // Guardar edición
   const guardarEdicion=()=>{
     if(!editPedido)return;
-    const tc=editLineas[0]?.tipoCambioUsado||1450;
     const nuevasVentas=(data.ventas||[]).map(v=>{
       const linea=editLineas.find(l=>l.id===v.id);
       if(!linea)return v;
       const total=Number(linea.cantidad)*Number(linea.precioVenta);
-      return{...v,articulo:linea.articulo,cantidad:Number(linea.cantidad),precioVenta:Number(linea.precioVenta),total,usd:total/tc};
+      const tc=Number(linea.tipoCambioUsado)||1450;
+      return{...v,articulo:linea.articulo,cantidad:Number(linea.cantidad),precioVenta:Number(linea.precioVenta),total,usd:total/tc,tipoCambioUsado:tc};
     });
     save({...data,ventas:nuevasVentas});
     setEditPedido(null);
@@ -5480,7 +5482,19 @@ function VentasView({data,save,showToast}){
                     <input type="number" value={l.precioVenta} onChange={e=>setEditLineas(ls=>ls.map((x,j)=>j===i?{...x,precioVenta:e.target.value}:x))} style={{fontSize:12}}/>
                   </div>
                 </div>
-                {l.cantidad&&l.precioVenta&&<div style={{fontSize:11,color:"var(--text-success)",marginTop:6,fontWeight:500}}>Subtotal: ${fmt(Number(l.cantidad)*Number(l.precioVenta))}</div>}
+                {/* TC editable — afecta el USD calculado */}
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
+                  <label style={{fontSize:10,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>TC ($/USD)</label>
+                  <input type="number" value={l.tipoCambioUsado||1450}
+                    onChange={e=>setEditLineas(ls=>ls.map((x,j)=>j===i?{...x,tipoCambioUsado:e.target.value}:x))}
+                    style={{fontSize:12,width:90}}/>
+                  {l.cantidad&&l.precioVenta&&l.tipoCambioUsado&&(
+                    <span style={{fontSize:11,color:"var(--text-info)"}}>
+                      = {fmtUSD(Number(l.cantidad)*Number(l.precioVenta)/Number(l.tipoCambioUsado))}
+                    </span>
+                  )}
+                </div>
+                {l.cantidad&&l.precioVenta&&<div style={{fontSize:11,color:"var(--text-success)",marginTop:4,fontWeight:500}}>Subtotal ARS: ${fmt(Number(l.cantidad)*Number(l.precioVenta))}</div>}
               </div>
             ))}
             <div style={{fontSize:12,fontWeight:600,color:"var(--text-primary)",marginBottom:14,paddingTop:4}}>
