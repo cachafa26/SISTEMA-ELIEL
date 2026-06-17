@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.7.2";
+const APP_VERSION = "v2.7.3";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -3026,15 +3026,17 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const realizados=[...eventos.filter(e=>e.estado==="Realizado"||(e.estado==="Confirmado"&&e.fecha<hoy2))].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
 
 
-  // Totales historial
-  const cobroTotal=realizados.reduce((a,e)=>{
-    // Suma pagos reales registrados; si no hay pagos, usa senaUSD o cobroUSD
+  // Totales: sobre TODOS los eventos (confirmados + historial) con pagos registrados
+  // La ganancia se cuenta desde que lo cobrado supera el costo, sin importar si pasó la fecha
+  const todosEventos=[...(data.dj?.eventos||[])];
+  const cobroTotal=todosEventos.reduce((a,e)=>{
     const pagado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0);
-    return a+(pagado>0?pagado:Number(e.senaUSD||0)>0?Number(e.senaUSD):Number(e.cobroUSD||0));
+    const cobrado=pagado>0?pagado:Number(e.senaUSD||0);
+    return a+cobrado;
   },0);
-  const ganTotal=realizados.reduce((a,e)=>{
+  const ganTotal=todosEventos.reduce((a,e)=>{
     const pagado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0);
-    const cobrado=pagado>0?pagado:Number(e.senaUSD||0)>0?Number(e.senaUSD):Number(e.cobroUSD||0);
+    const cobrado=pagado>0?pagado:Number(e.senaUSD||0);
     return a+Math.max(0,cobrado-Number(e.costoUSD||0));
   },0);
   const saldoTotal=confirmados.filter(e=>e.saldo>0).reduce((a,e)=>a+Number(e.saldo||0),0);
