@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.9.0";
+const APP_VERSION = "v2.9.1";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1061,7 +1061,7 @@ const EMPTY = {
   clientes:{},          // persistente en Firebase
   bh:{ despachos:[], cobros:[] },
   dj:{ eventos:[], presupuestos:[] },
-  fin:{ gastos:[], presupuestos:{} },
+  fin:{ gastos:[], presupuestos:{}, fx:[] },
   _v:10
 };
 
@@ -1413,10 +1413,14 @@ function App(){
   const djCobrado=djCobradoUSD;
 
   // Calculos Finanzas
-  // Gastos ARS: solo los registrados en pesos
-  const totalGastosARS=(data.fin?.gastos||[]).filter(g=>g.moneda!=="USD").reduce((a,g)=>a+g.monto,0);
-  // Gastos USD: los registrados en dólares (monto original en USD)
-  const totalGastosUSD=(data.fin?.gastos||[]).filter(g=>g.moneda==="USD").reduce((a,g)=>a+Number(g.montoOriginal||0),0);
+  // Gastos ARS: gastos en pesos + pesos gastados en compra de USD
+  const gastosFX_ARS=(data.fin?.fx||[]).filter(f=>f.tipo==="compra").reduce((a,f)=>a+Number(f.totalARS||0),0);
+  const ingresosFX_ARS=(data.fin?.fx||[]).filter(f=>f.tipo==="venta").reduce((a,f)=>a+Number(f.totalARS||0),0);
+  const totalGastosARS=(data.fin?.gastos||[]).filter(g=>g.moneda!=="USD").reduce((a,g)=>a+g.monto,0)+gastosFX_ARS-ingresosFX_ARS;
+  // Gastos USD: gastos en USD + USD vendidos
+  const gastosFX_USD=(data.fin?.fx||[]).filter(f=>f.tipo==="venta").reduce((a,f)=>a+Number(f.cantUSD||0),0);
+  const ingresosFX_USD=(data.fin?.fx||[]).filter(f=>f.tipo==="compra").reduce((a,f)=>a+Number(f.cantUSD||0),0);
+  const totalGastosUSD=(data.fin?.gastos||[]).filter(g=>g.moneda==="USD").reduce((a,g)=>a+Number(g.montoOriginal||0),0)+gastosFX_USD;
   const totalGastos=totalGastosARS; // para compatibilidad con FinanzasView (ARS)
   const totalRetSCPesos=(data.retiros||[]).reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0);
   // Ingresos ARS: solo lo efectivamente cobrado/retirado en pesos
@@ -2744,6 +2748,21 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
       monto:-g.monto,moneda:"ARS",
       modulo:"Gasto",color:"var(--color-text-danger)"
     })),
+    // Operaciones FX — compra/venta de dólares
+    ...(data.fin?.fx||[]).flatMap(f=>[
+      {
+        id:f.id+"_ars",fecha:f.fecha,
+        desc:(f.tipo==="compra"?"Compra USD":"Venta USD")+" · "+Number(f.cantUSD).toLocaleString("es-AR")+" USD @ $"+fmt(f.cotiz),
+        monto:f.tipo==="compra"?-Number(f.totalARS):Number(f.totalARS),
+        moneda:"ARS",modulo:"FX",color:f.tipo==="compra"?"var(--color-text-info)":"var(--color-text-success)"
+      },
+      {
+        id:f.id+"_usd",fecha:f.fecha,
+        desc:(f.tipo==="compra"?"Compra USD":"Venta USD")+" · $"+fmt(f.totalARS)+" ARS @ $"+fmt(f.cotiz),
+        monto:f.tipo==="compra"?Number(f.cantUSD):-Number(f.cantUSD),
+        moneda:"USD",modulo:"FX",color:f.tipo==="compra"?"var(--color-text-success)":"var(--color-text-warning)"
+      }
+    ]),
   ].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||"")).slice(0,8);
 
   const tcBar=blue||1450;
@@ -2767,12 +2786,14 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
         const gastoARS=totalGastosARS||totalGastos;
         const balanceARS=ingresoARS-gastoARS;
         const mi30Pesos=Math.round((pendienteRetiro||0)*tc);
-        // Ingresos USD: retiros en USD (SC+BH) + pagos DJ en USD
+        // Ingresos USD: retiros en USD (SC+BH) + pagos DJ en USD + USD comprados con pesos
         const retirosUSD=(data.retiros||[]).filter(r=>r.moneda==="USD").reduce((a,r)=>a+Number(r.montoUSD||0),0);
         const bhCobrosUSD=(data.bh?.cobros||[]).filter(c=>c.moneda==="USD").reduce((a,c)=>a+Number(c.monto||0),0);
         const djCobradoUSDtotal=(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD").reduce((a,p)=>a+Number(p.montoUSD||0),0);
-        const ingresosUSD=retirosUSD+bhCobrosUSD+djCobradoUSDtotal;
-        // Egresos USD: gastos registrados en USD desde Finanzas
+        const fxCompradoUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="compra").reduce((a,f)=>a+Number(f.cantUSD||0),0);
+        const fxVendidoUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="venta").reduce((a,f)=>a+Number(f.cantUSD||0),0);
+        const ingresosUSD=retirosUSD+bhCobrosUSD+djCobradoUSDtotal+fxCompradoUSD-fxVendidoUSD;
+        // Egresos USD: gastos en USD + USD vendidos (ya incluidos en totalGastosUSD)
         const egresoUSD=totalGastosUSD||0;
         const balanceUSD=ingresosUSD-egresoUSD;
         return(
@@ -3796,6 +3817,11 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
   const [showPresupuesto,setShowPresupuesto]=useState(false);
   const [presupCat,setPresupCat]=useState("");
   const [presupMonto,setPresupMonto]=useState("");
+  // FX: compra/venta de dólares
+  const [showFX,setShowFX]=useState(false);
+  const [fxTipo,setFxTipo]=useState("compra");
+  const [fxCant,setFxCant]=useState("");
+  const [fxCotiz,setFxCotiz]=useState(blue?String(Math.round(blue)):"");
   const gastos=data.fin?.gastos||[];
   const balance=totalIngresos-totalGastos;
   const presupuestos=data.fin?.presupuestos||{};
@@ -3803,6 +3829,24 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
   const gastosMes=gastos.filter(g=>{const d=new Date(g.fecha);return d.getMonth()===mesActual&&d.getFullYear()===new Date().getFullYear();});
   const totalGastosMes=gastosMes.reduce((a,g)=>a+g.monto,0);
   
+  const fxTotal=Number(fxCant||0)*Number(fxCotiz||0);
+  const guardarFX=()=>{
+    if(!fxCant||!fxCotiz){showToast("Completá cantidad y cotización");return;}
+    const op={
+      id:Date.now().toString(),
+      tipo:fxTipo,
+      cantUSD:Number(fxCant),
+      cotiz:Number(fxCotiz),
+      totalARS:fxTotal,
+      fecha:new Date().toISOString().split("T")[0],
+      ts:Date.now(),
+    };
+    const fx=[...(data.fin?.fx||[]),op];
+    save({...data,fin:{...data.fin,fx}});
+    setFxCant("");setFxCotiz(blue?String(Math.round(blue)):"");setShowFX(false);
+    showToast(fxTipo==="compra"?"✓ Compra de USD registrada":"✓ Venta de USD registrada");
+  };
+
   const guardarPresupuesto=()=>{
     if(!presupCat||!presupMonto)return;
     save({...data,fin:{...data.fin,presupuestos:{...presupuestos,[presupCat]:Number(presupMonto)}}});
@@ -3938,6 +3982,73 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
         <button onClick={guardar} style={{fontSize:13,padding:"8px 16px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-text-danger)",color:"var(--color-background-primary)",fontWeight:500,marginTop:2}}>
           Cargar gasto
         </button>
+      </div>
+
+      {/* ── DÓLARES: COMPRA / VENTA ── */}
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 18px",marginBottom:"1.5rem"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:showFX?12:0}}>
+          <div>
+            <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)"}}>Operaciones en dólares</div>
+            <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>Registrá compras y ventas de USD</div>
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>{setFxTipo("compra");setShowFX(s=>!s);}} style={{fontSize:12,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",cursor:"pointer",fontWeight:600}}>💵 Comprar</button>
+            <button onClick={()=>{setFxTipo("venta");setShowFX(s=>!s);}} style={{fontSize:12,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",cursor:"pointer",fontWeight:600}}>💱 Vender</button>
+          </div>
+        </div>
+        {showFX&&(
+          <div style={{background:"rgba(120,120,128,0.06)",borderRadius:"var(--r-md)",padding:"14px",border:"0.5px solid var(--glass-border)"}}>
+            <div style={{fontSize:12,fontWeight:600,color:fxTipo==="compra"?"var(--text-info)":"var(--text-success)",marginBottom:12}}>
+              {fxTipo==="compra"?"🔵 Comprás dólares (pagás pesos)": "🟢 Vendés dólares (recibís pesos)"}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div>
+                <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Cantidad (USD)</label>
+                <input type="number" value={fxCant} onChange={e=>setFxCant(e.target.value)} placeholder="ej: 500" inputMode="decimal"/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Cotización ($/USD){blue?" · Blue $"+fmt(blue):""}</label>
+                <input type="number" value={fxCotiz} onChange={e=>setFxCotiz(e.target.value)} placeholder={blue?String(Math.round(blue)):"1450"} inputMode="decimal"/>
+              </div>
+            </div>
+            {fxCant&&fxCotiz&&Number(fxCant)>0&&(
+              <div style={{padding:"10px 14px",borderRadius:"var(--r-md)",marginBottom:12,fontSize:13,fontWeight:600,
+                background:fxTipo==="compra"?"var(--bg-tint-blue)":"var(--bg-tint-green)",
+                color:fxTipo==="compra"?"var(--text-info)":"var(--text-success)",
+                border:"0.5px solid "+(fxTipo==="compra"?"var(--border-info)":"var(--border-success)")}}>
+                {fxTipo==="compra"
+                  ?<>Pagás <strong>${fmt(fxTotal)}</strong> ARS → recibís <strong>USD {Number(fxCant).toLocaleString("es-AR")}</strong></>
+                  :<>Entregás <strong>USD {Number(fxCant).toLocaleString("es-AR")}</strong> → recibís <strong>${fmt(fxTotal)}</strong> ARS</>
+                }
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={guardarFX} style={{fontSize:13,padding:"8px 20px",borderRadius:"var(--r-pill)",border:"none",
+                background:fxTipo==="compra"?"linear-gradient(135deg,#185FA5,#2E86C1)":"linear-gradient(135deg,#5BAD41,#3D8B2A)",
+                color:"#fff",fontWeight:600,cursor:"pointer"}}>
+                {fxTipo==="compra"?"Registrar compra":"Registrar venta"}
+              </button>
+              <button onClick={()=>setShowFX(false)} style={{fontSize:13,padding:"8px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+            </div>
+          </div>
+        )}
+        {/* Historial FX */}
+        {(data.fin?.fx||[]).length>0&&(
+          <div style={{marginTop:showFX?12:0}}>
+            {[...(data.fin?.fx||[])].sort((a,b)=>b.ts-a.ts).slice(0,5).map(f=>(
+              <div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderTop:"0.5px solid var(--glass-border)",fontSize:12}}>
+                <div>
+                  <span style={{fontWeight:600,color:f.tipo==="compra"?"var(--text-info)":"var(--text-success)"}}>{f.tipo==="compra"?"Compra":"Venta"} USD</span>
+                  <span style={{color:"var(--text-secondary)",marginLeft:8}}>{f.fecha} · TC ${fmt(f.cotiz)}</span>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontWeight:600}}>{f.tipo==="compra"?"+":"−"} USD {Number(f.cantUSD).toLocaleString("es-AR")}</div>
+                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>{f.tipo==="compra"?"-":"+"}${fmt(f.totalARS)} ARS</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Gráficos */}
