@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.8.5";
+const APP_VERSION = "v2.8.6";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1388,7 +1388,15 @@ function App(){
 
   // Calculos DJ globales
   const djEventos=data.dj?.eventos||[];
-  const djRealizados=djEventos.filter(e=>e.estado==="Realizado");
+  const _hoyISO=new Date().toISOString().split("T")[0];
+  const djRealizados=djEventos.filter(e=>{
+    if(e.estado==="Realizado"||e.estado==="Señado") return true;
+    if(e.estado==="Confirmado"&&e.fecha<_hoyISO){
+      const cobrado=(e.pagos||[]).reduce((a,p)=>a+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
+      return Math.max(0,Number(e.cobroUSD||0)-cobrado)===0;
+    }
+    return false;
+  });
   // Ganancia = lo cobrado que supera el costo, sin importar estado
   const djGananciaUSD=djEventos.reduce((a,e)=>{
     if(e.estado==="Pendiente") return a;
@@ -3127,8 +3135,26 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const eventos=data.dj?.eventos||[];
   const presupuestos=[...(data.dj?.presupuestos||[])].filter(p=>p.estado==="Pendiente"||p.estado==="Rechazado").sort((a,b)=>b.id.localeCompare(a.id));
   const hoy2=hoy();
-  const confirmados=[...eventos.filter(e=>(e.estado==="Confirmado")&&e.fecha>=hoy2)].sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  const realizados=[...eventos.filter(e=>e.estado==="Realizado"||(e.estado==="Confirmado"&&e.fecha<hoy2))].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
+  // Confirmados: futuros + pasados con saldo pendiente
+  const confirmados=[...eventos.filter(e=>{
+    if(e.estado!=="Confirmado") return false;
+    const cobrado=(e.pagos||[]).reduce((a,p)=>a+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
+    const saldo=Math.max(0,Number(e.cobroUSD||0)-cobrado);
+    // Si la fecha pasó pero aún debe → sigue en Confirmados
+    if(e.fecha<hoy2 && saldo>0) return true;
+    return e.fecha>=hoy2;
+  })].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  // Historial: Realizado, o Confirmado con fecha pasada Y saldo=0
+  const realizados=[...eventos.filter(e=>{
+    if(e.estado==="Realizado") return true;
+    if(e.estado==="Señado") return true;
+    if(e.estado==="Confirmado"&&e.fecha<hoy2){
+      const cobrado=(e.pagos||[]).reduce((a,p)=>a+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
+      const saldo=Math.max(0,Number(e.cobroUSD||0)-cobrado);
+      return saldo===0; // solo pasa a historial si está saldado
+    }
+    return false;
+  })].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
 
 
   // Totales historial
