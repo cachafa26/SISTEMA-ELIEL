@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.6.9";
+const APP_VERSION = "v2.7.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4369,7 +4369,26 @@ function TabArmado({cont,updateCont,showToast}){
 
 function TabCostos({cont,updateCont,showToast,blue}){
   const tcDef=blue?String(Math.round(blue)):(cont.costos?.tipoCambio||"1450");
-  const [form,setForm]=useState({tipoCambio:tcDef,costoChina:"",costoMoneda:"USD",despacho:"",mDespacho:"ARS",naviera:"",mNaviera:"ARS",despachante:"",mDespachante:"USD",losPrincipes:"",mLosPrincipes:"ARS",deposito:"",mDeposito:"ARS",terminal:"",mTerminal:"ARS",otros:"",mOtros:"USD",...cont.costos});
+  const _savedCostos=cont.costos||{};
+  const [form,setForm]=useState({
+    tipoCambio:tcDef,costoChina:"",costoMoneda:"USD",
+    despacho:"",mDespacho:"ARS",
+    naviera:"",mNaviera:"ARS",
+    despachante:"",mDespachante:"USD",
+    losPrincipes:"",mLosPrincipes:"ARS",
+    deposito:"",mDeposito:"ARS",
+    terminal:"",mTerminal:"ARS",
+    otros:"",mOtros:"USD",
+    ..._savedCostos,
+    // Restore moneda fields with fallbacks if not saved
+    mDespacho:_savedCostos.mDespacho||"ARS",
+    mNaviera:_savedCostos.mNaviera||"ARS",
+    mDespachante:_savedCostos.mDespachante||"USD",
+    mLosPrincipes:_savedCostos.mLosPrincipes||"ARS",
+    mDeposito:_savedCostos.mDeposito||"ARS",
+    mTerminal:_savedCostos.mTerminal||"ARS",
+    mOtros:_savedCostos.mOtros||"USD",
+  });
   const [tcPesos,setTcPesos]=useState(tcDef);
   const tc=Number(form.tipoCambio)||1450;
   const toUSD=p=>Number(p||0)/tc;
@@ -4382,15 +4401,15 @@ function TabCostos({cont,updateCont,showToast,blue}){
     updateCont({...cont,costos:{...form,tipoCambioFijado:form.tipoCambio},costoTotal:totalUSD,artsCostoDetalle:artsCosto});
     showToast("Costos guardados");
   };
-  const campos=[{k:"despacho",l:"Despacho ($ARS)"},{k:"naviera",l:"Naviera ($ARS)"},{k:"despachante",l:"Despachante (USD)"},{k:"losPrincipes",l:"Los Príncipes ($ARS)"},{k:"deposito",l:"Depósito ($ARS)"},{k:"terminal",l:"Terminal ($ARS)"},{k:"otros",l:"Otros (USD)"}];
+  const campos=[{k:"despacho",m:"mDespacho",l:"Despacho"},{k:"naviera",m:"mNaviera",l:"Naviera"},{k:"despachante",m:"mDespachante",l:"Despachante"},{k:"losPrincipes",m:"mLosPrincipes",l:"Los Príncipes"},{k:"deposito",m:"mDeposito",l:"Depósito"},{k:"terminal",m:"mTerminal",l:"Terminal"},{k:"otros",m:"mOtros",l:"Otros"}];
   return(
     <div>
       {blue&&<div style={{background:"var(--color-background-success)",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:"1rem",fontSize:12,color:"var(--color-text-success)"}}>💵 Blue en tiempo real: ${fmt(blue)}</div>}
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-          <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Tipo de cambio Blue ($/USD)</label><input type="number" value={form.tipoCambio} onChange={e=>setForm({...form,tipoCambio:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Costo China</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form.costoChina||""} onChange={e=>setForm({...form,costoChina:e.target.value})} style={{flex:1,boxSizing:"border-box"}}/><select value={form.costoMoneda||"ARS"} onChange={e=>setForm({...form,costoMoneda:e.target.value})} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>
-          {campos.map(c=>(<div key={c.k}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{c.l}</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form[c.k]||""} onChange={e=>setForm({...form,[c.k]:e.target.value})} style={{flex:1,boxSizing:"border-box"}}/><select value={form[c.m||"m"+c.k]||"ARS"} onChange={e=>setForm({...form,[c.m||"m"+c.k]:e.target.value})} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>))}
+          <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Tipo de cambio Blue ($/USD)</label><input type="number" value={form.tipoCambio} onChange={e=>{const v=e.target.value;setForm(f=>({...f,tipoCambio:v}));}} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
+          <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Costo China</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form.costoChina||""} onChange={e=>setForm({...form,costoChina:e.target.value})} style={{flex:1,boxSizing:"border-box"}}/><select value={form.costoMoneda||"ARS"} onChange={e=>{const v=e.target.value;setForm(f=>({...f,costoMoneda:v}));}} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>
+          {campos.map(c=>(<div key={c.k}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{c.l}</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form[c.k]||""} onChange={e=>{const v=e.target.value;setForm(f=>({...f,[c.k]:v}));}} style={{flex:1,boxSizing:"border-box"}}/><select value={form[c.m||"m"+c.k]||"ARS"} onChange={e=>{const v=e.target.value;setForm(f=>({...f,[c.m||"m"+c.k]:v}));}} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>))}
         </div>
         <div style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:10}}>
           <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Total costo estimado</div>
