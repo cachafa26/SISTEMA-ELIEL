@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.9.3";
+const APP_VERSION = "v2.9.4";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2844,52 +2844,114 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
           ))}
         </div>
 
-        {verTodo
-          /* ── VISTA COMPLETA DE MOVIMIENTOS ── */
-          ?<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontSize:12,fontWeight:600,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em"}}>Todos los movimientos</div>
-              <button onClick={()=>setVerTodo(false)} style={{fontSize:11,padding:"4px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>← Volver</button>
-            </div>
-            {todosMovimientos.length===0
-              ?<p style={{color:"var(--color-text-secondary)",fontSize:13}}>Sin movimientos.</p>
-              :(()=>{
-                // Group by date
-                const byDate={};
-                todosMovimientos.forEach(m=>{
-                  const d=m.fecha||"Sin fecha";
-                  if(!byDate[d])byDate[d]=[];
-                  byDate[d].push(m);
-                });
-                const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
-                return dates.map(fecha=>(
-                  <div key={fecha} style={{marginBottom:12}}>
-                    <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",
-                      color:"var(--text-secondary)",padding:"6px 0",
-                      borderBottom:"0.5px solid var(--glass-border)",marginBottom:4}}>
-                      {fecha}
-                    </div>
-                    {byDate[fecha].map((m,i)=>(
-                      <div key={m.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                        <div>
-                          <div style={{fontSize:12,color:"var(--color-text-primary)"}}>{m.desc}</div>
-                          <div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:1}}><span style={{color:m.color}}>{m.modulo}</span></div>
-                        </div>
-                        <div style={{fontSize:13,fontWeight:500,color:m.monto>=0?"var(--color-text-success)":"var(--color-text-danger)",flexShrink:0,marginLeft:12}}>
-                          {m.monto>=0
-                            ?(m.moneda==="USD"?fmtUSD(m.monto):"$"+fmt(m.monto))
-                            :(m.moneda==="USD"?"-"+fmtUSD(Math.abs(m.monto)):"-$"+fmt(Math.abs(m.monto)))
-                          }
-                        </div>
-                      </div>
-                    ))}
+        <>
+          {/* ── MODAL FLOTANTE VER TODO ── */}
+          {verTodo&&(
+            <div onClick={()=>setVerTodo(false)} style={{
+              position:"fixed",inset:0,zIndex:2000,
+              background:"rgba(0,0,0,0.55)",
+              backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",
+              display:"flex",alignItems:"flex-start",justifyContent:"center",
+              padding:"5vh 1rem 1rem",overflowY:"auto",
+            }}>
+              <div onClick={e=>e.stopPropagation()} style={{
+                background:"var(--bg-modal)",
+                backdropFilter:"blur(40px) saturate(2)",WebkitBackdropFilter:"blur(40px) saturate(2)",
+                border:"0.5px solid var(--glass-border)",
+                boxShadow:"var(--glass-shadow-lg)",
+                borderRadius:"var(--r-xl)",
+                width:"100%",maxWidth:520,
+                padding:"22px 24px",
+                animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)",
+                maxHeight:"80vh",display:"flex",flexDirection:"column",
+              }}>
+                {/* Header */}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexShrink:0}}>
+                  <div>
+                    <div style={{fontSize:15,fontWeight:700,color:"var(--text-primary)",letterSpacing:"-.01em"}}>Todos los movimientos</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{todosMovimientos.length} movimientos registrados</div>
                   </div>
-                ));
-              })()
-            }
-          </div>
-          /* ── CARD NORMAL (últimos 8) ── */
-          :<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
+                  <button onClick={()=>setVerTodo(false)} style={{
+                    width:30,height:30,borderRadius:"50%",
+                    border:"0.5px solid var(--glass-border)",
+                    background:"var(--bg-card)",cursor:"pointer",
+                    fontSize:14,color:"var(--text-secondary)",
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    flexShrink:0,
+                  }}>✕</button>
+                </div>
+                {/* Lista scrolleable */}
+                <div style={{overflowY:"auto",flex:1}}>
+                  {todosMovimientos.length===0
+                    ?<p style={{color:"var(--text-secondary)",fontSize:13,textAlign:"center",padding:"2rem 0"}}>Sin movimientos aún.</p>
+                    :(()=>{
+                      // Ordenar por id (timestamp) desc para orden exacto dentro del mismo día
+                      const sorted=[...todosMovimientos].sort((a,b)=>{
+                        const fd=b.fecha.localeCompare(a.fecha);
+                        if(fd!==0)return fd;
+                        return (b.id||"z").localeCompare(a.id||"z");
+                      });
+                      // Agrupar por fecha
+                      const byDate={};
+                      sorted.forEach(m=>{
+                        const d=m.fecha||"Sin fecha";
+                        if(!byDate[d])byDate[d]=[];
+                        byDate[d].push(m);
+                      });
+                      const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+                      const hoyStr=new Date().toISOString().split("T")[0];
+                      const ayer=new Date(); ayer.setDate(ayer.getDate()-1);
+                      const ayerStr=ayer.toISOString().split("T")[0];
+                      const fmtFecha=d=>d===hoyStr?"Hoy":d===ayerStr?"Ayer":new Date(d+"T12:00:00").toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"});
+                      return dates.map(fecha=>(
+                        <div key={fecha} style={{marginBottom:4}}>
+                          {/* Separador de día */}
+                          <div style={{
+                            fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",
+                            color:"var(--text-secondary)",
+                            padding:"10px 0 5px",
+                            display:"flex",alignItems:"center",gap:8,
+                          }}>
+                            <span>{fmtFecha(fecha)}</span>
+                            <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
+                          </div>
+                          {/* Movimientos del día */}
+                          {byDate[fecha].map((m,i)=>(
+                            <div key={m.id||i} style={{
+                              display:"flex",justifyContent:"space-between",alignItems:"center",
+                              padding:"8px 10px",marginBottom:3,
+                              borderRadius:"var(--r-md)",
+                              background:"rgba(120,120,128,0.04)",
+                              border:"0.5px solid var(--glass-border)",
+                            }}>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:12,color:"var(--text-primary)",fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.desc}</div>
+                                <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>
+                                  <span style={{color:m.color,fontWeight:600}}>{m.modulo}</span>
+                                </div>
+                              </div>
+                              <div style={{
+                                fontSize:13,fontWeight:600,
+                                color:m.monto>=0?"var(--color-text-success)":"var(--color-text-danger)",
+                                flexShrink:0,marginLeft:12,
+                              }}>
+                                {m.monto>=0
+                                  ?(m.moneda==="USD"?fmtUSD(m.monto):"$"+fmt(m.monto))
+                                  :(m.moneda==="USD"?"-"+fmtUSD(Math.abs(m.monto)):"-$"+fmt(Math.abs(m.monto)))
+                                }
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ));
+                    })()
+                  }
+                </div>
+              </div>
+            </div>
+          )}
+          {/* ── CARD NORMAL (últimos 8) ── */}
+          <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
               <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em"}}>Últimos movimientos</div>
               {todosMovimientos.length>0&&<button onClick={()=>setVerTodo(true)} style={{fontSize:11,padding:"4px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-info)",cursor:"pointer",fontWeight:500}}>Ver todo →</button>}
@@ -2909,7 +2971,7 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
               </div>
             ))}
           </div>
-        }
+        </>
       </div>
 
       {/* Accesos rápidos */}
