@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.8.1";
+const APP_VERSION = "v2.8.2";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -3014,6 +3014,75 @@ function fechaEspToISO(fechaEsp){
   return fechaEsp;
 }
 
+
+// ── EditPagoInline: add a payment from within the event editor ───────────
+function EditPagoInline({eventoId,eventos,data,save,showToast,blue}){
+  const [open,setOpen]=useState(false);
+  const [fp,setFp]=useState({monto:"",moneda:"USD",concepto:"Cuota",fecha:new Date().toISOString().split("T")[0],nota:""});
+  const tc=blue||1450;
+  if(!open) return(
+    <button onClick={()=>setOpen(true)} style={{fontSize:11,padding:"5px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer",fontWeight:500}}>
+      + Agregar pago
+    </button>
+  );
+  const guardar=()=>{
+    if(!fp.monto)return;
+    const evento=eventos.find(e=>e.id===eventoId);
+    if(!evento)return;
+    const montoN=Number(fp.monto);
+    const montoUSD=fp.moneda==="ARS"?montoN/tc:montoN;
+    const nuevoPago={id:Date.now().toString(),fecha:fp.fecha,concepto:fp.concepto,monto:montoN,moneda:fp.moneda,montoUSD,nota:fp.nota};
+    const pagos=[...(evento.pagos||[]),nuevoPago];
+    const totalPagadoUSD=pagos.reduce((a,p)=>a+p.montoUSD,0);
+    const nuevoSaldo=Math.max(0,Number(evento.cobroUSD||0)-totalPagadoUSD);
+    const updEvento={...evento,pagos,saldo:nuevoSaldo,senaUSD:totalPagadoUSD};
+    save({...data,dj:{...data.dj,eventos:eventos.map(e=>e.id===eventoId?updEvento:e)}});
+    setFp({monto:"",moneda:"USD",concepto:"Cuota",fecha:new Date().toISOString().split("T")[0],nota:""});
+    setOpen(false);
+    showToast("✓ Pago agregado");
+  };
+  return(
+    <div style={{background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)",padding:"12px",marginTop:6}}>
+      <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:8}}>Agregar pago</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <div>
+          <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:3}}>Monto</label>
+          <div style={{display:"flex",gap:4}}>
+            <select value={fp.moneda} onChange={e=>setFp(f=>({...f,moneda:e.target.value}))} style={{width:60,flexShrink:0}}>
+              <option value="USD">USD</option><option value="ARS">ARS</option>
+            </select>
+            <input type="number" value={fp.monto} onChange={e=>setFp(f=>({...f,monto:e.target.value}))} placeholder="0" inputMode="decimal" autoFocus/>
+          </div>
+        </div>
+        <div>
+          <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:3}}>Concepto</label>
+          <select value={fp.concepto} onChange={e=>setFp(f=>({...f,concepto:e.target.value}))}>
+            {["Seña","1ra cuota","2da cuota","Anticipo","Pago total","Pago parcial","Saldo"].map(c=><option key={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:3}}>Fecha</label>
+          <input type="date" value={fp.fecha} onChange={e=>setFp(f=>({...f,fecha:e.target.value}))}/>
+        </div>
+        <div>
+          <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:3}}>Nota</label>
+          <input value={fp.nota} onChange={e=>setFp(f=>({...f,nota:e.target.value}))} placeholder="Opcional"/>
+        </div>
+      </div>
+      {fp.monto&&Number(fp.monto)>0&&(
+        <div style={{fontSize:11,color:"var(--text-info)",marginBottom:8}}>
+          = {fp.moneda==="ARS"?fmtUSD(Number(fp.monto)/tc)+" al TC $"+fmt(tc):"$"+fmt(Number(fp.monto)*tc)+" ARS"}
+        </div>
+      )}
+      <div style={{display:"flex",gap:6}}>
+        <button onClick={guardar} style={{fontSize:12,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:600,cursor:"pointer"}}>Guardar pago</button>
+        <button onClick={()=>setOpen(false)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+
 function DJView({data,save,showToast,blue,onGenerarDoc}){
   const tc=blue||1450;
   const initForm={nombre:"",fecha:hoy(),estado:"Confirmado",
@@ -3049,19 +3118,33 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 
   const guardarEvento=()=>{
     if(!form.nombre.trim())return;
-    const cobroRaw=Number(form.cobro||0),costoRaw=Number(form.costo||0),senaRaw=Number(form.sena||0);
+    const cobroRaw=Number(form.cobro||0),costoRaw=Number(form.costo||0);
     const cobroUSD=form.monedaCobro==="ARS"?cobroRaw/tc:cobroRaw;
     const costoUSD=form.monedaCosto==="ARS"?costoRaw/tc:costoRaw;
-    const senaUSD=form.monedaCobro==="ARS"?senaRaw/tc:senaRaw;
     const gananciaUSD=cobroUSD-costoUSD;
+    // Preserve existing pagos when editing
+    const eventoExistente=editId?eventos.find(e=>e.id===editId):null;
+    const pagosExistentes=eventoExistente?.pagos||[];
+    const totalPagadoUSD=pagosExistentes.reduce((a,p)=>a+Number(p.montoUSD||0),0);
+    // For new events, seña from form; for edits, saldo calculated from real pagos
+    let pagos=pagosExistentes;
+    let senaUSD=totalPagadoUSD;
+    if(!editId){
+      // New event: if seña specified, create first pago
+      const senaRaw=Number(form.sena||0);
+      senaUSD=form.monedaCobro==="ARS"?senaRaw/tc:senaRaw;
+      pagos=senaRaw>0?[{id:Date.now().toString(),fecha:new Date().toISOString().split("T")[0],concepto:"Seña",monto:senaRaw,moneda:form.monedaCobro,montoUSD:senaUSD,nota:"Al confirmar"}]:[];
+    }
     const saldo=Math.max(0,cobroUSD-senaUSD);
     const evento={
+      ...(eventoExistente||{}),
       id:editId||Date.now().toString(),nombre:form.nombre,fecha:form.fecha,estado:form.estado,
       monedaCobro:form.monedaCobro,cobro:cobroRaw,cobroUSD,
       monedaCosto:form.monedaCosto,costo:costoRaw,costoUSD,
-      sena:senaRaw,senaUSD,saldo,gananciaUSD,
+      senaUSD,saldo,gananciaUSD,
       margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
       notas:form.notas,tcUsado:tc,
+      pagos,
     };
     const nuevos=editId?eventos.map(e=>e.id===editId?evento:e):[...eventos,evento];
     save({...data,dj:{...data.dj,eventos:nuevos}});
@@ -3531,25 +3614,73 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
       {/* ── TAB: NUEVO EVENTO (manual) ── */}
       {tab==="nuevo"&&(
         <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px 18px",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:12}}>{editId?"Editar evento":"Nuevo evento manual"}</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:12}}>{editId?"✏️ Editar evento":"Nuevo evento manual"}</div>
+          {/* Datos del evento */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
             <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nombre del evento</label><input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder="Casamiento García — Salón XYZ"/></div>
             <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm(f=>({...f,fecha:e.target.value}))}/></div>
             <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Estado</label><select value={form.estado} onChange={e=>setForm(f=>({...f,estado:e.target.value}))}>{["Confirmado","Realizado"].map(s=><option key={s}>{s}</option>)}</select></div>
-            <MonedaInput labelText="Cobro total" monedaKey="monedaCobro" montoKey="cobro" form={form} setForm={setForm}/>
+            <MonedaInput labelText="Cobro total (precio)" monedaKey="monedaCobro" montoKey="cobro" form={form} setForm={setForm}/>
             <MonedaInput labelText="Costo total" monedaKey="monedaCosto" montoKey="costo" form={form} setForm={setForm}/>
-            <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Seña ({form.monedaCobro})</label><input type="number" value={form.sena} onChange={e=>setForm(f=>({...f,sena:e.target.value}))} placeholder="0" inputMode="decimal"/></div>
-            <div style={{display:"flex",alignItems:"flex-end"}}>
+            {!editId&&<div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Seña inicial ({form.monedaCobro})</label><input type="number" value={form.sena} onChange={e=>setForm(f=>({...f,sena:e.target.value}))} placeholder="0" inputMode="decimal"/></div>}
+            <div style={{display:"flex",alignItems:"flex-end",gridColumn:editId?"1/-1":"auto"}}>
               {showPreview&&<div style={{width:"100%",padding:"9px 11px",background:previewGanUSD>=0?"var(--bg-tint-green)":"var(--bg-tint-red)",border:"0.5px solid "+(previewGanUSD>=0?"var(--border-success)":"var(--border-danger)"),borderRadius:"var(--r-md)",fontSize:12}}>
                 <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:previewGanUSD>=0?"var(--text-success)":"var(--text-danger)",marginBottom:3}}>Ganancia estimada</div>
                 <div style={{fontWeight:700,color:previewGanUSD>=0?"var(--text-success)":"var(--text-danger)"}}>{fmtUSD(previewGanUSD)}</div>
                 <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>≈ ${fmt(previewGanUSD*tc)} ARS</div>
               </div>}
             </div>
-            <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Notas</label><input value={form.notas} onChange={e=>setForm(f=>({...f,notas:e.target.value}))} placeholder="Rider, detalles..."/></div>
+            <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Notas / anotaciones del evento</label><input value={form.notas} onChange={e=>setForm(f=>({...f,notas:e.target.value}))} placeholder="Rider, salón, detalles, recordatorios..."/></div>
           </div>
+
+          {/* Sección de pagos — solo al editar */}
+          {editId&&(()=>{
+            const eventoEdit=eventos.find(e=>e.id===editId);
+            const pagosEdit=eventoEdit?.pagos||[];
+            const totalPagadoUSD=pagosEdit.reduce((a,p)=>a+Number(p.montoUSD||0),0);
+            const saldoActual=Math.max(0,Number(eventoEdit?.cobroUSD||0)-totalPagadoUSD);
+            return(
+              <div style={{marginBottom:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)"}}>Pagos registrados</div>
+                  <div style={{fontSize:12}}>
+                    <span style={{color:"var(--text-success)",fontWeight:600}}>Cobrado: {fmtUSD(totalPagadoUSD)}</span>
+                    {saldoActual>0&&<span style={{color:"var(--text-warning)",fontWeight:600,marginLeft:10}}>Saldo: {fmtUSD(saldoActual)}</span>}
+                  </div>
+                </div>
+                {pagosEdit.length===0
+                  ?<div style={{fontSize:12,color:"var(--text-secondary)",padding:"8px 0"}}>Sin pagos aún.</div>
+                  :<div style={{background:"rgba(120,120,128,0.06)",borderRadius:"var(--r-md)",padding:"10px 12px",marginBottom:10}}>
+                    {pagosEdit.map((p,i)=>(
+                      <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<pagosEdit.length-1?"0.5px solid var(--glass-border)":"none"}}>
+                        <div>
+                          <span style={{fontSize:12,fontWeight:500,color:"var(--text-primary)"}}>{p.concepto||"Pago"}</span>
+                          <span style={{fontSize:11,color:"var(--text-secondary)",marginLeft:8}}>{p.fecha}</span>
+                          {p.nota&&<span style={{fontSize:11,color:"var(--text-secondary)",marginLeft:6}}>· {p.nota}</span>}
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:12,fontWeight:600,color:"var(--text-success)"}}>{p.moneda==="ARS"?"$"+fmt(p.monto):"USD "+fmt(p.montoUSD)}</span>
+                          <button onClick={()=>{
+                            const nuevosPagos=pagosEdit.filter((_,idx)=>idx!==i);
+                            const nuevosTotPag=nuevosPagos.reduce((a,x)=>a+x.montoUSD,0);
+                            const nuevoSaldo=Math.max(0,Number(eventoEdit.cobroUSD||0)-nuevosTotPag);
+                            const updEvento={...eventoEdit,pagos:nuevosPagos,saldo:nuevoSaldo,senaUSD:nuevosTotPag};
+                            save({...data,dj:{...data.dj,eventos:eventos.map(e=>e.id===editId?updEvento:e)}});
+                            showToast("Pago eliminado");
+                          }} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:13,padding:"2px 4px"}}>✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                }
+                {/* Agregar nuevo pago desde el editor */}
+                <EditPagoInline eventoId={editId} eventos={eventos} data={data} save={save} showToast={showToast} blue={blue}/>
+              </div>
+            );
+          })()}
+
           <div style={{display:"flex",gap:8}}>
-            <button onClick={guardarEvento} style={{fontSize:13,padding:"9px 20px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer",boxShadow:"0 4px 14px rgba(24,95,165,0.35)"}}>{editId?"Actualizar":"Guardar evento"}</button>
+            <button onClick={guardarEvento} style={{fontSize:13,padding:"9px 20px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer",boxShadow:"0 4px 14px rgba(24,95,165,0.35)"}}>{editId?"Actualizar datos":"Guardar evento"}</button>
             {editId&&<button onClick={()=>{setEditId(null);setForm(initForm);setTab("confirmados");}} style={{fontSize:13,padding:"9px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>}
           </div>
         </div>
