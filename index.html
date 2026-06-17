@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.6.8";
+const APP_VERSION = "v2.6.9";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -5243,7 +5243,7 @@ function DespachosView({data,save,showToast}){
   const calcularBultos=d=>{
     // Parsea "30GR x5, TINTA NEGRO x3" -> [{nombre,cantidad,esTinta}]
     if(!d.articulos)return[{...d,bultoLabel:"",bultoNum:1,bultoTotal:1}];
-    const items=d.articulos.split(",").map(s=>{
+    const items=d.articulos.split(/,\s+(?=[A-Z0-9\d])/i).map(s=>{
       // Greedy: match nombre up to last " x N" at end
       const m=s.trim().match(/^(.+)\s+[xX×]\s*(\d+)$/);
       if(!m)return null;
@@ -5257,7 +5257,7 @@ function DespachosView({data,save,showToast}){
     // 1 etiqueta por cada rollo individual
     rollos.forEach(r=>{
       for(let i=0;i<r.cantidad;i++){
-        bultos.push({tipo:"rollo",desc:r.nombre+" (1 rollo)"});
+        bultos.push({tipo:"rollo",desc:r.nombre});
       }
     });
     // Tintas: hasta 20 unidades por bulto
