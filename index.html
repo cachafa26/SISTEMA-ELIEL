@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.8.0";
+const APP_VERSION = "v2.8.1";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -3033,7 +3033,9 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     monedaCobro:"USD",cobro:"",monedaCosto:"ARS",costo:"",sena:"",notas:""};
   const [form,setForm]=useState(initForm);
   const [editId,setEditId]=useState(null);
-  const [tab,setTab]=useState("presupuestos"); // presupuestos | confirmados | realizados
+  const [tab,setTab]=useState("presupuestos");
+  const [modalEditar,setModalEditar]=useState(null); // evento being edited
+  const [formEdit,setFormEdit]=useState({}); // presupuestos | confirmados | realizados
 
   const eventos=data.dj?.eventos||[];
   const presupuestos=[...(data.dj?.presupuestos||[])].filter(p=>p.estado==="Pendiente"||p.estado==="Rechazado").sort((a,b)=>b.id.localeCompare(a.id));
@@ -3067,6 +3069,8 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     const senaUSD=form.monedaCobro==="ARS"?senaRaw/tc:senaRaw;
     const gananciaUSD=cobroUSD-costoUSD;
     const saldo=Math.max(0,cobroUSD-senaUSD);
+    // Preserve existing pagos when editing
+    const eventoExistente=editId?eventos.find(e=>e.id===editId):null;
     const evento={
       id:editId||Date.now().toString(),nombre:form.nombre,fecha:form.fecha,estado:form.estado,
       monedaCobro:form.monedaCobro,cobro:cobroRaw,cobroUSD,
@@ -3074,20 +3078,49 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
       sena:senaRaw,senaUSD,saldo,gananciaUSD,
       margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
       notas:form.notas,tcUsado:tc,
+      // Preserve pagos from existing event; for new events with seña, create initial pago
+      pagos:eventoExistente
+        ? eventoExistente.pagos||[]
+        : senaRaw>0
+          ? [{id:Date.now().toString(),fecha:new Date().toISOString().split("T")[0],concepto:"Seña",monto:senaRaw,moneda:form.monedaCobro,montoUSD:senaUSD,nota:"Al confirmar"}]
+          : [],
     };
     const nuevos=editId?eventos.map(e=>e.id===editId?evento:e):[...eventos,evento];
     save({...data,dj:{...data.dj,eventos:nuevos}});
     setForm(initForm);setEditId(null);
+    setTab("confirmados"); // volver a confirmados tras guardar
     showToast(editId?"Evento actualizado":"Evento cargado");
   };
 
-  const editar=e=>{setEditId(e.id);setForm({
-    nombre:e.nombre,fecha:e.fecha,estado:e.estado,
-    monedaCobro:e.monedaCobro||"USD",cobro:String(e.cobro||""),
-    monedaCosto:e.monedaCosto||"ARS",costo:String(e.costo||""),
-    sena:String(e.sena||""),notas:e.notas||"",
-  });setTab("nuevo");};
+  const editar=e=>{
+    setFormEdit({
+      nombre:e.nombre,fecha:e.fecha,estado:e.estado,
+      monedaCobro:e.monedaCobro||"USD",cobro:String(e.cobro||""),
+      monedaCosto:e.monedaCosto||"ARS",costo:String(e.costo||""),
+      notas:e.notas||"",
+    });
+    setModalEditar(e);
+  };
 
+  const guardarEditar=()=>{
+    if(!modalEditar||!formEdit.nombre) return;
+    const cobroRaw=Number(formEdit.cobro||0),costoRaw=Number(formEdit.costo||0);
+    const cobroUSD=formEdit.monedaCobro==="ARS"?cobroRaw/tc:cobroRaw;
+    const costoUSD=formEdit.monedaCosto==="ARS"?costoRaw/tc:costoRaw;
+    const gananciaUSD=cobroUSD-costoUSD;
+    const pagosTotales=(modalEditar.pagos||[]).reduce((a,p)=>a+Number(p.montoUSD||0),0);
+    const saldo=Math.max(0,cobroUSD-pagosTotales);
+    const updated={...modalEditar,
+      nombre:formEdit.nombre,fecha:formEdit.fecha,estado:formEdit.estado,
+      monedaCobro:formEdit.monedaCobro,cobro:cobroRaw,cobroUSD,
+      monedaCosto:formEdit.monedaCosto,costo:costoRaw,costoUSD,
+      gananciaUSD,saldo,notas:formEdit.notas,
+      margen:cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
+    };
+    save({...data,dj:{...data.dj,eventos:eventos.map(e=>e.id===modalEditar.id?updated:e)}});
+    setModalEditar(null);
+    showToast("Evento actualizado");
+  };
   const eliminarEvento=id=>save({...data,dj:{...data.dj,eventos:eventos.filter(e=>e.id!==id)}});
   const actualizarEstado=(id,estado)=>save({...data,dj:{...data.dj,eventos:eventos.map(x=>x.id===id?{...x,estado}:x)}});
 
