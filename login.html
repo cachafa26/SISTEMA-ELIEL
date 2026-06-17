@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
-  <meta name="theme-color" content="#F47920"/>
+  <meta name="theme-color" content="#0E0E10"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
@@ -205,8 +205,13 @@
       const val = input.value.trim();
       const target = CREDS[val];
       if(target){
-        // Set session token
-        sessionStorage.setItem(SESSION_KEY, TOKENS[target]);
+        // Set session token in localStorage so all pages can read it
+        var tokenVal = TOKENS[target];
+        if(target === "index.html") {
+          localStorage.setItem("eliel_sys_session", JSON.stringify({token: tokenVal, exp: Date.now() + 86400000 * 7}));
+        } else {
+          localStorage.setItem("eliel_status_session", JSON.stringify({token: tokenVal, exp: Date.now() + 86400000 * 7}));
+        }
         showSuccess(target);
       } else {
         showError();
