@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.0.7 · 2026-06-17 -->
+  <!-- v3.0.8 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.7</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.8</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.0.7";
+const APP_VERSION = "v3.0.8";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4863,7 +4863,7 @@ function ContenedorDetail({cont,data,save,tab,setTab,onBack,showToast,blue}){
         ))}
       </div>
       {tab==="armado"&&<TabArmado cont={c} updateCont={updateCont} showToast={showToast}/>}
-      {tab==="costos"&&<TabCostos cont={c} updateCont={updateCont} showToast={showToast} blue={blue}/>}
+      {tab==="costos"&&<TabCostos cont={c} updateCont={updateCont} showToast={showToast} blue={blue} ventas={data.ventas}/>}
       {tab==="ventas"&&<TabVentasCont cont={c} ventasCont={ventasCont} data={data} save={save} showToast={showToast} blue={blue}/>}
       {tab==="stock"&&(
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -5039,7 +5039,7 @@ function TabArmado({cont,updateCont,showToast}){
   );
 }
 
-function TabCostos({cont,updateCont,showToast,blue}){
+function TabCostos({cont,updateCont,showToast,blue,ventas}){
   const tcDef=blue?String(Math.round(blue)):(cont.costos?.tipoCambio||"1450");
   const _savedCostos=cont.costos||{};
   const [form,setForm]=useState({
@@ -5175,85 +5175,114 @@ function TabCostos({cont,updateCont,showToast,blue}){
 
           {/* ── PANEL DE SIMULACIÓN ── */}
           {(()=>{
-            // Stock disponible por artículo (no vendido)
-            const stockDisponible={};
+            // Ventas ya realizadas en este contenedor
+            const ventasCont=(ventas||[]).filter(v=>v.contId===cont.id);
+            // Lo ya cobrado en USD
+            const cobradoUSDya=ventasCont.reduce((a,v)=>a+Number(v.usd||0),0);
+
+            // Stock disponible (no vendido) por artículo
+            const vendidoPorArt={};
+            for(const v of ventasCont){
+              vendidoPorArt[v.articulo]=(vendidoPorArt[v.articulo]||0)+Number(v.cantidad||0);
+            }
+            const stockRestante={};
             for(const art of (cont.articulos||[])){
-              stockDisponible[art.nombre]=Number(art.cantidad||0);
+              stockRestante[art.nombre]=Math.max(0,Number(art.cantidad||0)-(vendidoPorArt[art.nombre]||0));
             }
 
-            // Calc simulation
-            let simIngresosARS=0, simIngresosTotARS=0;
-            let simIngresosUSD=0;
+            const costoTotal=cont.costoTotal||0;
+            let simRestanteUSD=0;
             let hayPrecio=false;
 
             const simLineas=cont.artsCostoDetalle.map(a=>{
               const pventa=Number(preciosVenta[a.nombre]||0);
-              const stock=stockDisponible[a.nombre]||0;
-              const costoARS=a.costoUnitario*tcP;
-              const costoTotalARS=costoARS*stock;
-              const ventaTotalARS=pventa*stock;
-              const ganARS=ventaTotalARS-costoTotalARS;
-              const ganUSD=pventa>0?ganARS/tcP:0;
-              if(pventa>0){
-                hayPrecio=true;
-                simIngresosARS+=ventaTotalARS;
-                simIngresosTotARS+=ganARS;
-                simIngresosUSD+=ganUSD;
-              }
-              return{nombre:a.nombre,stock,pventa,ventaTotalARS,ganARS,ganUSD,costoTotalARS};
+              const stock=stockRestante[a.nombre]||0;
+              const costoUnitARS=a.costoUnitario*tcP;
+              const ventaRestARS=pventa*stock;
+              const ventaRestUSD=pventa>0?ventaRestARS/tcP:0;
+              if(pventa>0){hayPrecio=true;simRestanteUSD+=ventaRestUSD;}
+              return{nombre:a.nombre,stock,pventa,ventaRestARS,ventaRestUSD,costoUnitARS};
             });
 
             if(!hayPrecio)return(
               <div style={{marginTop:14,padding:"14px 16px",background:"rgba(120,120,128,0.06)",borderRadius:"var(--r-lg)",fontSize:12,color:"var(--text-secondary)",textAlign:"center"}}>
-                Cargá precios de venta arriba para ver la simulación de ganancia.
+                Cargá precios de venta arriba para ver la simulación.
               </div>
             );
 
-            const costoTotalContenedor=cont.costoTotal||0;
-            const ganTotalUSD=simIngresosUSD;
-            const mi30USD=ganTotalUSD*0.30;
-            const pctGanContenedor=costoTotalContenedor>0?(ganTotalUSD/costoTotalContenedor*100):0;
+            // Totales simulados
+            const ingresoTotalUSD=cobradoUSDya+simRestanteUSD;
+            const gananciaTotalUSD=ingresoTotalUSD-costoTotal;
+            const mi30TotalUSD=Math.max(0,gananciaTotalUSD)*0.30;
+            const pctGanTotal=costoTotal>0?(gananciaTotalUSD/costoTotal*100):0;
+
+            // Si ya está en ganancia — ganancia restante por cobrar del stock pendiente
+            const enGanancia=cobradoUSDya>=costoTotal;
+            const gananciaYaUSD=enGanancia?cobradoUSDya-costoTotal:0;
+            const gananciaRestanteUSD=enGanancia?simRestanteUSD:0; // todo lo restante es ganancia
+            const mi30RestanteUSD=gananciaRestanteUSD*0.30;
+
+            const Card=({label,main,sub,color,small})=>(
+              <div style={{background:"rgba(255,255,255,0.35)",backdropFilter:"blur(8px)",borderRadius:"var(--r-md)",padding:"12px 14px"}}>
+                <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:5}}>{label}</div>
+                <div style={{fontSize:small?14:18,fontWeight:700,color:color||"var(--text-primary)",letterSpacing:"-.01em"}}>{main}</div>
+                {sub&&<div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{sub}</div>}
+              </div>
+            );
 
             return(
-              <div style={{marginTop:16,background:"linear-gradient(135deg,rgba(91,173,65,0.08),rgba(46,134,193,0.08))",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-lg)",padding:"16px 18px"}}>
-                <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-success)",marginBottom:14}}>📊 Simulación — si vendés el stock restante a estos precios</div>
-
-                {/* Detalle por artículo */}
-                <div style={{marginBottom:14}}>
-                  {simLineas.filter(l=>l.pventa>0).map(l=>(
-                    <div key={l.nombre} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"0.5px solid rgba(91,173,65,0.15)",fontSize:12}}>
-                      <span style={{color:"var(--text-secondary)"}}>{l.nombre} <strong style={{color:"var(--text-primary)"}}>×{fmt(l.stock)}</strong></span>
-                      <span style={{color:"var(--text-primary)"}}>
-                        ${fmt(l.ventaTotalARS)}
-                        <span style={{color:l.ganARS>=0?"var(--text-success)":"var(--text-danger)",marginLeft:8,fontWeight:600}}>
-                          ({l.ganARS>=0?"+":""}{fmtUSD(l.ganUSD)})
+              <div style={{marginTop:16}}>
+                {/* ── Detalle por artículo ── */}
+                <div style={{background:"rgba(120,120,128,0.05)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",marginBottom:12}}>
+                  <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-secondary)",marginBottom:10}}>Stock restante a vender</div>
+                  {simLineas.filter(l=>l.pventa>0&&l.stock>0).length===0
+                    ?<div style={{fontSize:12,color:"var(--text-secondary)"}}>Sin stock restante con precio cargado.</div>
+                    :simLineas.filter(l=>l.pventa>0).map(l=>(
+                      <div key={l.nombre} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"0.5px solid var(--glass-border)",fontSize:12}}>
+                        <span>
+                          <strong style={{color:"var(--text-primary)"}}>{l.nombre}</strong>
+                          <span style={{color:"var(--text-secondary)",marginLeft:6}}>×{fmt(l.stock)} u restantes</span>
                         </span>
-                      </span>
-                    </div>
-                  ))}
+                        <span style={{color:"var(--text-info)",fontWeight:500}}>
+                          ${fmt(l.ventaRestARS)} → {fmtUSD(l.ventaRestUSD)}
+                        </span>
+                      </div>
+                    ))
+                  }
+                  <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:12,fontWeight:600}}>
+                    <span style={{color:"var(--text-secondary)"}}>Ya cobrado</span>
+                    <span style={{color:"var(--text-primary)"}}>{fmtUSD(cobradoUSDya)}</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:600,marginTop:4,paddingTop:4,borderTop:"0.5px solid var(--glass-border)"}}>
+                    <span style={{color:"var(--text-secondary)"}}>Ingreso total simulado</span>
+                    <span style={{color:"var(--text-primary)"}}>{fmtUSD(ingresoTotalUSD)}</span>
+                  </div>
                 </div>
 
-                {/* Totales */}
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10}}>
-                  <div style={{background:"rgba(255,255,255,0.4)",backdropFilter:"blur(8px)",borderRadius:"var(--r-md)",padding:"10px 12px"}}>
-                    <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:4}}>Ganancia total</div>
-                    <div style={{fontSize:17,fontWeight:700,color:"var(--text-success)"}}>{fmtUSD(ganTotalUSD)}</div>
-                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>${fmt(Math.round(ganTotalUSD*tcP))} ARS</div>
-                  </div>
-                  <div style={{background:"rgba(255,255,255,0.4)",backdropFilter:"blur(8px)",borderRadius:"var(--r-md)",padding:"10px 12px"}}>
-                    <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:4}}>% Ganancia sobre costo</div>
-                    <div style={{fontSize:17,fontWeight:700,color:pctGanContenedor>=0?"var(--text-success)":"var(--text-danger)"}}>{pctGanContenedor>=0?"+":""}{pctGanContenedor.toFixed(1)}%</div>
-                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>del costo total del cont.</div>
-                  </div>
-                  <div style={{background:"rgba(255,255,255,0.4)",backdropFilter:"blur(8px)",borderRadius:"var(--r-md)",padding:"10px 12px"}}>
-                    <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:4}}>Tu 30%</div>
-                    <div style={{fontSize:17,fontWeight:700,color:"var(--text-info)"}}>{fmtUSD(mi30USD)}</div>
-                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>${fmt(Math.round(mi30USD*tcP))} ARS</div>
+                {/* ── Tarjetas totales ── */}
+                <div style={{background:"linear-gradient(135deg,rgba(91,173,65,0.10),rgba(46,134,193,0.10))",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-lg)",padding:"14px 16px",marginBottom:enGanancia?12:0}}>
+                  <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-success)",marginBottom:12}}>📊 Resultado total del contenedor</div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8}}>
+                    <Card label="Ganancia total" main={fmtUSD(gananciaTotalUSD)} sub={"$"+fmt(Math.round(gananciaTotalUSD*tcP))+" ARS"} color={gananciaTotalUSD>=0?"var(--text-success)":"var(--text-danger)"}/>
+                    <Card label="% sobre costo" main={(pctGanTotal>=0?"+":"")+pctGanTotal.toFixed(1)+"%"} sub={"Costo: "+fmtUSD(costoTotal)} color={pctGanTotal>=0?"var(--text-success)":"var(--text-danger)"}/>
+                    <Card label="Tu 30% total" main={fmtUSD(mi30TotalUSD)} sub={"$"+fmt(Math.round(mi30TotalUSD*tcP))+" ARS"} color="var(--text-info)"/>
                   </div>
                 </div>
+
+                {/* ── Si ya en ganancia: restante por cobrar ── */}
+                {enGanancia&&(
+                  <div style={{background:"linear-gradient(135deg,rgba(46,134,193,0.10),rgba(142,68,173,0.10))",border:"0.5px solid var(--color-border-info)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
+                    <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-info)",marginBottom:12}}>💰 Ganancia pendiente del stock restante</div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8}}>
+                      <Card label="Ganancia ya obtenida" main={fmtUSD(gananciaYaUSD)} sub={"$"+fmt(Math.round(gananciaYaUSD*tcP))+" ARS"} color="var(--text-success)" small/>
+                      <Card label="Ganancia restante" main={fmtUSD(gananciaRestanteUSD)} sub={"Todo lo que vendas es ganancia"} color="var(--text-success)" small/>
+                      <Card label="Tu 30% restante" main={fmtUSD(mi30RestanteUSD)} sub={"$"+fmt(Math.round(mi30RestanteUSD*tcP))+" ARS"} color="#8E44AD" small/>
+                    </div>
+                  </div>
+                )}
               </div>
             );
-          })()}
+          })()}}
         </div>
       )}
     </div>
