@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.9.2";
+const APP_VERSION = "v2.9.3";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2696,6 +2696,7 @@ function SearchModal({data,onClose,goModulo,setView}){
 // DASHBOARD CENTRAL
 // ══════════════════════════════════════════════════════════════════════════
 function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,bhCobradoTotal,djGanancia,djCobrado,djEventos,djGananciaUSD,djCobradoUSD,djRealizados,totalGastos,totalGastosARS,totalGastosUSD,totalIngresos,totalRetSCPesos,totalVentaUSD,totalCobUSD,stockUni,goModulo}){
+  const [verTodo,setVerTodo]=useState(false);
   const tcActual=blue||1450;
   const balance=totalIngresos-totalGastos;
   const djSaldoPendiente=(djEventos||[]).filter(e=>e.estado==="Confirmado").reduce((a,e)=>a+Number(e.saldo||0),0);
@@ -2764,7 +2765,11 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
         moneda:"USD",modulo:"FX",color:f.tipo==="compra"?"var(--color-text-success)":"var(--color-text-warning)"
       }
     ]),
-  ].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||"")).slice(0,8);
+  ].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
+  // Full list for "Ver todo" — same array, no slice
+  const todosMovimientos=recientes;
+  // Trim recientes to 8 for dashboard card
+  const recientes8=recientes.slice(0,8);
 
   const tcBar=blue||1450;
   const fuentes=[
@@ -2839,23 +2844,72 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
           ))}
         </div>
 
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
-          <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Últimos movimientos</div>
-          {recientes.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:13}}>Sin movimientos aún.</p>:recientes.map((m,i)=>(
-            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <div>
-                <div style={{fontSize:12,color:"var(--color-text-primary)"}}>{m.desc}</div>
-                <div style={{fontSize:10,color:"var(--color-text-secondary)"}}>{m.fecha} · <span style={{color:m.color}}>{m.modulo}</span></div>
-              </div>
-              <div style={{fontSize:13,fontWeight:500,color:m.monto>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>
-                {m.monto>=0
-                  ?(m.moneda==="USD"?fmtUSD(m.monto):"$"+fmt(m.monto))
-                  :(m.moneda==="USD"?"-"+fmtUSD(Math.abs(m.monto)):"-$"+fmt(Math.abs(m.monto)))
-                }
-              </div>
+        {verTodo
+          /* ── VISTA COMPLETA DE MOVIMIENTOS ── */
+          ?<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontSize:12,fontWeight:600,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em"}}>Todos los movimientos</div>
+              <button onClick={()=>setVerTodo(false)} style={{fontSize:11,padding:"4px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>← Volver</button>
             </div>
-          ))}
-        </div>
+            {todosMovimientos.length===0
+              ?<p style={{color:"var(--color-text-secondary)",fontSize:13}}>Sin movimientos.</p>
+              :(()=>{
+                // Group by date
+                const byDate={};
+                todosMovimientos.forEach(m=>{
+                  const d=m.fecha||"Sin fecha";
+                  if(!byDate[d])byDate[d]=[];
+                  byDate[d].push(m);
+                });
+                const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+                return dates.map(fecha=>(
+                  <div key={fecha} style={{marginBottom:12}}>
+                    <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",
+                      color:"var(--text-secondary)",padding:"6px 0",
+                      borderBottom:"0.5px solid var(--glass-border)",marginBottom:4}}>
+                      {fecha}
+                    </div>
+                    {byDate[fecha].map((m,i)=>(
+                      <div key={m.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                        <div>
+                          <div style={{fontSize:12,color:"var(--color-text-primary)"}}>{m.desc}</div>
+                          <div style={{fontSize:10,color:"var(--color-text-secondary)",marginTop:1}}><span style={{color:m.color}}>{m.modulo}</span></div>
+                        </div>
+                        <div style={{fontSize:13,fontWeight:500,color:m.monto>=0?"var(--color-text-success)":"var(--color-text-danger)",flexShrink:0,marginLeft:12}}>
+                          {m.monto>=0
+                            ?(m.moneda==="USD"?fmtUSD(m.monto):"$"+fmt(m.monto))
+                            :(m.moneda==="USD"?"-"+fmtUSD(Math.abs(m.monto)):"-$"+fmt(Math.abs(m.monto)))
+                          }
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ));
+              })()
+            }
+          </div>
+          /* ── CARD NORMAL (últimos 8) ── */
+          :<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em"}}>Últimos movimientos</div>
+              {todosMovimientos.length>0&&<button onClick={()=>setVerTodo(true)} style={{fontSize:11,padding:"4px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-info)",cursor:"pointer",fontWeight:500}}>Ver todo →</button>}
+            </div>
+            {recientes8.length===0?<p style={{color:"var(--color-text-secondary)",fontSize:13}}>Sin movimientos aún.</p>:recientes8.map((m,i)=>(
+              <div key={m.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                <div>
+                  <div style={{fontSize:12,color:"var(--color-text-primary)"}}>{m.desc}</div>
+                  <div style={{fontSize:10,color:"var(--color-text-secondary)"}}>{m.fecha} · <span style={{color:m.color}}>{m.modulo}</span></div>
+                </div>
+                <div style={{fontSize:13,fontWeight:500,color:m.monto>=0?"var(--color-text-success)":"var(--color-text-danger)",flexShrink:0,marginLeft:8}}>
+                  {m.monto>=0
+                    ?(m.moneda==="USD"?fmtUSD(m.monto):"$"+fmt(m.monto))
+                    :(m.moneda==="USD"?"-"+fmtUSD(Math.abs(m.monto)):"-$"+fmt(Math.abs(m.monto)))
+                  }
+                </div>
+              </div>
+            ))}
+          </div>
+        }
       </div>
 
       {/* Accesos rápidos */}
