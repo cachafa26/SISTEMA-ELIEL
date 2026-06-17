@@ -9,495 +9,137 @@
   <meta name="apple-mobile-web-app-title" content="SC Status"/>
   <title>Status Super Coating</title>
   <style>
-    /* ── LIQUID GLASS DESIGN SYSTEM ─────────────────────────────────── */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body,#root{height:100%;min-height:100%}
-    
-    body{
-      font-family:"Inter",-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;
-      background:var(--bg-base);color:var(--text-primary);
-      -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
-      transition:background .3s,color .3s;
-    }
-
-    /* ── LIGHT MODE ─────────────────────────────────────────────────── */
+    body{font-family:"Inter",-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;background:var(--bg-base);color:var(--text-primary);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;transition:background .3s,color .3s;}
     :root{
-      /* SC Brand colors from logo */
-      --sc-orange:#F47920;
-      --sc-green:#5BAD41;
-      --sc-blue:#2E86C1;
+      --sc-orange:#F47920;--sc-green:#5BAD41;--sc-blue:#2E86C1;
       --sc-gradient:linear-gradient(135deg,#F47920 0%,#5BAD41 50%,#2E86C1 100%);
       --sc-gradient-soft:linear-gradient(135deg,rgba(244,121,32,0.12) 0%,rgba(91,173,65,0.12) 50%,rgba(46,134,193,0.12) 100%);
-
-      /* Backgrounds */
-      --bg-base:#F0F2F5;
-      --bg-elevated:rgba(255,255,255,0.72);
-      --bg-card:rgba(255,255,255,0.65);
-      --bg-card-hover:rgba(255,255,255,0.85);
-      --bg-input:rgba(255,255,255,0.8);
-      --bg-nav:rgba(255,255,255,0.78);
-      --bg-modal:rgba(255,255,255,0.92);
-      --bg-tint-green:rgba(91,173,65,0.12);
-      --bg-tint-orange:rgba(244,121,32,0.12);
-      --bg-tint-blue:rgba(46,134,193,0.12);
-      --bg-tint-red:rgba(220,53,69,0.10);
-      --bg-tint-amber:rgba(255,149,0,0.12);
-      --bg-overlay:rgba(0,0,0,0.45);
-
-      /* Glass effect */
-      --glass-blur:blur(20px) saturate(1.8);
-      --glass-border:rgba(255,255,255,0.55);
+      --bg-base:#F0F2F5;--bg-elevated:rgba(255,255,255,0.72);--bg-card:rgba(255,255,255,0.65);
+      --bg-card-hover:rgba(255,255,255,0.85);--bg-input:rgba(255,255,255,0.8);
+      --bg-nav:rgba(255,255,255,0.78);--bg-modal:rgba(255,255,255,0.92);
+      --bg-tint-green:rgba(91,173,65,0.12);--bg-tint-orange:rgba(244,121,32,0.12);
+      --bg-tint-blue:rgba(46,134,193,0.12);--bg-tint-red:rgba(220,53,69,0.10);
+      --bg-tint-amber:rgba(255,149,0,0.12);--bg-overlay:rgba(0,0,0,0.45);
+      --glass-blur:blur(20px) saturate(1.8);--glass-border:rgba(255,255,255,0.55);
       --glass-shadow:0 8px 32px rgba(0,0,0,0.10),0 1.5px 0 rgba(255,255,255,0.7) inset;
       --glass-shadow-sm:0 2px 12px rgba(0,0,0,0.07),0 1px 0 rgba(255,255,255,0.6) inset;
       --glass-shadow-lg:0 20px 60px rgba(0,0,0,0.14),0 1.5px 0 rgba(255,255,255,0.65) inset;
-
-      /* Text */
-      --text-primary:#1C1C1E;
-      --text-secondary:#636366;
-      --text-tertiary:#AEAEB2;
-      --text-success:#1A7F3C;
-      --text-warning:#B25000;
-      --text-danger:#C0392B;
-      --text-info:#1A5FA5;
-      --text-on-color:#fff;
-
-      /* Borders */
-      --border-sm:0.5px solid rgba(0,0,0,0.10);
-      --border-md:0.5px solid rgba(0,0,0,0.16);
-      --border-card:0.5px solid rgba(255,255,255,0.8);
-      --border-input:0.5px solid rgba(0,0,0,0.18);
-      --border-focus:rgba(46,134,193,0.6);
-      --border-success:rgba(91,173,65,0.4);
-      --border-danger:rgba(192,57,43,0.3);
-
-      /* Radius */
+      --text-primary:#1C1C1E;--text-secondary:#636366;--text-tertiary:#AEAEB2;
+      --text-success:#1A7F3C;--text-warning:#B25000;--text-danger:#C0392B;--text-info:#1A5FA5;--text-on-color:#fff;
+      --border-sm:0.5px solid rgba(0,0,0,0.10);--border-md:0.5px solid rgba(0,0,0,0.16);
+      --border-card:0.5px solid rgba(255,255,255,0.8);--border-input:0.5px solid rgba(0,0,0,0.18);
+      --border-focus:rgba(46,134,193,0.6);--border-success:rgba(91,173,65,0.4);--border-danger:rgba(192,57,43,0.3);
       --r-sm:8px;--r-md:12px;--r-lg:18px;--r-xl:24px;--r-pill:100px;
-
-      /* Semantic aliases (keep old names working) */
-      --font-sans:"Inter",-apple-system,sans-serif;
-      --color-background-primary:var(--bg-card);
-      --color-background-secondary:rgba(240,242,245,0.8);
-      --color-background-tertiary:var(--bg-base);
-      --color-background-success:var(--bg-tint-green);
-      --color-background-warning:var(--bg-tint-amber);
-      --color-background-danger:var(--bg-tint-red);
-      --color-background-info:var(--bg-tint-blue);
-      --color-text-primary:var(--text-primary);
-      --color-text-secondary:var(--text-secondary);
-      --color-text-tertiary:var(--text-tertiary);
-      --color-text-success:var(--text-success);
-      --color-text-warning:var(--text-warning);
-      --color-text-danger:var(--text-danger);
-      --color-text-info:var(--text-info);
-      --color-border-tertiary:rgba(0,0,0,0.08);
-      --color-border-secondary:rgba(0,0,0,0.14);
-      --color-border-primary:rgba(0,0,0,0.28);
-      --color-border-success:rgba(91,173,65,0.4);
-      --color-border-danger:rgba(192,57,43,0.3);
-      --color-border-info:rgba(46,134,193,0.4);
-      --color-border-warning:rgba(178,80,0,0.3);
-      --border-radius-md:var(--r-md);
-      --border-radius-lg:var(--r-lg);
-      --border-radius-xl:var(--r-xl);
+      --color-background-primary:var(--bg-card);--color-background-secondary:rgba(240,242,245,0.8);
+      --color-background-tertiary:var(--bg-base);--color-background-success:var(--bg-tint-green);
+      --color-background-warning:var(--bg-tint-amber);--color-background-danger:var(--bg-tint-red);
+      --color-background-info:var(--bg-tint-blue);--color-text-primary:var(--text-primary);
+      --color-text-secondary:var(--text-secondary);--color-text-tertiary:var(--text-tertiary);
+      --color-text-success:var(--text-success);--color-text-warning:var(--text-warning);
+      --color-text-danger:var(--text-danger);--color-text-info:var(--text-info);
+      --color-border-tertiary:rgba(0,0,0,0.08);--color-border-secondary:rgba(0,0,0,0.14);
+      --color-border-primary:rgba(0,0,0,0.28);--color-border-success:rgba(91,173,65,0.4);
+      --color-border-danger:rgba(192,57,43,0.3);--color-border-info:rgba(46,134,193,0.4);
+      --color-border-warning:rgba(178,80,0,0.3);--border-radius-md:var(--r-md);
+      --border-radius-lg:var(--r-lg);--border-radius-xl:var(--r-xl);
     }
-
-    /* ── DARK MODE ───────────────────────────────────────────────────── */
     @media(prefers-color-scheme:dark){:root{
-      --bg-base:#0E0E10;
-      --bg-elevated:rgba(28,28,30,0.85);
-      --bg-card:rgba(28,28,30,0.72);
-      --bg-card-hover:rgba(44,44,46,0.85);
-      --bg-input:rgba(44,44,46,0.8);
-      --bg-nav:rgba(18,18,20,0.85);
-      --bg-modal:rgba(28,28,30,0.95);
-      --bg-tint-green:rgba(91,173,65,0.18);
-      --bg-tint-orange:rgba(244,121,32,0.18);
-      --bg-tint-blue:rgba(46,134,193,0.18);
-      --bg-tint-red:rgba(220,53,69,0.16);
-      --bg-tint-amber:rgba(255,149,0,0.16);
+      --bg-base:#0E0E10;--bg-elevated:rgba(28,28,30,0.85);--bg-card:rgba(28,28,30,0.72);
+      --bg-card-hover:rgba(44,44,46,0.85);--bg-input:rgba(44,44,46,0.8);--bg-nav:rgba(18,18,20,0.85);
+      --bg-modal:rgba(28,28,30,0.95);--bg-tint-green:rgba(91,173,65,0.18);--bg-tint-orange:rgba(244,121,32,0.18);
+      --bg-tint-blue:rgba(46,134,193,0.18);--bg-tint-red:rgba(220,53,69,0.16);--bg-tint-amber:rgba(255,149,0,0.16);
       --glass-border:rgba(255,255,255,0.12);
       --glass-shadow:0 8px 32px rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08) inset;
       --glass-shadow-sm:0 2px 12px rgba(0,0,0,0.3),0 1px 0 rgba(255,255,255,0.06) inset;
       --glass-shadow-lg:0 20px 60px rgba(0,0,0,0.6),0 1px 0 rgba(255,255,255,0.08) inset;
-      --text-primary:#F2F2F7;
-      --text-secondary:#AEAEB2;
-      --text-tertiary:#636366;
-      --text-success:#5BAD41;
-      --text-warning:#F47920;
-      --text-danger:#FF6B6B;
-      --text-info:#5B9BD5;
-      --border-sm:0.5px solid rgba(255,255,255,0.10);
-      --border-md:0.5px solid rgba(255,255,255,0.14);
-      --border-card:0.5px solid rgba(255,255,255,0.10);
-      --border-input:0.5px solid rgba(255,255,255,0.16);
+      --text-primary:#F2F2F7;--text-secondary:#AEAEB2;--text-tertiary:#636366;
+      --text-success:#5BAD41;--text-warning:#F47920;--text-danger:#FF6B6B;--text-info:#5B9BD5;
+      --border-sm:0.5px solid rgba(255,255,255,0.10);--border-md:0.5px solid rgba(255,255,255,0.14);
+      --border-card:0.5px solid rgba(255,255,255,0.10);--border-input:0.5px solid rgba(255,255,255,0.16);
     }}
     html[data-theme="dark"]{
-      --bg-base:#0E0E10;
-      --bg-elevated:rgba(28,28,30,0.85);
-      --bg-card:rgba(28,28,30,0.72);
-      --bg-card-hover:rgba(44,44,46,0.85);
-      --bg-input:rgba(44,44,46,0.8);
-      --bg-nav:rgba(18,18,20,0.85);
-      --bg-modal:rgba(28,28,30,0.95);
-      --bg-tint-green:rgba(91,173,65,0.18);
-      --bg-tint-orange:rgba(244,121,32,0.18);
-      --bg-tint-blue:rgba(46,134,193,0.18);
-      --bg-tint-red:rgba(220,53,69,0.16);
-      --bg-tint-amber:rgba(255,149,0,0.16);
+      --bg-base:#0E0E10;--bg-card:rgba(28,28,30,0.72);--bg-input:rgba(44,44,46,0.8);--bg-nav:rgba(18,18,20,0.85);
+      --bg-modal:rgba(28,28,30,0.95);--bg-tint-green:rgba(91,173,65,0.18);--bg-tint-orange:rgba(244,121,32,0.18);
+      --bg-tint-blue:rgba(46,134,193,0.18);--bg-tint-red:rgba(220,53,69,0.16);--bg-tint-amber:rgba(255,149,0,0.16);
       --glass-border:rgba(255,255,255,0.12);
       --glass-shadow:0 8px 32px rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.08) inset;
       --glass-shadow-sm:0 2px 12px rgba(0,0,0,0.3),0 1px 0 rgba(255,255,255,0.06) inset;
       --glass-shadow-lg:0 20px 60px rgba(0,0,0,0.6),0 1px 0 rgba(255,255,255,0.08) inset;
-      --text-primary:#F2F2F7;
-      --text-secondary:#AEAEB2;
-      --text-tertiary:#636366;
-      --text-success:#5BAD41;
-      --text-warning:#F47920;
-      --text-danger:#FF6B6B;
-      --text-info:#5B9BD5;
-      --border-sm:0.5px solid rgba(255,255,255,0.10);
-      --border-md:0.5px solid rgba(255,255,255,0.14);
-      --border-card:0.5px solid rgba(255,255,255,0.10);
+      --text-primary:#F2F2F7;--text-secondary:#AEAEB2;--text-tertiary:#636366;
+      --text-success:#5BAD41;--text-warning:#F47920;--text-danger:#FF6B6B;--text-info:#5B9BD5;
+      --border-sm:0.5px solid rgba(255,255,255,0.10);--border-card:0.5px solid rgba(255,255,255,0.10);
       --border-input:0.5px solid rgba(255,255,255,0.16);
-      --color-background-primary:var(--bg-card);
-      --color-background-secondary:rgba(28,28,30,0.6);
-      --color-background-tertiary:var(--bg-base);
-      --color-background-success:var(--bg-tint-green);
-      --color-background-warning:var(--bg-tint-amber);
-      --color-background-danger:var(--bg-tint-red);
-      --color-background-info:var(--bg-tint-blue);
-      --color-text-primary:var(--text-primary);
-      --color-text-secondary:var(--text-secondary);
-      --color-text-tertiary:var(--text-tertiary);
-      --color-text-success:var(--text-success);
-      --color-text-warning:var(--text-warning);
-      --color-text-danger:var(--text-danger);
-      --color-text-info:var(--text-info);
-      --color-border-tertiary:rgba(255,255,255,0.08);
-      --color-border-secondary:rgba(255,255,255,0.14);
+      --color-background-primary:var(--bg-card);--color-background-secondary:rgba(28,28,30,0.6);
+      --color-background-tertiary:var(--bg-base);--color-background-success:var(--bg-tint-green);
+      --color-background-warning:var(--bg-tint-amber);--color-background-danger:var(--bg-tint-red);
+      --color-background-info:var(--bg-tint-blue);--color-text-primary:var(--text-primary);
+      --color-text-secondary:var(--text-secondary);--color-text-tertiary:var(--text-tertiary);
+      --color-text-success:var(--text-success);--color-text-warning:var(--text-warning);
+      --color-text-danger:var(--text-danger);--color-text-info:var(--text-info);
+      --color-border-tertiary:rgba(255,255,255,0.08);--color-border-secondary:rgba(255,255,255,0.14);
     }
     html[data-theme="light"]{
-      --bg-base:#F0F2F5;
-      --bg-elevated:rgba(255,255,255,0.72);
-      --bg-card:rgba(255,255,255,0.65);
-      --bg-card-hover:rgba(255,255,255,0.85);
-      --bg-input:rgba(255,255,255,0.8);
-      --bg-nav:rgba(255,255,255,0.78);
-      --bg-modal:rgba(255,255,255,0.92);
-      --bg-tint-green:rgba(91,173,65,0.12);
-      --bg-tint-orange:rgba(244,121,32,0.12);
-      --bg-tint-blue:rgba(46,134,193,0.12);
-      --bg-tint-red:rgba(220,53,69,0.10);
-      --bg-tint-amber:rgba(255,149,0,0.12);
+      --bg-base:#F0F2F5;--bg-card:rgba(255,255,255,0.65);--bg-input:rgba(255,255,255,0.8);
+      --bg-nav:rgba(255,255,255,0.78);--bg-modal:rgba(255,255,255,0.92);
+      --bg-tint-green:rgba(91,173,65,0.12);--bg-tint-orange:rgba(244,121,32,0.12);
+      --bg-tint-blue:rgba(46,134,193,0.12);--bg-tint-red:rgba(220,53,69,0.10);--bg-tint-amber:rgba(255,149,0,0.12);
       --glass-border:rgba(255,255,255,0.55);
       --glass-shadow:0 8px 32px rgba(0,0,0,0.10),0 1.5px 0 rgba(255,255,255,0.7) inset;
       --glass-shadow-sm:0 2px 12px rgba(0,0,0,0.07),0 1px 0 rgba(255,255,255,0.6) inset;
       --glass-shadow-lg:0 20px 60px rgba(0,0,0,0.14),0 1.5px 0 rgba(255,255,255,0.65) inset;
-      --text-primary:#1C1C1E;
-      --text-secondary:#636366;
-      --text-tertiary:#AEAEB2;
-      --text-success:#1A7F3C;
-      --text-warning:#B25000;
-      --text-danger:#C0392B;
-      --text-info:#1A5FA5;
-      --border-sm:0.5px solid rgba(0,0,0,0.10);
-      --border-md:0.5px solid rgba(0,0,0,0.16);
-      --border-card:0.5px solid rgba(255,255,255,0.8);
-      --border-input:0.5px solid rgba(0,0,0,0.18);
-      --border-focus:rgba(46,134,193,0.6);
-      --border-success:rgba(91,173,65,0.4);
-      --border-danger:rgba(192,57,43,0.3);
-      --color-background-primary:rgba(255,255,255,0.65);
-      --color-background-secondary:rgba(240,242,245,0.8);
-      --color-background-tertiary:#F0F2F5;
-      --color-background-success:rgba(91,173,65,0.12);
-      --color-background-warning:rgba(255,149,0,0.12);
-      --color-background-danger:rgba(220,53,69,0.10);
-      --color-background-info:rgba(46,134,193,0.12);
-      --color-text-primary:#1C1C1E;
-      --color-text-secondary:#636366;
-      --color-text-tertiary:#AEAEB2;
-      --color-text-success:#1A7F3C;
-      --color-text-warning:#B25000;
-      --color-text-danger:#C0392B;
-      --color-text-info:#1A5FA5;
-      --color-border-tertiary:rgba(0,0,0,0.08);
-      --color-border-secondary:rgba(0,0,0,0.14);
-      --color-border-primary:rgba(0,0,0,0.28);
-      --color-border-success:rgba(91,173,65,0.4);
-      --color-border-danger:rgba(192,57,43,0.3);
-      --color-border-info:rgba(46,134,193,0.4);
-      --color-border-warning:rgba(178,80,0,0.3);
+      --text-primary:#1C1C1E;--text-secondary:#636366;--text-tertiary:#AEAEB2;
+      --text-success:#1A7F3C;--text-warning:#B25000;--text-danger:#C0392B;--text-info:#1A5FA5;
+      --border-sm:0.5px solid rgba(0,0,0,0.10);--border-card:0.5px solid rgba(255,255,255,0.8);
+      --border-input:0.5px solid rgba(0,0,0,0.18);--border-focus:rgba(46,134,193,0.6);
+      --border-success:rgba(91,173,65,0.4);--border-danger:rgba(192,57,43,0.3);
+      --color-background-primary:rgba(255,255,255,0.65);--color-background-secondary:rgba(240,242,245,0.8);
+      --color-background-tertiary:#F0F2F5;--color-background-success:rgba(91,173,65,0.12);
+      --color-background-warning:rgba(255,149,0,0.12);--color-background-danger:rgba(220,53,69,0.10);
+      --color-background-info:rgba(46,134,193,0.12);--color-text-primary:#1C1C1E;
+      --color-text-secondary:#636366;--color-text-tertiary:#AEAEB2;--color-text-success:#1A7F3C;
+      --color-text-warning:#B25000;--color-text-danger:#C0392B;--color-text-info:#1A5FA5;
+      --color-border-tertiary:rgba(0,0,0,0.08);--color-border-secondary:rgba(0,0,0,0.14);
+      --color-border-primary:rgba(0,0,0,0.28);--color-border-success:rgba(91,173,65,0.4);
+      --color-border-danger:rgba(192,57,43,0.3);--color-border-info:rgba(46,134,193,0.4);--color-border-warning:rgba(178,80,0,0.3);
     }
-
-    /* ── GLOBAL AMBIENT BACKGROUND ──────────────────────────────────── */
-    body::before{
-      content:"";position:fixed;inset:0;z-index:-1;
-      background:
-        radial-gradient(ellipse 60% 50% at 10% 10%,rgba(244,121,32,0.18) 0%,transparent 70%),
-        radial-gradient(ellipse 50% 60% at 90% 20%,rgba(91,173,65,0.14) 0%,transparent 70%),
-        radial-gradient(ellipse 70% 50% at 50% 90%,rgba(46,134,193,0.16) 0%,transparent 70%),
-        var(--bg-base);
-      pointer-events:none;
-    }
-
-    /* ── GLASS CARD ─────────────────────────────────────────────────── */
-    .glass{
-      background:var(--bg-card);
-      backdrop-filter:var(--glass-blur);
-      -webkit-backdrop-filter:var(--glass-blur);
-      border:0.5px solid var(--glass-border);
-      box-shadow:var(--glass-shadow);
-    }
-    .glass-sm{
-      background:var(--bg-card);
-      backdrop-filter:blur(12px) saturate(1.6);
-      -webkit-backdrop-filter:blur(12px) saturate(1.6);
-      border:0.5px solid var(--glass-border);
-      box-shadow:var(--glass-shadow-sm);
-    }
-    .glass-nav{
-      background:var(--bg-nav);
-      backdrop-filter:blur(24px) saturate(2);
-      -webkit-backdrop-filter:blur(24px) saturate(2);
-      border-bottom:0.5px solid var(--glass-border);
-    }
-
-    /* ── INPUTS ─────────────────────────────────────────────────────── */
-    input,select,textarea{
-      font-family:inherit;font-size:14px;padding:9px 12px;
-      border:var(--border-input);border-radius:var(--r-sm);
-      background:var(--bg-input);
-      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-      color:var(--text-primary);outline:none;
-      transition:border-color .15s,box-shadow .15s;width:100%;
-    }
-    input:focus,select:focus,textarea:focus{
-      border-color:var(--border-focus);
-      box-shadow:0 0 0 3px rgba(46,134,193,0.15);
-    }
+    body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse 60% 50% at 10% 10%,rgba(244,121,32,0.18) 0%,transparent 70%),radial-gradient(ellipse 50% 60% at 90% 20%,rgba(91,173,65,0.14) 0%,transparent 70%),radial-gradient(ellipse 70% 50% at 50% 90%,rgba(46,134,193,0.16) 0%,transparent 70%),var(--bg-base);pointer-events:none;}
+    .glass{background:var(--bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:0.5px solid var(--glass-border);box-shadow:var(--glass-shadow);}
+    .glass-sm{background:var(--bg-card);backdrop-filter:blur(12px) saturate(1.6);-webkit-backdrop-filter:blur(12px) saturate(1.6);border:0.5px solid var(--glass-border);box-shadow:var(--glass-shadow-sm);}
+    .glass-nav{background:var(--bg-nav);backdrop-filter:blur(24px) saturate(2);-webkit-backdrop-filter:blur(24px) saturate(2);border-bottom:0.5px solid var(--glass-border);}
+    input,select,textarea{font-family:inherit;font-size:14px;padding:9px 12px;border:var(--border-input);border-radius:var(--r-sm);background:var(--bg-input);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--text-primary);outline:none;transition:border-color .15s,box-shadow .15s;width:100%;}
+    input:focus,select:focus,textarea:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(46,134,193,0.15);}
     input::placeholder{color:var(--text-tertiary)}
-
-    /* ── BUTTONS ─────────────────────────────────────────────────────── */
     button{font-family:inherit;cursor:pointer;}
-    .btn-primary{
-      background:var(--sc-gradient);color:#fff;border:none;
-      padding:9px 18px;border-radius:var(--r-pill);font-size:13px;font-weight:600;
-      box-shadow:0 4px 16px rgba(244,121,32,0.3);
-      transition:transform .12s,box-shadow .12s,opacity .12s;
-      letter-spacing:0.01em;
-    }
-    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(244,121,32,0.4);}
-    .btn-primary:active{transform:translateY(0);opacity:.9;}
-    .btn-glass{
-      background:var(--bg-card);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-      border:var(--border-card);color:var(--text-primary);
-      padding:8px 16px;border-radius:var(--r-pill);font-size:13px;font-weight:500;
-      box-shadow:var(--glass-shadow-sm);transition:transform .12s,box-shadow .12s;
-    }
-    .btn-glass:hover{transform:translateY(-1px);box-shadow:var(--glass-shadow);}
-    .btn-danger{
-      background:var(--bg-tint-red);color:var(--text-danger);
-      border:0.5px solid var(--border-danger);
-      padding:6px 12px;border-radius:var(--r-pill);font-size:12px;font-weight:500;
-    }
-    .btn-success{
-      background:linear-gradient(135deg,#5BAD41,#3D8B2A);color:#fff;border:none;
-      padding:9px 18px;border-radius:var(--r-pill);font-size:13px;font-weight:600;
-      box-shadow:0 4px 16px rgba(91,173,65,0.35);
-      transition:transform .12s,box-shadow .12s;
-    }
-    .btn-success:hover{transform:translateY(-1px);}
-
-    /* ── PILLS / BADGES ─────────────────────────────────────────────── */
-    .pill{display:inline-flex;align-items:center;padding:3px 10px;font-size:11px;font-weight:500;border-radius:var(--r-pill);}
-    .pill-green{background:var(--bg-tint-green);color:var(--text-success);}
-    .pill-orange{background:var(--bg-tint-orange);color:var(--text-warning);}
-    .pill-blue{background:var(--bg-tint-blue);color:var(--text-info);}
-    .pill-red{background:var(--bg-tint-red);color:var(--text-danger);}
-    .pill-gray{background:rgba(120,120,128,0.12);color:var(--text-secondary);}
-
-    /* ── PROGRESS BAR ───────────────────────────────────────────────── */
-    .progress-track{height:5px;background:rgba(120,120,128,0.15);border-radius:3px;overflow:hidden;}
-    .progress-fill{height:100%;border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1);}
-
-    /* ── TABLE ──────────────────────────────────────────────────────── */
     table{width:100%;border-collapse:collapse;font-size:13px;}
-    th{padding:8px 10px;text-align:left;font-size:10px;font-weight:600;
-      color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;
-      border-bottom:var(--border-sm);}
+    th{padding:8px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;border-bottom:var(--border-sm);}
     td{padding:9px 10px;border-bottom:var(--border-sm);color:var(--text-primary);vertical-align:middle;}
     tr:last-child td{border-bottom:none;}
     tr:hover td{background:rgba(120,120,128,0.05);}
-
-    /* ── LOADING ─────────────────────────────────────────────────────── */
-    #loading{
-      position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-      flex-direction:column;gap:16px;z-index:9999;
-      background:var(--bg-base);
-    }
-    #loading::before{
-      content:"";position:absolute;inset:0;
-      background:
-        radial-gradient(ellipse 60% 50% at 20% 20%,rgba(244,121,32,0.2) 0%,transparent 70%),
-        radial-gradient(ellipse 50% 60% at 80% 80%,rgba(91,173,65,0.16) 0%,transparent 70%);
-    }
-    .spin{
-      width:36px;height:36px;border-radius:50%;
-      border:2.5px solid rgba(120,120,128,0.15);
-      border-top-color:var(--sc-orange);
-      animation:sp .7s linear infinite;z-index:1;
-    }
+    #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:9999;background:var(--bg-base);}
+    #loading::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 20% 20%,rgba(244,121,32,0.2) 0%,transparent 70%),radial-gradient(ellipse 50% 60% at 80% 80%,rgba(91,173,65,0.16) 0%,transparent 70%);}
+    .spin{width:36px;height:36px;border-radius:50%;border:2.5px solid rgba(120,120,128,0.15);border-top-color:var(--sc-orange);animation:sp .7s linear infinite;z-index:1;}
     @keyframes sp{to{transform:rotate(360deg)}}
     #loading p{font-size:13px;color:var(--text-secondary);z-index:1;font-weight:500;}
-    #loading .brand{
-      font-size:22px;font-weight:700;letter-spacing:-.02em;z-index:1;
-      background:var(--sc-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-    }
-
-    /* ── ERROR ───────────────────────────────────────────────────────── */
-    #err{display:none;position:fixed;inset:0;align-items:center;justify-content:center;
-      flex-direction:column;gap:12px;background:var(--bg-base);padding:2rem;text-align:center;z-index:9999}
-    #err h3{color:var(--text-danger);font-size:15px;margin-bottom:8px}
-    #err pre{font-size:11px;color:var(--text-secondary);white-space:pre-wrap;max-width:500px;
-      background:var(--bg-card);padding:12px;border-radius:var(--r-md);max-height:300px;overflow:auto;text-align:left;border:var(--border-sm)}
-    #err button{margin-top:8px;padding:9px 20px;border:none;background:var(--sc-gradient);color:#fff;border-radius:var(--r-pill);font-size:13px;font-weight:600;cursor:pointer}
-
-    /* ── SCROLLBAR ───────────────────────────────────────────────────── */
-    ::-webkit-scrollbar{width:5px;height:5px}
-    ::-webkit-scrollbar-track{background:transparent}
-    ::-webkit-scrollbar-thumb{background:rgba(120,120,128,0.3);border-radius:3px}
-    ::-webkit-scrollbar-thumb:hover{background:rgba(120,120,128,0.5)}
-
-    /* ── TOAST ───────────────────────────────────────────────────────── */
-    .toast{
-      position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:10000;
-      background:var(--bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
-      border:var(--border-card);box-shadow:var(--glass-shadow-lg);
-      padding:10px 20px;border-radius:var(--r-pill);
-      font-size:13px;font-weight:500;color:var(--text-primary);
-      animation:toastIn .25s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;
-    }
+    #loading .brand{font-size:22px;font-weight:700;letter-spacing:-.02em;z-index:1;background:var(--sc-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(120,120,128,0.3);border-radius:3px}
+    .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:10000;background:var(--bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:var(--border-card);box-shadow:var(--glass-shadow-lg);padding:10px 20px;border-radius:var(--r-pill);font-size:13px;font-weight:500;color:var(--text-primary);animation:toastIn .25s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;}
     @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-12px) scale(.95)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
-
-    /* ── MODAL ───────────────────────────────────────────────────────── */
-    .modal-overlay{
-      position:fixed;inset:0;z-index:1000;
-      background:rgba(0,0,0,0.5);
-      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-      display:flex;align-items:flex-start;justify-content:center;
-      overflow-y:auto;padding:1rem;
-    }
-    .modal-box{
-      background:var(--bg-modal);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);
-      border:0.5px solid var(--glass-border);box-shadow:var(--glass-shadow-lg);
-      border-radius:var(--r-xl);width:100%;max-width:560px;padding:24px;
-      margin:auto;animation:modalIn .3s cubic-bezier(.34,1.2,.64,1);
-    }
-    @keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
-
-    /* ── SC HEADER GRADIENT ──────────────────────────────────────────── */
-    .sc-header{
-      background:var(--sc-gradient);
-      padding:3px 12px 3px 4px;border-radius:var(--r-pill);
-      display:inline-flex;align-items:center;gap:6px;
-    }
-    .sc-header span{color:#fff;font-weight:700;font-size:12px;letter-spacing:.02em;}
-
-    /* ── METRIC CARD ─────────────────────────────────────────────────── */
-    .metric-card{
-      background:var(--bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
-      border:0.5px solid var(--glass-border);box-shadow:var(--glass-shadow-sm);
-      border-radius:var(--r-lg);padding:14px 16px;
-    }
-    .metric-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:6px;}
-    .metric-value{font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--text-primary);}
-    .metric-sub{font-size:11px;color:var(--text-secondary);margin-top:3px;}
-
-    /* ── NAV TAB ─────────────────────────────────────────────────────── */
-    .nav-tab{
-      background:none;border:none;padding:10px 12px;cursor:pointer;
-      font-size:12px;font-weight:500;color:var(--text-secondary);
-      border-bottom:2px solid transparent;white-space:nowrap;
-      transition:color .15s,border-color .15s;
-    }
-    .nav-tab.active{color:var(--text-primary);border-bottom-color:var(--sc-orange);}
-    .nav-tab:hover:not(.active){color:var(--text-primary);}
-
-    /* ── SECTION CARD ─────────────────────────────────────────────────── */
-    .card{
-      background:var(--bg-card);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
-      border:0.5px solid var(--glass-border);box-shadow:var(--glass-shadow-sm);
-      border-radius:var(--r-lg);padding:16px 18px;margin-bottom:12px;
-    }
-    .card-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:12px;}
-
-    /* ── FORM LABEL ──────────────────────────────────────────────────── */
-    .form-label{font-size:11px;font-weight:500;color:var(--text-secondary);display:block;margin-bottom:5px;}
-
-    /* ── DIVIDER ─────────────────────────────────────────────────────── */
-    .divider{height:0.5px;background:var(--glass-border);margin:12px 0;}
-
-    /* ── MOBILE BOTTOM NAV ───────────────────────────────────────────── */
-    @media(max-width:640px){
-      .bottom-nav{
-        position:fixed;bottom:0;left:0;right:0;z-index:100;
-        background:var(--bg-nav);backdrop-filter:blur(24px) saturate(2);-webkit-backdrop-filter:blur(24px) saturate(2);
-        border-top:0.5px solid var(--glass-border);
-        display:flex;padding:8px 0 calc(8px + env(safe-area-inset-bottom));
-        box-shadow:0 -8px 24px rgba(0,0,0,0.08);
-      }
-      .bottom-nav-item{
-        flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
-        background:none;border:none;cursor:pointer;padding:6px 4px;
-        font-size:9px;font-weight:500;color:var(--text-secondary);
-        transition:color .15s;
-      }
-      .bottom-nav-item.active{color:var(--sc-orange);}
-      .bottom-nav-icon{font-size:20px;line-height:1;}
-      .main-content{padding-bottom:80px;}
-      .top-nav{display:none!important;}
-    }
-    @media(min-width:641px){
-      .bottom-nav{display:none!important;}
-      .main-content{padding-bottom:0;}
-    }
-
-    /* ── ANIMATIONS ──────────────────────────────────────────────────── */
     @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     .fade-up{animation:fadeUp .3s cubic-bezier(.4,0,.2,1);}
-    
-    /* Force light/dark regardless of system preference */
     html[data-theme="light"] body,html[data-theme="light"]{color:#1C1C1E!important}
     html[data-theme="light"] body{background:#F0F2F5!important}
-    html[data-theme="light"] body::before{background:
-      radial-gradient(ellipse 60% 50% at 10% 10%,rgba(244,121,32,0.18) 0%,transparent 70%),
-      radial-gradient(ellipse 50% 60% at 90% 20%,rgba(91,173,65,0.14) 0%,transparent 70%),
-      radial-gradient(ellipse 70% 50% at 50% 90%,rgba(46,134,193,0.16) 0%,transparent 70%),
-      #F0F2F5!important}
     html[data-theme="dark"] body{background:#0E0E10!important}
-    html[data-theme="dark"] body::before{background:
-      radial-gradient(ellipse 60% 50% at 10% 10%,rgba(244,121,32,0.18) 0%,transparent 70%),
-      radial-gradient(ellipse 50% 60% at 90% 20%,rgba(91,173,65,0.14) 0%,transparent 70%),
-      radial-gradient(ellipse 70% 50% at 50% 90%,rgba(46,134,193,0.16) 0%,transparent 70%),
-      #0E0E10!important}
     html[data-theme="dark"] body,html[data-theme="dark"]{color:#F2F2F7!important}
-    /* Glass cards - force bg in light mode */
-    html[data-theme="light"] .glass,
-    html[data-theme="light"] .glass-sm,
-    html[data-theme="light"] .glass-nav{background:rgba(255,255,255,0.72)!important}
-    html[data-theme="dark"] .glass,
-    html[data-theme="dark"] .glass-sm,
-    html[data-theme="dark"] .glass-nav{background:rgba(28,28,30,0.72)!important}
-    /* Nav */
+    html[data-theme="light"] .glass,html[data-theme="light"] .glass-sm,html[data-theme="light"] .glass-nav{background:rgba(255,255,255,0.72)!important}
+    html[data-theme="dark"] .glass,html[data-theme="dark"] .glass-sm,html[data-theme="dark"] .glass-nav{background:rgba(28,28,30,0.72)!important}
     html[data-theme="light"] .glass-nav{background:rgba(255,255,255,0.82)!important}
     html[data-theme="dark"] .glass-nav{background:rgba(18,18,20,0.88)!important}
-</style>
+  </style>
 </head>
 <body>
-  <!-- Session guard -->
   <script>
     (function(){
       var VALID_TOKEN = "ELstat_4nTwJvKs";
@@ -521,11 +163,6 @@
     <div class="brand">Status Super Coating</div>
     <p id="msg">Conectando…</p>
   </div>
-  <div id="err">
-    <h3>&#9888; Error</h3>
-    <pre id="err-txt"></pre>
-    <button onclick="location.reload()">Reintentar</button>
-  </div>
   <div id="root"></div>
 
   <script>
@@ -536,14 +173,11 @@
         '⚠ '+(typeof e==="string"?e:e.message||String(e))+
         '<br><br><button onclick="location.reload()" style="padding:9px 20px;border:none;background:linear-gradient(135deg,#F47920,#5BAD41);color:#fff;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer">Reintentar</button></p>';
     }
-    // Set theme before React to prevent flash
     (function(){var t=localStorage.getItem("sc_status_theme")||"light";document.documentElement.setAttribute("data-theme",t);})();
   </script>
 
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"
-    onerror="showErr('No se pudo cargar Firebase.')"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"
-    onerror="showErr('No se pudo cargar Firestore.')"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" onerror="showErr('No se pudo cargar Firebase.')"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" onerror="showErr('No se pudo cargar Firestore.')"></script>
   <script>
     setMsg("Conectando a Firebase…");
     try{
@@ -561,13 +195,11 @@
 
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"
-    onerror="showErr('No se pudo cargar Babel.')"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js" onerror="showErr('No se pudo cargar Babel.')"></script>
 
   <script id="src" type="text/raw">
 const {useState,useEffect,useRef}=React;
 
-// ── helpers ───────────────────────────────────────────────────────────────
 const fmt = n => Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
 const fmtUSD = n => "USD "+Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtPct = n => Number(n||0).toFixed(1)+"%";
@@ -594,7 +226,6 @@ function precioPromedioUltimoMes(contId,artNombre,ventas){
   return vs.reduce((a,v)=>a+Number(v.precioVenta),0)/vs.length;
 }
 
-// ── APP ───────────────────────────────────────────────────────────────────
 function App(){
   const [data,setData]=useState(null);
   const [blue,setBlue]=useState(null);
@@ -607,9 +238,7 @@ function App(){
   const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("sc_status_theme",n);document.documentElement.setAttribute("data-theme",n);return n;});
   const logout=()=>{localStorage.removeItem("eliel_session");localStorage.removeItem("eliel_status_session");window.location.replace("login.html");};
 
-  useEffect(()=>{
-    document.documentElement.setAttribute("data-theme",theme);
-  },[theme]);
+  useEffect(()=>{document.documentElement.setAttribute("data-theme",theme);},[theme]);
 
   useEffect(()=>{
     let unsub=null;
@@ -627,7 +256,6 @@ function App(){
           setData({contenedores:[],ventas:[],pagos:[],retiros:[]});
         }
         setSyncStatus("ok");
-        // Escuchar cambios en tiempo real
         unsub=docRef.onSnapshot(snap=>{
           if(snap.exists){
             const d=snap.data().payload;
@@ -635,21 +263,15 @@ function App(){
           }
         });
       }catch(e){
-        console.error(e);
-        setSyncStatus("error");
+        console.error(e);setSyncStatus("error");
         setData({contenedores:[],ventas:[],pagos:[],retiros:[]});
       }
     })();
     return()=>{if(unsub)unsub();};
   },[]);
 
-  if(!data)return(
-    <div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)"}}>
-      Cargando datos…
-    </div>
-  );
+  if(!data)return(<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)"}}>Cargando datos…</div>);
 
-  // ── calculos globales ──────────────────────────────────────────────────
   const stockUni={};
   for(const c of data.contenedores||[]){
     for(const art of(c.articulos||[])){
@@ -658,7 +280,6 @@ function App(){
     }
   }
   const tcActual=blue||1450;
-
   const navItems=[
     {id:"dashboard",label:"Status"},
     {id:"stock",label:"Stock"},
@@ -668,69 +289,29 @@ function App(){
 
   return(
     <div style={{fontFamily:'"Inter",-apple-system,sans-serif',minHeight:"100vh"}}>
-
-      {/* TOP NAV */}
-      <div style={{
-        position:"sticky",top:0,zIndex:50,
-        background:"var(--bg-nav)",
-        backdropFilter:"blur(24px) saturate(2)",WebkitBackdropFilter:"blur(24px) saturate(2)",
-        borderBottom:"0.5px solid var(--glass-border)",
-        padding:"0 1rem",display:"flex",alignItems:"center",gap:0,minHeight:52,overflowX:"auto",
-      }}>
-        {/* Brand */}
+      <div style={{position:"sticky",top:0,zIndex:50,background:"var(--bg-nav)",backdropFilter:"blur(24px) saturate(2)",WebkitBackdropFilter:"blur(24px) saturate(2)",borderBottom:"0.5px solid var(--glass-border)",padding:"0 1rem",display:"flex",alignItems:"center",gap:0,minHeight:52,overflowX:"auto"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginRight:16,flexShrink:0}}>
-          <div style={{
-            width:28,height:28,borderRadius:8,flexShrink:0,
-            background:"linear-gradient(135deg,#F47920,#5BAD41,#2E86C1)",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:14,fontWeight:900,color:"#fff",
-            boxShadow:"0 2px 8px rgba(244,121,32,0.4)",
-          }}>S</div>
+          <div style={{width:28,height:28,borderRadius:8,flexShrink:0,background:"linear-gradient(135deg,#F47920,#5BAD41,#2E86C1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:"#fff",boxShadow:"0 2px 8px rgba(244,121,32,0.4)"}}>S</div>
           <div>
-            <div style={{
-              fontSize:13,fontWeight:700,letterSpacing:"-.01em",lineHeight:1.1,
-              background:"linear-gradient(135deg,#F47920,#5BAD41,#2E86C1)",
-              WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",
-            }}>Super Coating</div>
+            <div style={{fontSize:13,fontWeight:700,letterSpacing:"-.01em",lineHeight:1.1,background:"linear-gradient(135deg,#F47920,#5BAD41,#2E86C1)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>Super Coating</div>
             <div style={{fontSize:9,fontWeight:600,color:"var(--text-secondary)",letterSpacing:".06em",textTransform:"uppercase"}}>Status · Tiempo real</div>
           </div>
         </div>
-
-        {/* Nav tabs */}
         {navItems.map(n=>(
           <button key={n.id} onClick={()=>{setView(n.id);setContSel(null);}}
-            style={{
-              background:"none",border:"none",padding:"14px 12px",cursor:"pointer",
-              fontSize:12,fontWeight:view===n.id?600:400,
-              color:view===n.id?"var(--text-primary)":"var(--text-secondary)",
-              borderBottom:view===n.id?"2px solid var(--sc-orange)":"2px solid transparent",
-              whiteSpace:"nowrap",transition:"color .15s",
-            }}>
+            style={{background:"none",border:"none",padding:"14px 12px",cursor:"pointer",fontSize:12,fontWeight:view===n.id?600:400,color:view===n.id?"var(--text-primary)":"var(--text-secondary)",borderBottom:view===n.id?"2px solid var(--sc-orange)":"2px solid transparent",whiteSpace:"nowrap",transition:"color .15s"}}>
             {n.label}
           </button>
         ))}
-
-        {/* Right */}
         <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
-          <div style={{
-            fontSize:10,fontWeight:500,padding:"4px 9px",borderRadius:"var(--r-pill)",
-            background:syncStatus==="ok"?"var(--bg-tint-green)":"var(--bg-tint-amber)",
-            color:syncStatus==="ok"?"var(--text-success)":"var(--text-warning)",
-            border:syncStatus==="ok"?"0.5px solid var(--border-success)":"0.5px solid rgba(244,121,32,0.3)",
-          }}>
+          <div style={{fontSize:10,fontWeight:500,padding:"4px 9px",borderRadius:"var(--r-pill)",background:syncStatus==="ok"?"var(--bg-tint-green)":"var(--bg-tint-amber)",color:syncStatus==="ok"?"var(--text-success)":"var(--text-warning)",border:syncStatus==="ok"?"0.5px solid var(--border-success)":"0.5px solid rgba(244,121,32,0.3)"}}>
             {syncStatus==="ok"?"● en vivo":"⚠ sin sync"}
           </div>
-          {lastUpdate&&<div style={{fontSize:10,color:"var(--text-secondary)"}}>
-            {lastUpdate.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
-          </div>}
-          <button onClick={toggleTheme} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0}}>
-            {theme==="dark"?"☀️":"🌙"}
-          </button>
+          {lastUpdate&&<div style={{fontSize:10,color:"var(--text-secondary)"}}>{lastUpdate.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</div>}
+          <button onClick={toggleTheme} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,cursor:"pointer",flexShrink:0}}>{theme==="dark"?"☀️":"🌙"}</button>
           <button onClick={logout} title="Cerrar sesión" style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,cursor:"pointer",flexShrink:0,color:"var(--text-secondary)"}}>⏻</button>
         </div>
       </div>
-
-      {/* CONTENT */}
       <div style={{padding:"1rem",maxWidth:900,margin:"0 auto",paddingBottom:20}}>
         {view==="dashboard"&&<ViewDashboard data={data} stockUni={stockUni} setView={setView} lastUpdate={lastUpdate}/>}
         {view==="stock"&&<ViewStock stockUni={stockUni} data={data}/>}
@@ -741,17 +322,12 @@ function App(){
   );
 }
 
-// ── TARJETA MÉTRICA ────────────────────────────────────────────────────────
 function Metric({label,value,sub,green,warn,info}){
   const bg=green?"var(--bg-tint-green)":warn?"var(--bg-tint-amber)":info?"var(--bg-tint-blue)":"var(--bg-card)";
   const col=green?"var(--text-success)":warn?"var(--text-warning)":info?"var(--text-info)":"var(--text-primary)";
   const border=green?"0.5px solid var(--border-success)":warn?"0.5px solid rgba(244,121,32,0.3)":info?"0.5px solid var(--border-info)":"0.5px solid var(--glass-border)";
   return(
-    <div style={{
-      background:bg,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
-      border:border,borderRadius:"var(--r-lg)",padding:"13px 15px",
-      boxShadow:"var(--glass-shadow-sm)",
-    }}>
+    <div style={{background:bg,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:border,borderRadius:"var(--r-lg)",padding:"13px 15px",boxShadow:"var(--glass-shadow-sm)"}}>
       <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:green||warn||info?col:"var(--text-secondary)",marginBottom:6}}>{label}</div>
       <div style={{fontSize:20,fontWeight:600,letterSpacing:"-.02em",color:col}}>{value}</div>
       {sub&&<div style={{fontSize:11,color:col,opacity:0.75,marginTop:3}}>{sub}</div>}
@@ -759,7 +335,6 @@ function Metric({label,value,sub,green,warn,info}){
   );
 }
 
-// ── BARRA DE PROGRESO ──────────────────────────────────────────────────────
 function BarraProgreso({pct,enGanancia}){
   return(
     <div style={{height:5,background:"rgba(120,120,128,0.15)",borderRadius:3,overflow:"hidden",margin:"8px 0"}}>
@@ -768,9 +343,9 @@ function BarraProgreso({pct,enGanancia}){
   );
 }
 
-// ── DASHBOARD ──────────────────────────────────────────────────────────────
+// ── DASHBOARD: contenedores ordenados más nuevo → más viejo ───────────────
 function ViewDashboard({data,stockUni,lastUpdate,setView}){
-  const conts=data.contenedores||[];
+  const conts=[...(data.contenedores||[])].sort((a,b)=>(b.id||"").localeCompare(a.id||""));
   const stockTotal=Object.values(stockUni).reduce((a,v)=>a+v,0);
   const resumen=conts.map(c=>{
     const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
@@ -793,12 +368,8 @@ function ViewDashboard({data,stockUni,lastUpdate,setView}){
           <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-.02em",margin:"0 0 2px",color:"var(--text-primary)"}}>Status Super Coating</h1>
           <p style={{fontSize:12,color:"var(--text-secondary)",margin:0}}>Datos en tiempo real · Solo lectura</p>
         </div>
-        {lastUpdate&&<div style={{fontSize:10,color:"var(--text-secondary)",textAlign:"right"}}>
-          Actualizado<br/>{lastUpdate.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
-        </div>}
+        {lastUpdate&&<div style={{fontSize:10,color:"var(--text-secondary)",textAlign:"right"}}>Actualizado<br/>{lastUpdate.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</div>}
       </div>
-
-      {/* Stock total único */}
       <div style={{background:"var(--bg-tint-green)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-lg)",boxShadow:"var(--glass-shadow-sm)",padding:"14px 18px",marginBottom:"1.25rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
           <div style={{fontSize:11,color:"var(--text-success)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Stock total disponible</div>
@@ -806,20 +377,15 @@ function ViewDashboard({data,stockUni,lastUpdate,setView}){
         </div>
         <button onClick={()=>setView("stock")} style={{fontSize:12,padding:"7px 14px",border:"0.5px solid var(--color-text-success)",borderRadius:"var(--r-md)",background:"none",color:"var(--text-success)",cursor:"pointer"}}>Ver detalle →</button>
       </div>
-
-      {/* Estado por contenedor */}
       <div style={{fontSize:10,fontWeight:600,color:"var(--text-secondary)",marginBottom:10,textTransform:"uppercase",letterSpacing:".06em"}}>Estado por contenedor</div>
       <div style={{display:"grid",gap:8}}>
         {resumen.map(({c,cobUSD,costo,pct,enG,stockCont})=>(
-          <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",cursor:"pointer"}}
-            onClick={()=>setView("stock")}>
+          <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",cursor:"pointer"}} onClick={()=>setView("stock")}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
               <span style={{fontWeight:500,fontSize:14,color:"var(--text-primary)"}}>{c.nombre}</span>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <span style={{fontSize:12,fontWeight:500,color:"var(--text-secondary)"}}>{fmt(stockCont)} u</span>
-                <span style={{fontSize:11,padding:"2px 9px",borderRadius:20,
-                  background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",
-                  color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)",fontWeight:500}}>
+                <span style={{fontSize:11,padding:"2px 9px",borderRadius:20,background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)",fontWeight:500}}>
                   {costo===0?"Activo":enG?"✓ Recuperado":fmtPct(pct)+" recuperado"}
                 </span>
               </div>
@@ -833,255 +399,6 @@ function ViewDashboard({data,stockUni,lastUpdate,setView}){
   );
 }
 
-
-// ── CONTENEDORES ───────────────────────────────────────────────────────────
-function ViewContenedores({data,stockUni,blue,tcActual,setContSel}){
-  const conts=data.contenedores||[];
-  return(
-    <div>
-      <h2 style={{fontSize:18,fontWeight:500,margin:"0 0 1rem",color:"var(--text-primary)"}}>Contenedores</h2>
-      <div style={{display:"grid",gap:10}}>
-        {conts.map(c=>{
-          const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
-          const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
-          const costo=c.costoTotal||0;
-          const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;
-          const enG=costo>0&&cobUSD>=costo;
-          const stockCont={};
-          (c.articulos||[]).forEach(art=>{
-            const sd=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
-            if(sd>0)stockCont[art.nombre]=sd;
-          });
-          const totalStockCont=Object.values(stockCont).reduce((a,v)=>a+v,0);
-          const fobTot=(c.articulos||[]).reduce((a,x)=>a+Number(x.precio||0)*Number(x.cantidad),0);
-
-          // Proyección si no está en ganancia
-          let proyeccion=null;
-          if(!enG&&costo>0){
-            let stockRestARS=0;
-            const tc_=Number(c.costos?.tipoCambioFijado||c.costos?.tipoCambio||tcActual);
-            for(const art of(c.articulos||[])){
-              const sd=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
-              if(sd>0){const prom=precioPromedioUltimoMes(c.id,art.nombre,data.ventas);if(prom>0)stockRestARS+=sd*prom;}
-            }
-            const stockRestUSD=stockRestARS/tc_;
-            const ganFutura=Math.max(0,cobUSD+stockRestUSD-costo);
-            proyeccion={stockRestUSD,ganFutura};
-          }
-
-          return(
-            <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"16px 18px",cursor:"pointer"}}
-              onClick={()=>setContSel(c)}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                <div>
-                  <div style={{fontSize:15,fontWeight:500,color:"var(--text-primary)",marginBottom:2}}>{c.nombre}</div>
-                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>{(c.articulos||[]).length} artículos · {fmt(totalStockCont)} u en stock</div>
-                </div>
-                <span style={{fontSize:11,padding:"3px 10px",borderRadius:20,
-                  background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",
-                  color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)",fontWeight:500}}>
-                  {costo===0?"Sin costo":enG?"✓ En ganancia":fmtPct(pct)}
-                </span>
-              </div>
-
-              {costo>0&&(
-                <>
-                  <BarraProgreso pct={pct} enGanancia={enG}/>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,marginTop:10}}>
-                    {[
-                      {l:"Inversión total",v:fmtUSD(costo)},
-                      {l:"Cobrado",v:fmtUSD(cobUSD),ok:cobUSD>0},
-                      {l:enG?"Ganancia":"Falta cobrar",v:fmtUSD(enG?cobUSD-costo:costo-cobUSD),green:enG,warn:!enG},
-                      {l:"FOB original",v:fmt(fobTot)+" ¥"},
-                    ].map(x=>(
-                      <div key={x.l} style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--r-md)",padding:"8px 10px"}}>
-                        <div style={{fontSize:10,color:"var(--text-secondary)",marginBottom:2}}>{x.l}</div>
-                        <div style={{fontSize:13,fontWeight:500,color:x.green?"var(--text-success)":x.warn?"var(--text-warning)":"var(--text-primary)"}}>{x.v}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {proyeccion&&(
-                    <div style={{marginTop:10,padding:"10px 12px",background:"var(--bg-tint-blue)",borderRadius:"var(--r-md)"}}>
-                      <div style={{fontSize:11,color:"var(--text-info)",marginBottom:4,fontWeight:500}}>📊 Proyección si se vende el stock restante</div>
-                      <div style={{display:"flex",gap:16,fontSize:12}}>
-                        <span style={{color:"var(--text-info)"}}>Stock restante est.: <strong>{fmtUSD(proyeccion.stockRestUSD)}</strong></span>
-                        <span style={{color:proyeccion.ganFutura>0?"var(--text-success)":"var(--text-secondary)"}}>Ganancia est.: <strong>{fmtUSD(proyeccion.ganFutura)}</strong></span>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
-        {conts.length===0&&<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin contenedores.</div>}
-      </div>
-    </div>
-  );
-}
-
-// ── DETALLE CONTENEDOR ─────────────────────────────────────────────────────
-function ViewContenedorDetalle({cont,data,blue,tcActual,onBack}){
-  const c=data.contenedores.find(x=>x.id===cont.id)||cont;
-  const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
-  const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
-  const costo=c.costoTotal||0;
-  const enG=costo>0&&cobUSD>=costo;
-  const ganancia=enG?cobUSD-costo:0;
-  const fobTot=(c.articulos||[]).reduce((a,x)=>a+Number(x.precio||0)*Number(x.cantidad),0);
-  const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;
-  const [tab,setTab]=useState("articulos");
-
-  return(
-    <div>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:"1rem"}}>
-        <button onClick={onBack} style={{fontSize:13,padding:"6px 12px",borderRadius:"var(--r-md)",
-          cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",
-          background:"var(--color-background-primary)",color:"var(--text-primary)"}}>← Volver</button>
-        <h2 style={{fontSize:15,fontWeight:500,margin:0,color:"var(--text-primary)"}}>{c.nombre}</h2>
-      </div>
-
-      {/* Métricas */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:"1rem"}}>
-        <Metric label="Inversión" value={fmtUSD(costo)}/>
-        <Metric label="Cobrado" value={fmtUSD(cobUSD)} info={cobUSD>0}/>
-        <Metric label={enG?"Ganancia":"Falta cobrar"} value={fmtUSD(enG?ganancia:costo-cobUSD)} green={enG} warn={!enG&&costo>0}/>
-        <Metric label="FOB total" value={fmt(fobTot)+" ¥"}/>
-      </div>
-      {costo>0&&<BarraProgreso pct={pct} enGanancia={enG}/>}
-
-      {/* Tabs */}
-      <div style={{display:"flex",gap:4,margin:"1rem 0 0.75rem",background:"rgba(120,120,128,0.08)",borderRadius:"var(--r-md)",padding:4}}>
-        {["articulos","ventas","costos"].map(t=>(
-          <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"7px 4px",border:"none",
-            borderRadius:"var(--r-md)",cursor:"pointer",fontSize:12,
-            background:tab===t?"var(--color-background-primary)":"transparent",
-            color:tab===t?"var(--text-primary)":"var(--text-secondary)",
-            fontWeight:tab===t?500:400}}>
-            {t==="articulos"?"Artículos":t==="ventas"?"Ventas":"Costos"}
-          </button>
-        ))}
-      </div>
-
-      {tab==="articulos"&&(
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead>
-              <tr style={{background:"rgba(120,120,128,0.08)"}}>
-                {["Artículo","En cont.","Vendido","Stock disp.","Peso/u","% FOB"].map(h=>(
-                  <th key={h} style={{padding:"7px 8px",textAlign:"left",fontWeight:500,fontSize:10,
-                    color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(c.articulos||[]).map(art=>{
-                const vendido=stockDisp(c.id,art.nombre,data.ventas);
-                const disp=Math.max(0,Number(art.cantidad)-vendido);
-                const pr=pesoRollo(art);
-                const tot=Number(art.precio||0)*Number(art.cantidad);
-                const pf=fobTot>0?(tot/fobTot*100):0;
-                const mon=art.moneda==="USD"?"USD ":art.moneda==="RMB"?"¥":"";
-                return(
-                  <tr key={art.id||art.nombre} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                    <td style={{padding:"7px 8px",fontWeight:500,color:"var(--text-primary)"}}>{art.nombre}</td>
-                    <td style={{padding:"7px 8px",color:"var(--text-secondary)"}}>{fmt(art.cantidad)}</td>
-                    <td style={{padding:"7px 8px",color:"var(--text-secondary)"}}>{fmt(vendido)}</td>
-                    <td style={{padding:"7px 8px",fontWeight:500,color:disp>0?"var(--text-success)":"var(--text-secondary)"}}>{fmt(disp)}</td>
-                    <td style={{padding:"7px 8px",color:"var(--text-secondary)"}}>{pr>0?pr.toFixed(2)+" kg":"—"}</td>
-                    <td style={{padding:"7px 8px",color:"var(--text-secondary)"}}>{fmtPct(pf)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {tab==="ventas"&&(
-        <div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:"1rem"}}>
-            <Metric label="Total ventas" value={fmt(ventasCont.length)+" ops"}/>
-            <Metric label="Facturado" value={fmtUSD(ventasCont.reduce((a,v)=>a+Number(v.usd||0),0))} info/>
-            <Metric label="Ganancia" value={fmtUSD(ganancia)} green={enG}/>
-          </div>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-              <thead>
-                <tr style={{background:"rgba(120,120,128,0.08)"}}>
-                  {["Fecha","Artículo","Cant.","Cliente","USD","Estado"].map(h=>(
-                    <th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[...ventasCont].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(v=>(
-                  <tr key={v.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                    <td style={{padding:"6px 8px",color:"var(--text-secondary)",fontSize:11}}>{v.fecha}</td>
-                    <td style={{padding:"6px 8px",color:"var(--text-primary)"}}>{v.articulo}</td>
-                    <td style={{padding:"6px 8px",color:"var(--text-secondary)"}}>{v.cantidad}</td>
-                    <td style={{padding:"6px 8px",color:"var(--text-primary)"}}>{v.cliente}</td>
-                    <td style={{padding:"6px 8px",color:"var(--text-secondary)"}}>{fmtUSD(v.usd||0)}</td>
-                    <td style={{padding:"6px 8px"}}>
-                      <span style={{fontSize:10,padding:"2px 6px",borderRadius:4,
-                        background:v.estado==="Retirado"?"var(--bg-tint-green)":"rgba(120,120,128,0.08)",
-                        color:v.estado==="Retirado"?"var(--text-success)":"var(--text-secondary)"}}>
-                        {v.estado||"—"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {ventasCont.length===0&&<tr><td colSpan={6} style={{padding:"24px",textAlign:"center",color:"var(--text-secondary)"}}>Sin ventas registradas.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {tab==="costos"&&(
-        <div>
-          {c.artsCostoDetalle?(
-            <>
-              <div style={{marginBottom:"1rem",padding:"10px 14px",background:"rgba(120,120,128,0.08)",borderRadius:"var(--r-md)",fontSize:12}}>
-                Costo total del contenedor: <strong style={{fontSize:14}}>{fmtUSD(costo)}</strong>
-                {c.costos?.tipoCambioFijado&&<span style={{color:"var(--text-secondary)",marginLeft:8}}>TC fijado: ${fmt(c.costos.tipoCambioFijado)}</span>}
-              </div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                  <thead>
-                    <tr style={{background:"rgba(120,120,128,0.08)"}}>
-                      {["Artículo","% FOB","Costo total USD","Costo/u USD","Costo/u $ARS"].map(h=>(
-                        <th key={h} style={{padding:"7px 8px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {c.artsCostoDetalle.map(a=>{
-                      const ars=a.costoUnitario*(Number(c.costos?.tipoCambioFijado)||tcActual);
-                      return(
-                        <tr key={a.id||a.nombre} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-                          <td style={{padding:"7px 8px",fontWeight:500,color:"var(--text-primary)"}}>{a.nombre}</td>
-                          <td style={{padding:"7px 8px",color:"var(--text-secondary)"}}>{fmtPct(a.pct)}</td>
-                          <td style={{padding:"7px 8px",color:"var(--text-secondary)"}}>{fmtUSD(a.costoProporcional)}</td>
-                          <td style={{padding:"7px 8px",color:"var(--text-secondary)"}}>{fmtUSD(a.costoUnitario)}</td>
-                          <td style={{padding:"7px 8px",fontWeight:500,color:"var(--text-primary)"}}>{"$"+fmt(ars)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ):(
-            <div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Los costos de este contenedor aún no fueron calculados.</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── STOCK UNIFICADO ────────────────────────────────────────────────────────
 function ViewStock({stockUni,data}){
   const stockPapel={}, stockTinta={};
   let totalPapel=0, totalTinta=0;
@@ -1144,10 +461,11 @@ function ViewStock({stockUni,data}){
   );
 }
 
+// ── COSTOS: contenedores ordenados más nuevo → más viejo ──────────────────
 function ViewCostos({data,blue,tcActual}){
   const [tcManual,setTcManual]=useState(String(Math.round(tcActual)));
   const tc=Number(tcManual)||tcActual;
-  const conts=(data.contenedores||[]).filter(c=>c.artsCostoDetalle&&c.artsCostoDetalle.length>0);
+  const conts=[...(data.contenedores||[])].filter(c=>c.artsCostoDetalle&&c.artsCostoDetalle.length>0).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
 
   return(
     <div>
@@ -1156,9 +474,7 @@ function ViewCostos({data,blue,tcActual}){
         <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
           <label style={{color:"var(--text-secondary)"}}>TC para ARS:</label>
           <input type="number" value={tcManual} onChange={e=>setTcManual(e.target.value)}
-            style={{width:90,padding:"5px 8px",fontSize:12,borderRadius:"var(--r-md)",
-              border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",
-              color:"var(--text-primary)"}}/>
+            style={{width:90,padding:"5px 8px",fontSize:12,borderRadius:"var(--r-md)",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--text-primary)"}}/>
           {blue&&<span style={{color:"var(--text-secondary)"}}>Blue: ${fmt(blue)}</span>}
         </div>
       </div>
@@ -1198,17 +514,15 @@ function ViewCostos({data,blue,tcActual}){
   );
 }
 
-// ── VENTAS SOLO LECTURA ─────────────────────────────────────────────────
+// ── VENTAS: ordenadas más nuevo → más viejo ───────────────────────────────
 function ViewVentas({data}){
   const [desde,setDesde]=useState("");
   const [hasta,setHasta]=useState("");
   const [filtroArt,setFiltroArt]=useState("");
   const [filtroCont,setFiltroCont]=useState("");
-  const fmtUSD=n=>"USD "+Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const fmt=n=>Number(n||0).toLocaleString("es-AR");
 
   const ARTS_UNICOS=[...new Set((data.ventas||[]).map(v=>v.articulo))].filter(Boolean).sort();
-  const CONTS_UNICOS=[...(data.contenedores||[])].sort((a,b)=>b.id.localeCompare(a.id)).map(c=>({id:c.id,nombre:c.nombre}));
+  const CONTS_UNICOS=[...(data.contenedores||[])].sort((a,b)=>(b.id||"").localeCompare(a.id||"")).map(c=>({id:c.id,nombre:c.nombre}));
   const stBg={"Retirado":"var(--bg-tint-green)","A despachar":"var(--bg-tint-blue)","Despachado":"var(--bg-tint-blue)","A retirar Ezeiza":"var(--bg-tint-amber)","A retirar Once":"var(--bg-tint-amber)"};
   const stCol={"Retirado":"var(--text-success)","A despachar":"var(--text-info)","Despachado":"var(--text-info)","A retirar Ezeiza":"var(--text-warning)","A retirar Once":"var(--text-warning)"};
 
@@ -1220,7 +534,7 @@ function ViewVentas({data}){
       if(filtroCont&&v.contId!==filtroCont)return false;
       return true;
     })
-    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
 
   const totalUSD=ventas.reduce((a,v)=>a+Number(v.usd||0),0);
   const totalU=ventas.reduce((a,v)=>a+Number(v.cantidad||0),0);
@@ -1241,8 +555,6 @@ function ViewVentas({data}){
         <Card l="Unidades" v={fmt(totalU)+" u"}/>
         <Card l="USD facturado" v={fmtUSD(totalUSD)} info/>
       </div>
-
-      {/* Filtros */}
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",marginBottom:"1rem",boxShadow:"var(--glass-shadow-sm)"}}>
         <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:10}}>Filtros</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:hayFiltros?10:0}}>
@@ -1253,7 +565,6 @@ function ViewVentas({data}){
         </div>
         {hayFiltros&&<button onClick={()=>{setDesde("");setHasta("");setFiltroArt("");setFiltroCont("");}} style={{fontSize:11,padding:"5px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>✕ Limpiar filtros</button>}
       </div>
-
       {ventas.length===0
         ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)"}}>Sin ventas para los filtros seleccionados.</div>
         :<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",overflow:"hidden",boxShadow:"var(--glass-shadow-sm)"}}>
