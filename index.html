@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.8.8";
+const APP_VERSION = "v2.8.9";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -5541,6 +5541,7 @@ function DespachosView({data,save,showToast}){
     setManual(false);showToast("Despacho agregado");
   };
   const actualizarEstado=(id,estado)=>save({...data,despachos:data.despachos.map(d=>d.id===id?{...d,estado}:d)});
+  const eliminarDespacho=id=>{if(window.confirm("¿Eliminar este despacho?"))save({...data,despachos:(data.despachos||[]).filter(d=>d.id!==id)});};
   const calcularBultos=d=>{
     // Parsea "30GR x5, TINTA NEGRO x3" -> [{nombre,cantidad,esTinta}]
     if(!d.articulos)return[{...d,bultoLabel:"",bultoNum:1,bultoTotal:1}];
@@ -5666,6 +5667,7 @@ function DespachosView({data,save,showToast}){
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
                 <select value={d.estado||"Pendiente"} onChange={e=>actualizarEstado(d.id,e.target.value)} style={{fontSize:11,padding:"3px 6px",borderRadius:4}}><option>Pendiente</option><option>Despachado</option></select>
                 <button onClick={()=>imprimirUno(d)} style={{fontSize:11,padding:"4px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)",whiteSpace:"nowrap"}}>🖨️</button>
+                <button onClick={()=>eliminarDespacho(d.id)} style={{fontSize:11,padding:"4px 8px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--border-danger)",background:"var(--bg-tint-red)",color:"var(--text-danger)",whiteSpace:"nowrap"}}>✕</button>
               </div>
             </div>
             <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>{[d.direccion,d.localidad,d.provincia].filter(Boolean).join(" · ")+(d.dni?" · DNI "+d.dni:"")}</div>
