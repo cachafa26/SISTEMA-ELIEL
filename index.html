@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.0.3 · 2026-06-17 -->
+  <!-- v3.0.4 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.3</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.4</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.0.3";
+const APP_VERSION = "v3.0.4";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -5591,8 +5591,10 @@ function VentasView({data,save,showToast}){
 }
 
 function CuentasView({data,save,showToast}){
-  const [modal,setModal]=useState(null);
+  const [modal,setModal]=useState(null); // {ventaId, ventaIds[], cliente, saldoTotal, venta}
   const [monto,setMonto]=useState("");
+  const [fechaPago,setFechaPago]=useState(hoy());
+  const [notaPago,setNotaPago]=useState("");
   const [desde,setDesde]=useState("");
   const [hasta,setHasta]=useState("");
   const [clienteSel,setClienteSel]=useState(null);
@@ -5612,30 +5614,64 @@ function CuentasView({data,save,showToast}){
     perfilClientes[cl].totalUSD+=Number(v.usd||0);
   }
 
-  // Filter for list
   const clientes=Object.values(perfilClientes)
     .filter(c=>!busq||c.nombre.toLowerCase().includes(busq.toLowerCase()))
     .sort((a,b)=>b.debe-a.debe||b.totalHistorico-a.totalHistorico);
   const conDeuda=clientes.filter(c=>c.debe>0);
   const sinDeuda=clientes.filter(c=>c.debe===0);
 
+  // Registrar pago — puede aplicarse a una venta o a múltiples (por pedidoId)
   const registrarPago=()=>{
     if(!monto||!modal)return;
-    save({...data,pagos:[...(data.pagos||[]),{id:Date.now().toString(),ventaId:modal.ventaId,monto:Number(monto),fecha:hoy()}]});
-    setMonto("");setModal(null);showToast("Pago registrado");
+    const montoN=Number(monto);
+    if(montoN<=0){showToast("Monto inválido");return;}
+    // If modal has multiple ventaIds (pedido completo), distribute payment across them
+    const ventaIds=modal.ventaIds||[modal.ventaId];
+    const pagos=[...(data.pagos||[])];
+    // Apply monto to ventaIds in order until exhausted
+    let restante=montoN;
+    for(const vid of ventaIds){
+      if(restante<=0)break;
+      const venta=(data.ventas||[]).find(v=>v.id===vid);
+      if(!venta)continue;
+      const yaCob=pagadoVenta(venta,data.pagos);
+      const saldoV=Math.max(0,Number(venta.total||0)-yaCob);
+      if(saldoV<=0)continue;
+      const aplicar=Math.min(restante,saldoV);
+      pagos.push({id:Date.now().toString()+"_"+vid,ventaId:vid,monto:aplicar,fecha:fechaPago,nota:notaPago});
+      restante-=aplicar;
+    }
+    save({...data,pagos});
+    setMonto("");setFechaPago(hoy());setNotaPago("");setModal(null);
+    showToast("✓ Pago de $"+fmt(montoN)+" registrado");
   };
 
   // ── Client Profile Modal ──────────────────────────────────────────────
   if(clienteSel){
     const p=perfilClientes[clienteSel]||{nombre:clienteSel,ventas:[],debe:0,favor:0,totalHistorico:0,totalUSD:0};
     const info=data.clientes?.[clienteSel]||{};
+
+    // Group ventas by pedidoId
+    const pedidoMap=new Map();
     const ventasFilt=p.ventas
       .filter(v=>(!desde||v.fecha>=desde)&&(!hasta||v.fecha<=hasta))
       .sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
+
+    for(const v of ventasFilt){
+      const pid=v.pedidoId||v.id;
+      if(!pedidoMap.has(pid))pedidoMap.set(pid,{pid,fecha:v.fecha,lineas:[],totalPedido:0,totalCob:0,saldoPedido:0});
+      const ped=pedidoMap.get(pid);
+      ped.lineas.push(v);
+      ped.totalPedido+=Number(v.total||0);
+      ped.totalCob+=v.cob;
+      ped.saldoPedido+=v.saldo;
+    }
+    const pedidos=[...pedidoMap.values()];
+
     return(
       <div>
         <button onClick={()=>setClienteSel(null)} style={{fontSize:13,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",color:"var(--text-primary)",cursor:"pointer",marginBottom:"1rem",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>← Volver</button>
-        
+
         {/* Client header */}
         <div style={{background:"linear-gradient(135deg,rgba(244,121,32,0.15),rgba(91,173,65,0.15),rgba(46,134,193,0.15))",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"20px 22px",marginBottom:"1rem",boxShadow:"var(--glass-shadow)"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
@@ -5649,6 +5685,17 @@ function CuentasView({data,save,showToast}){
               {p.debe>0&&<div style={{fontSize:15,fontWeight:700,color:"var(--text-danger)"}}>Debe ${fmt(p.debe)}</div>}
               {p.favor>0&&<div style={{fontSize:13,fontWeight:600,color:"var(--text-info)"}}>A favor ${fmt(p.favor)}</div>}
               {p.debe===0&&p.favor===0&&<div style={{fontSize:13,color:"var(--text-success)",fontWeight:500}}>✓ Al día</div>}
+              {/* Botón pago total si debe */}
+              {p.debe>0&&(
+                <button onClick={()=>{
+                  const ids=p.ventas.filter(v=>v.saldo>0).map(v=>v.id);
+                  setModal({ventaIds:ids,cliente:p.nombre,saldoTotal:p.debe});
+                  setMonto(String(p.debe));
+                  setFechaPago(hoy());
+                }} style={{marginTop:8,fontSize:12,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:600,cursor:"pointer",display:"block",width:"100%"}}>
+                  + Saldar todo (${fmt(p.debe)})
+                </button>
+              )}
             </div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
@@ -5667,14 +5714,30 @@ function CuentasView({data,save,showToast}){
 
         {/* Payment modal */}
         {modal&&(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
-            <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"22px",width:"100%",maxWidth:320,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
-              <h3 style={{fontSize:16,fontWeight:600,margin:"0 0 14px",color:"var(--text-primary)"}}>Registrar pago</h3>
-              <label style={{fontSize:12,color:"var(--text-secondary)",display:"block",marginBottom:5}}>Monto recibido ($)</label>
-              <input type="number" value={monto} onChange={e=>setMonto(e.target.value)} autoFocus style={{marginBottom:14}}/>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+            <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"22px",width:"100%",maxWidth:360,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
+              <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Registrar pago</h3>
+              <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{modal.cliente}{modal.saldoTotal?" · Saldo total: $"+fmt(modal.saldoTotal):""}</p>
+              <div style={{marginBottom:10}}>
+                <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto recibido ($ARS)</label>
+                <input type="number" value={monto} onChange={e=>setMonto(e.target.value)} autoFocus placeholder="0" inputMode="decimal"/>
+              </div>
+              <div style={{marginBottom:10}}>
+                <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha del pago</label>
+                <input type="date" value={fechaPago} onChange={e=>setFechaPago(e.target.value)}/>
+              </div>
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota (opcional)</label>
+                <input value={notaPago} onChange={e=>setNotaPago(e.target.value)} placeholder="Transferencia, efectivo..."/>
+              </div>
+              {monto&&Number(monto)>0&&modal.saldoTotal&&Number(monto)<modal.saldoTotal&&(
+                <div style={{fontSize:11,color:"var(--text-warning)",marginBottom:12,padding:"8px 10px",background:"var(--bg-tint-amber)",borderRadius:"var(--r-md)"}}>
+                  Saldo restante después del pago: ${fmt(modal.saldoTotal-Number(monto))}
+                </div>
+              )}
               <div style={{display:"flex",gap:8}}>
-                <button onClick={registrarPago} style={{flex:1,fontSize:13,padding:"10px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:600}}>Registrar</button>
-                <button onClick={()=>{setModal(null);setMonto("");}} style={{fontSize:13,padding:"10px 16px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)"}}>Cancelar</button>
+                <button onClick={registrarPago} style={{flex:1,fontSize:13,padding:"11px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:600}}>✓ Registrar</button>
+                <button onClick={()=>{setModal(null);setMonto("");setNotaPago("");}} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)"}}>Cancelar</button>
               </div>
             </div>
           </div>
@@ -5683,30 +5746,73 @@ function CuentasView({data,save,showToast}){
         {/* Filter */}
         <FiltroFechas desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta}/>
 
-        {/* Operations table */}
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",overflow:"hidden",boxShadow:"var(--glass-shadow-sm)"}}>
-          {ventasFilt.length===0?<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin operaciones en el período.</div>:(
-            <div style={{overflowX:"auto"}}>
-              <table>
-                <thead><tr>{["Fecha","Artículo","Cant.","Total","Pagado","Saldo",""].map(h=><th key={h}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {ventasFilt.map(v=>(
-                    <tr key={v.id}>
-                      <td style={{fontSize:11,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{v.fecha}</td>
-                      <td style={{fontWeight:500,whiteSpace:"nowrap"}}>{v.articulo} ×{v.cantidad}</td>
-                      <td style={{color:"var(--text-secondary)"}}>{fmtUSD(v.usd)}</td>
-                      <td style={{color:"var(--text-primary)"}}>${fmt(v.total)}</td>
-                      <td style={{color:"var(--text-success)"}}>${fmt(v.cob)}</td>
-                      <td style={{fontWeight:v.saldo>0?600:400,color:v.saldo>0?"var(--text-danger)":v.saldo<0?"var(--text-info)":"var(--text-success)",whiteSpace:"nowrap"}}>
-                        {v.saldo>0?"Debe $"+fmt(v.saldo):v.saldo<0?"Favor $"+fmt(Math.abs(v.saldo)):"✓"}
-                      </td>
-                      <td>{v.saldo>0&&<button onClick={()=>setModal({ventaId:v.id,cliente:p.nombre})} style={{fontSize:11,padding:"4px 10px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"0.5px solid var(--border-success)",background:"var(--bg-tint-green)",color:"var(--text-success)"}}>+ Pago</button>}</td>
-                    </tr>
+        {/* Pedidos agrupados */}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {pedidos.length===0
+            ?<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin operaciones en el período.</div>
+            :pedidos.map(ped=>{
+              const debe=ped.saldoPedido>0;
+              const saldado=ped.saldoPedido<=0;
+              return(
+                <div key={ped.pid} style={{
+                  background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",
+                  border:debe?"0.5px solid rgba(192,57,43,0.4)":"0.5px solid var(--glass-border)",
+                  borderRadius:"var(--r-lg)",overflow:"hidden",boxShadow:"var(--glass-shadow-sm)",
+                }}>
+                  {/* Pedido header */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",borderBottom:"0.5px solid var(--glass-border)"}}>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:600,color:"var(--text-primary)"}}>{ped.fecha}</div>
+                      <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{ped.lineas.length} artículo{ped.lineas.length>1?"s":""}</div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)"}}>${fmt(ped.totalPedido)}</div>
+                        {debe&&<div style={{fontSize:11,fontWeight:700,color:"var(--text-danger)"}}>Debe ${fmt(ped.saldoPedido)}</div>}
+                        {saldado&&<div style={{fontSize:11,color:"var(--text-success)",fontWeight:500}}>✓ Pagado</div>}
+                      </div>
+                      {debe&&(
+                        <button onClick={()=>{
+                          setModal({ventaIds:ped.lineas.map(l=>l.id),cliente:p.nombre,saldoTotal:ped.saldoPedido});
+                          setMonto(String(ped.saldoPedido));
+                          setFechaPago(hoy());
+                        }} style={{fontSize:11,padding:"6px 12px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:600,whiteSpace:"nowrap"}}>
+                          + Pago
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {/* Líneas */}
+                  {ped.lineas.map(v=>(
+                    <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 14px",borderBottom:"0.5px solid rgba(120,120,128,0.08)",fontSize:12}}>
+                      <span style={{color:"var(--text-secondary)"}}>{v.articulo} <strong style={{color:"var(--text-primary)"}}>×{v.cantidad}</strong></span>
+                      <div style={{display:"flex",gap:16,alignItems:"center"}}>
+                        <span style={{color:"var(--text-secondary)"}}>${fmt(v.total)}</span>
+                        {v.cob>0&&<span style={{color:"var(--text-success)",fontSize:11}}>Cob: ${fmt(v.cob)}</span>}
+                        {v.saldo>0&&<span style={{color:"var(--text-danger)",fontSize:11,fontWeight:600}}>Saldo: ${fmt(v.saldo)}</span>}
+                        {v.saldo===0&&<span style={{color:"var(--text-success)",fontSize:11}}>✓</span>}
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  {/* Pagos registrados del pedido */}
+                  {(()=>{
+                    const pagosPed=(data.pagos||[]).filter(pg=>ped.lineas.some(l=>l.id===pg.ventaId));
+                    if(!pagosPed.length)return null;
+                    return(
+                      <div style={{padding:"8px 14px",background:"rgba(91,173,65,0.04)"}}>
+                        {pagosPed.sort((a,b)=>a.fecha?.localeCompare(b.fecha||"")||0).map(pg=>(
+                          <div key={pg.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text-success)",padding:"2px 0"}}>
+                            <span>💳 Pago {pg.fecha||""}{pg.nota?" · "+pg.nota:""}</span>
+                            <span style={{fontWeight:600}}>+${fmt(pg.monto)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })
+          }
         </div>
       </div>
     );
@@ -5719,15 +5825,11 @@ function CuentasView({data,save,showToast}){
         <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:0,color:"var(--text-primary)"}}>Cuentas corrientes</h2>
         <span style={{fontSize:11,color:"var(--text-secondary)"}}>{clientes.length} clientes</span>
       </div>
-
-      {/* Search */}
       <div style={{marginBottom:"1rem",position:"relative"}}>
         <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"var(--text-tertiary)",pointerEvents:"none"}}>🔍</span>
         <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar cliente..." style={{paddingLeft:36}}/>
       </div>
-
       <FiltroFechas desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta}/>
-
       {conDeuda.length>0&&(
         <>
           <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-danger)",marginBottom:8}}>Con deuda ({conDeuda.length})</div>
@@ -5752,7 +5854,6 @@ function CuentasView({data,save,showToast}){
           </div>
         </>
       )}
-
       {sinDeuda.length>0&&(
         <>
           <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Al día ({sinDeuda.length})</div>
