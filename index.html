@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.9.9 · 2026-06-17 -->
+  <!-- v3.0.0 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.9.9</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.9.9";
+const APP_VERSION = "v3.0.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1427,8 +1427,9 @@ function App(){
   const totalGastosUSD=(data.fin?.gastos||[]).filter(g=>g.moneda==="USD").reduce((a,g)=>a+Number(g.montoOriginal||0),0)+gastosFX_USD;
   const totalGastos=totalGastosARS; // para compatibilidad con FinanzasView (ARS)
   const totalRetSCPesos=(data.retiros||[]).reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0);
-  // Ingresos ARS: solo lo efectivamente cobrado/retirado en pesos
-  const totalIngresos=totalRetSCPesos+bhCobradoTotal; // SC retirado + BH cobrado; DJ no entra (es USD)
+  // Ingresos ARS: solo lo efectivamente cobrado/retirado en pesos + ingresos extra en ARS
+  const ingresosExtraARSTotal=(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="ARS").reduce((a,f)=>a+Number(f.monto||0),0);
+  const totalIngresos=totalRetSCPesos+bhCobradoTotal+ingresosExtraARSTotal; // SC retirado + BH cobrado + extras ARS
 
   // Módulos de navegación superior
   const modulos=[
@@ -2751,6 +2752,12 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
       moneda:r.moneda||"ARS",montoUSD:Number(r.montoUSD||0),
       modulo:"Super Coating",color:"var(--color-text-success)"
     })),
+    // Ingresos extra (regalos, transferencias, etc.)
+    ...(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra").map(f=>({
+      id:f.id,fecha:f.fecha,desc:f.desc,
+      monto:Number(f.monto),moneda:f.moneda||"USD",
+      modulo:"Ingreso extra",color:"#8E44AD"
+    })),
     // Gastos personales — en su moneda original
     ...(data.fin?.gastos||[]).map(g=>({
       id:g.id,fecha:g.fecha,desc:g.desc,
@@ -2810,7 +2817,9 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
         const djCobradoUSDtotal=(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD").reduce((a,p)=>a+Number(p.montoUSD||0),0);
         const fxCompradoUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="compra").reduce((a,f)=>a+Number(f.cantUSD||0),0);
         const fxVendidoUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="venta").reduce((a,f)=>a+Number(f.cantUSD||0),0);
-        const ingresosUSD=retirosUSD+bhCobrosUSD+djCobradoUSDtotal+fxCompradoUSD-fxVendidoUSD;
+        const ingresosExtraUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="USD").reduce((a,f)=>a+Number(f.monto||0),0);
+        const ingresosExtraARS=(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="ARS").reduce((a,f)=>a+Number(f.monto||0),0);
+        const ingresosUSD=retirosUSD+bhCobrosUSD+djCobradoUSDtotal+fxCompradoUSD-fxVendidoUSD+ingresosExtraUSD;
         // Egresos USD: gastos en USD + USD vendidos (ya incluidos en totalGastosUSD)
         const egresoUSD=totalGastosUSD||0;
         const balanceUSD=ingresosUSD-egresoUSD;
@@ -4038,6 +4047,12 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
   const [fxTipo,setFxTipo]=useState("compra");
   const [fxCant,setFxCant]=useState("");
   const [fxCotiz,setFxCotiz]=useState(blue?String(Math.round(blue)):"");
+  // Ingresos extra (regalos, transferencias, etc.)
+  const [showIngreso,setShowIngreso]=useState(false);
+  const [ingMoneda,setIngMoneda]=useState("USD");
+  const [ingMonto,setIngMonto]=useState("");
+  const [ingDesc,setIngDesc]=useState("");
+  const [ingFecha,setIngFecha]=useState(new Date().toISOString().split("T")[0]);
   const gastos=data.fin?.gastos||[];
   const balance=totalIngresos-totalGastos;
   const presupuestos=data.fin?.presupuestos||{};
@@ -4061,6 +4076,24 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
     save({...data,fin:{...data.fin,fx}});
     setFxCant("");setFxCotiz(blue?String(Math.round(blue)):"");setShowFX(false);
     showToast(fxTipo==="compra"?"✓ Compra de USD registrada":"✓ Venta de USD registrada");
+  };
+
+  const guardarIngreso=()=>{
+    if(!ingMonto||!ingDesc.trim()){showToast("Completá monto y descripción");return;}
+    const montoN=Number(ingMonto);
+    const ing={
+      id:Date.now().toString(),
+      tipo:"ingreso_extra",
+      moneda:ingMoneda,
+      monto:montoN,
+      desc:ingDesc,
+      fecha:ingFecha,
+      ts:Date.now(),
+    };
+    const fx=[...(data.fin?.fx||[]),ing];
+    save({...data,fin:{...data.fin,fx}});
+    setIngMonto("");setIngDesc("");setShowIngreso(false);
+    showToast("✓ Ingreso registrado");
   };
 
   const guardarPresupuesto=()=>{
@@ -4251,16 +4284,81 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
         {/* Historial FX */}
         {(data.fin?.fx||[]).length>0&&(
           <div style={{marginTop:showFX?12:0}}>
-            {[...(data.fin?.fx||[])].sort((a,b)=>b.ts-a.ts).slice(0,5).map(f=>(
+            {[...(data.fin?.fx||[])].sort((a,b)=>b.ts-a.ts).map(f=>(
               <div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderTop:"0.5px solid var(--glass-border)",fontSize:12}}>
-                <div>
+                <div style={{flex:1}}>
                   <span style={{fontWeight:600,color:f.tipo==="compra"?"var(--text-info)":"var(--text-success)"}}>{f.tipo==="compra"?"Compra":"Venta"} USD</span>
                   <span style={{color:"var(--text-secondary)",marginLeft:8}}>{f.fecha} · TC ${fmt(f.cotiz)}</span>
                 </div>
-                <div style={{textAlign:"right"}}>
+                <div style={{textAlign:"right",marginRight:8}}>
                   <div style={{fontWeight:600}}>{f.tipo==="compra"?"+":"−"} USD {Number(f.cantUSD).toLocaleString("es-AR")}</div>
                   <div style={{fontSize:11,color:"var(--text-secondary)"}}>{f.tipo==="compra"?"-":"+"}${fmt(f.totalARS)} ARS</div>
                 </div>
+                <button onClick={()=>{if(window.confirm("¿Eliminar este movimiento?"))save({...data,fin:{...data.fin,fx:(data.fin?.fx||[]).filter(x=>x.id!==f.id)}});}}
+                  style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:15,padding:"2px 4px",flexShrink:0}}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── INGRESOS EXTRA ── */}
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 18px",marginBottom:"1.5rem"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:showIngreso?12:0}}>
+          <div>
+            <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)"}}>Ingresos extra</div>
+            <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>Regalos, transferencias, otros</div>
+          </div>
+          <button onClick={()=>setShowIngreso(s=>!s)} style={{fontSize:12,padding:"6px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#8E44AD,#6C3483)",color:"#fff",cursor:"pointer",fontWeight:600}}>+ Ingreso</button>
+        </div>
+        {showIngreso&&(
+          <div style={{background:"rgba(142,68,173,0.07)",border:"0.5px solid rgba(142,68,173,0.25)",borderRadius:"var(--r-md)",padding:"14px"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#8E44AD",marginBottom:12}}>💜 Nuevo ingreso</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div style={{gridColumn:"1/-1"}}>
+                <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Descripción</label>
+                <input value={ingDesc} onChange={e=>setIngDesc(e.target.value)} placeholder="Ej: Regalo cumpleaños, transferencia papá..."/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto</label>
+                <div style={{display:"flex",gap:4}}>
+                  <select value={ingMoneda} onChange={e=>setIngMoneda(e.target.value)} style={{width:70,flexShrink:0}}>
+                    <option value="USD">USD</option>
+                    <option value="ARS">ARS</option>
+                  </select>
+                  <input type="number" value={ingMonto} onChange={e=>setIngMonto(e.target.value)} placeholder="0" inputMode="decimal"/>
+                </div>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label>
+                <input type="date" value={ingFecha} onChange={e=>setIngFecha(e.target.value)}/>
+              </div>
+            </div>
+            {ingMonto&&Number(ingMonto)>0&&(
+              <div style={{fontSize:11,color:"#8E44AD",marginBottom:10,fontWeight:500}}>
+                + {ingMoneda==="USD"?"USD "+fmt(ingMonto):"$"+fmt(ingMonto)+" ARS"}
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={guardarIngreso} style={{fontSize:13,padding:"8px 20px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#8E44AD,#6C3483)",color:"#fff",fontWeight:600,cursor:"pointer"}}>Guardar ingreso</button>
+              <button onClick={()=>setShowIngreso(false)} style={{fontSize:13,padding:"8px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+            </div>
+          </div>
+        )}
+        {/* Historial ingresos extra */}
+        {(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra").length>0&&(
+          <div style={{marginTop:showIngreso?12:8}}>
+            {[...(data.fin?.fx||[])].filter(f=>f.tipo==="ingreso_extra").sort((a,b)=>b.ts-a.ts).map(f=>(
+              <div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderTop:"0.5px solid var(--glass-border)",fontSize:12}}>
+                <div style={{flex:1}}>
+                  <span style={{fontWeight:600,color:"#8E44AD"}}>{f.desc}</span>
+                  <span style={{color:"var(--text-secondary)",marginLeft:8}}>{f.fecha}</span>
+                </div>
+                <div style={{textAlign:"right",marginRight:8,fontWeight:600,color:"var(--text-success)"}}>
+                  +{f.moneda==="USD"?"USD "+fmt(f.monto):"$"+fmt(f.monto)}
+                </div>
+                <button onClick={()=>{if(window.confirm("¿Eliminar este ingreso?"))save({...data,fin:{...data.fin,fx:(data.fin?.fx||[]).filter(x=>x.id!==f.id)}});}}
+                  style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:15,padding:"2px 4px",flexShrink:0}}>✕</button>
               </div>
             ))}
           </div>
