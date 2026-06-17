@@ -381,16 +381,29 @@ function ViewDashboard({data,stockUni,lastUpdate,setView}){
       <div style={{display:"grid",gap:8}}>
         {resumen.map(({c,cobUSD,costo,pct,enG,stockCont})=>(
           <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",cursor:"pointer"}} onClick={()=>setView("stock")}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
               <span style={{fontWeight:500,fontSize:14,color:"var(--text-primary)"}}>{c.nombre}</span>
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <span style={{fontSize:12,fontWeight:500,color:"var(--text-secondary)"}}>{fmt(stockCont)} u</span>
-                <span style={{fontSize:11,padding:"2px 9px",borderRadius:20,background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)",fontWeight:500}}>
-                  {costo===0?"Activo":enG?"✓ Recuperado":fmtPct(pct)+" recuperado"}
-                </span>
+              <div style={{textAlign:"right"}}>
+                <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"flex-end",marginBottom:4}}>
+                  <span style={{fontSize:12,fontWeight:500,color:"var(--text-secondary)"}}>{fmt(stockCont)} u</span>
+                  <span style={{fontSize:11,padding:"2px 9px",borderRadius:20,background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)",fontWeight:500}}>
+                    {costo===0?"Activo":enG?"✓ En ganancia":fmtPct(pct)+" recuperado"}
+                  </span>
+                </div>
+                {costo>0&&(
+                  <div style={{fontSize:13,fontWeight:700,color:enG?"var(--text-success)":"var(--text-warning)"}}>
+                    {enG?"+ "+fmtUSD(cobUSD-costo):"-"+fmtUSD(costo-cobUSD)+" para cubrir"}
+                  </div>
+                )}
               </div>
             </div>
             {costo>0&&<BarraProgreso pct={pct} enGanancia={enG}/>}
+            {costo>0&&(
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:11,color:"var(--text-secondary)"}}>
+                <span>Cobrado: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(cobUSD)}</strong></span>
+                <span>Inversión: <strong>{fmtUSD(costo)}</strong></span>
+              </div>
+            )}
           </div>
         ))}
         {resumen.length===0&&<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin contenedores.</div>}
