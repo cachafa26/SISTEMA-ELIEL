@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.8.2";
+const APP_VERSION = "v2.8.3";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1389,8 +1389,18 @@ function App(){
   // Calculos DJ globales
   const djEventos=data.dj?.eventos||[];
   const djRealizados=djEventos.filter(e=>e.estado==="Realizado");
-  const djGananciaUSD=djRealizados.reduce((a,e)=>a+Number(e.gananciaUSD||e.ganancia||0),0);
-  const djCobradoUSD=djRealizados.reduce((a,e)=>a+Number(e.cobroUSD||e.cobro||0),0);
+  // Ganancia = lo cobrado que supera el costo, sin importar estado
+  const djGananciaUSD=djEventos.reduce((a,e)=>{
+    if(e.estado==="Pendiente") return a;
+    const cobrado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
+    return a+Math.max(0,cobrado-Number(e.costoUSD||0));
+  },0);
+  // Cobrado = suma de pagos reales de todos los eventos no-Pendiente
+  const djCobradoUSD=djEventos.reduce((a,e)=>{
+    if(e.estado==="Pendiente") return a;
+    const cobrado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
+    return a+cobrado;
+  },0);
   const djGanancia=djGananciaUSD; // alias for backward compat
   const djCobrado=djCobradoUSD;
 
@@ -3099,14 +3109,15 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 
 
   // Totales historial
-  const cobroTotal=realizados.reduce((a,e)=>{
-    // Suma pagos reales registrados; si no hay pagos, usa senaUSD o cobroUSD
-    const pagado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0);
-    return a+(pagado>0?pagado:Number(e.senaUSD||0)>0?Number(e.senaUSD):Number(e.cobroUSD||0));
+  const cobroTotal=eventos.reduce((a,e)=>{
+    if(e.estado==="Pendiente") return a;
+    const cobrado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
+    return a+cobrado;
   },0);
-  const ganTotal=realizados.reduce((a,e)=>{
-    const pagado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0);
-    const cobrado=pagado>0?pagado:Number(e.senaUSD||0)>0?Number(e.senaUSD):Number(e.cobroUSD||0);
+  // Ganancia = lo cobrado que supera el costo, en todos los eventos no-Pendiente
+  const ganTotal=eventos.reduce((a,e)=>{
+    if(e.estado==="Pendiente") return a;
+    const cobrado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
     return a+Math.max(0,cobrado-Number(e.costoUSD||0));
   },0);
   const saldoTotal=confirmados.filter(e=>e.saldo>0).reduce((a,e)=>a+Number(e.saldo||0),0);
