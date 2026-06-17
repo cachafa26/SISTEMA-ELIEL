@@ -3986,19 +3986,19 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
       </div>
 
       {/* Tabs + add button */}
-      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:"1.25rem"}}>
-        <div style={{display:"flex",flex:1,gap:4,background:"rgba(120,120,128,0.1)",borderRadius:"var(--r-lg)",padding:4}}>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:"1.25rem"}}>
+        <div style={{display:"flex",gap:4,background:"rgba(120,120,128,0.1)",borderRadius:"var(--r-lg)",padding:4}}>
           <TabBtn id="presupuestos" label="Presupuestos" count={presupuestos.filter(p=>p.estado==="Pendiente").length}/>
           <TabBtn id="confirmados"  label="Confirmados"  count={confirmados.length}/>
           <TabBtn id="realizados"   label="Historial"    count={realizados.length}/>
           <TabBtn id="deudores"     label="Deudores"     count={eventos.filter(e=>e.saldo>0&&e.estado==="Confirmado").length}/>
         </div>
         <button onClick={()=>setTab(tab==="nuevo"?"confirmados":"nuevo")} style={{
-          flexShrink:0,padding:"8px 14px",borderRadius:"var(--r-lg)",border:"none",cursor:"pointer",
+          width:"100%",padding:"10px 14px",borderRadius:"var(--r-lg)",border:"none",cursor:"pointer",
           background:tab==="nuevo"?"var(--bg-tint-blue)":"linear-gradient(135deg,#185FA5,#2E86C1)",
-          color:"#fff",fontWeight:700,fontSize:13,
+          color:"#fff",fontWeight:700,fontSize:14,
           boxShadow:tab==="nuevo"?"none":"0 4px 14px rgba(24,95,165,0.35)",
-        }}>{tab==="nuevo"?"✕":"+ Evento"}</button>
+        }}>{tab==="nuevo"?"✕ Cancelar":"+ Evento"}</button>
       </div>
 
       {/* ── TAB: PRESUPUESTOS ── */}
