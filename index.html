@@ -2670,6 +2670,9 @@ function SearchModal({data,onClose,goModulo,setView}){
 function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,djGanancia,djCobrado,djEventos,djGananciaUSD,djCobradoUSD,djRealizados,totalGastos,totalIngresos,totalVentaUSD,totalCobUSD,stockUni,goModulo}){
   const tcActual=blue||1450;
   const balance=totalIngresos-totalGastos;
+  const djSaldoPendiente=(djEventos||[]).filter(e=>e.estado==="Confirmado").reduce((a,e)=>a+Number(e.saldo||0),0);
+  const bhCobradoTotal=(data.bh?.cobros||[]).reduce((a,c)=>a+Number(c.monto||0),0);
+  const bhPendienteCobro=Math.max(0,bhTotalAnio-bhCobradoTotal);
   const Card=({label,value,sub,color,onClick})=>(
     <div onClick={onClick}
       style={{
