@@ -206,6 +206,15 @@ const fmtPct = n => Number(n||0).toFixed(1)+"%";
 const pesoRollo = a => (Number(a.gramaje||0)/1000)*Number(a.ancho||0)*Number(a.largo||0);
 const haceUnMes = () => { const d=new Date(); d.setMonth(d.getMonth()-1); return d.toISOString().split("T")[0]; };
 
+function sortConts(conts,orden){
+  if(!orden||orden.length===0)return[...conts].sort((a,b)=>b.id.localeCompare(a.id));
+  const map=Object.fromEntries(conts.map(c=>[c.id,c]));
+  const sorted=orden.map(id=>map[id]).filter(Boolean);
+  const inOrden=new Set(orden);
+  const nuevos=conts.filter(c=>!inOrden.has(c.id)).sort((a,b)=>b.id.localeCompare(a.id));
+  return[...nuevos,...sorted];
+}
+
 async function fetchBlue(){
   try{const r=await fetch("https://dolarapi.com/v1/dolares/blue");const d=await r.json();return d.venta||d.compra||null;}catch{return null;}
 }
@@ -345,7 +354,7 @@ function BarraProgreso({pct,enGanancia}){
 
 // ── DASHBOARD: contenedores ordenados más nuevo → más viejo ───────────────
 function ViewDashboard({data,stockUni,lastUpdate,setView}){
-  const conts=[...(data.contenedores||[])].sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+  const conts=sortConts(data.contenedores||[],data.contenedoresOrden);
   const stockTotal=Object.values(stockUni).reduce((a,v)=>a+v,0);
   const resumen=conts.map(c=>{
     const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
@@ -478,7 +487,7 @@ function ViewStock({stockUni,data}){
 function ViewCostos({data,blue,tcActual}){
   const [tcManual,setTcManual]=useState(String(Math.round(tcActual)));
   const tc=Number(tcManual)||tcActual;
-  const conts=[...(data.contenedores||[])].filter(c=>c.artsCostoDetalle&&c.artsCostoDetalle.length>0).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+  const conts=sortConts(data.contenedores||[],data.contenedoresOrden).filter(c=>c.artsCostoDetalle&&c.artsCostoDetalle.length>0);
 
   return(
     <div>
@@ -535,7 +544,7 @@ function ViewVentas({data}){
   const [filtroCont,setFiltroCont]=useState("");
 
   const ARTS_UNICOS=[...new Set((data.ventas||[]).map(v=>v.articulo))].filter(Boolean).sort();
-  const CONTS_UNICOS=[...(data.contenedores||[])].sort((a,b)=>(b.id||"").localeCompare(a.id||"")).map(c=>({id:c.id,nombre:c.nombre}));
+  const CONTS_UNICOS=sortConts(data.contenedores||[],data.contenedoresOrden).map(c=>({id:c.id,nombre:c.nombre}));
   const stBg={"Retirado":"var(--bg-tint-green)","A despachar":"var(--bg-tint-blue)","Despachado":"var(--bg-tint-blue)","A retirar Ezeiza":"var(--bg-tint-amber)","A retirar Once":"var(--bg-tint-amber)"};
   const stCol={"Retirado":"var(--text-success)","A despachar":"var(--text-info)","Despachado":"var(--text-info)","A retirar Ezeiza":"var(--text-warning)","A retirar Once":"var(--text-warning)"};
 
