@@ -4231,7 +4231,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 // ══════════════════════════════════════════════════════════════════════════
 function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTotalAnio,bhCobradoTotal,djCobrado,totalRetSCPesos,bhSueldo,pendienteRetiro}){
   const tcBlue=blue||1450;
-  const initForm={desc:"",moneda:"ARS",monto:"",cotiz:String(Math.round(tcBlue)),cat:"Alimentación",fecha:hoy(),fuente:"Otros"};
+  const initForm={desc:"",moneda:"ARS",monto:"",cotiz:String(Math.round(tcBlue)),cat:"Otros",fecha:hoy(),fuente:"Otros"};
   const [form,setForm]=useState(initForm);
   const [showPresupuesto,setShowPresupuesto]=useState(false);
   const [presupCat,setPresupCat]=useState("");
