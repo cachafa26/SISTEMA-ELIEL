@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.0.6 · 2026-06-17 -->
+  <!-- v3.0.7 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.6</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.7</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.0.6";
+const APP_VERSION = "v3.0.7";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -5044,26 +5044,21 @@ function TabCostos({cont,updateCont,showToast,blue}){
   const _savedCostos=cont.costos||{};
   const [form,setForm]=useState({
     tipoCambio:tcDef,costoChina:"",costoMoneda:"USD",
-    despacho:"",mDespacho:"ARS",
-    naviera:"",mNaviera:"ARS",
-    despachante:"",mDespachante:"USD",
-    losPrincipes:"",mLosPrincipes:"ARS",
-    deposito:"",mDeposito:"ARS",
-    terminal:"",mTerminal:"ARS",
-    otros:"",mOtros:"USD",
+    despacho:"",mDespacho:"ARS",naviera:"",mNaviera:"ARS",
+    despachante:"",mDespachante:"USD",losPrincipes:"",mLosPrincipes:"ARS",
+    deposito:"",mDeposito:"ARS",terminal:"",mTerminal:"ARS",otros:"",mOtros:"USD",
     ..._savedCostos,
-    mDespacho:_savedCostos.mDespacho||"ARS",
-    mNaviera:_savedCostos.mNaviera||"ARS",
-    mDespachante:_savedCostos.mDespachante||"USD",
-    mLosPrincipes:_savedCostos.mLosPrincipes||"ARS",
-    mDeposito:_savedCostos.mDeposito||"ARS",
-    mTerminal:_savedCostos.mTerminal||"ARS",
-    mOtros:_savedCostos.mOtros||"USD",
+    mDespacho:_savedCostos.mDespacho||"ARS",mNaviera:_savedCostos.mNaviera||"ARS",
+    mDespachante:_savedCostos.mDespachante||"USD",mLosPrincipes:_savedCostos.mLosPrincipes||"ARS",
+    mDeposito:_savedCostos.mDeposito||"ARS",mTerminal:_savedCostos.mTerminal||"ARS",mOtros:_savedCostos.mOtros||"USD",
   });
-  // Gastos adicionales: array de {id, label, monto, moneda}
   const [extras,setExtras]=useState(()=>_savedCostos.extras||[]);
   const [tcPesos,setTcPesos]=useState(tcDef);
+  // Precios de venta simulados: {artNombre: precioVentaARS}
+  const [preciosVenta,setPreciosVenta]=useState(()=>cont.preciosVentaSim||{});
+
   const tc=Number(form.tipoCambio)||1450;
+  const tcP=Number(tcPesos)||tc;
   const toUSDf=(val,mon)=>mon==="USD"?Number(val||0):Number(val||0)/tc;
   const chinaUSD=form.costoMoneda==="USD"?Number(form.costoChina||0):toUSDf(form.costoChina,"ARS");
   const extrasUSD=extras.reduce((a,x)=>a+toUSDf(x.monto,x.moneda),0);
@@ -5075,11 +5070,23 @@ function TabCostos({cont,updateCont,showToast,blue}){
 
   const calcular=()=>{
     const fobTot=(cont.articulos||[]).reduce((a,x)=>a+Number(x.precio||0)*Number(x.cantidad),0);
-    const artsCosto=(cont.articulos||[]).map(art=>{const tot=Number(art.precio||0)*Number(art.cantidad);const pct=fobTot>0?tot/fobTot:0;return{...art,pct:pct*100,costoProporcional:totalUSD*pct,costoUnitario:art.cantidad>0?(totalUSD*pct)/art.cantidad:0};});
-    updateCont({...cont,costos:{...form,tipoCambioFijado:form.tipoCambio,extras},costoTotal:totalUSD,artsCostoDetalle:artsCosto});
+    const artsCosto=(cont.articulos||[]).map(art=>{
+      const tot=Number(art.precio||0)*Number(art.cantidad);
+      const pct=fobTot>0?tot/fobTot:0;
+      return{...art,pct:pct*100,costoProporcional:totalUSD*pct,costoUnitario:art.cantidad>0?(totalUSD*pct)/art.cantidad:0};
+    });
+    // Save preciosVenta together with costos
+    updateCont({...cont,costos:{...form,tipoCambioFijado:form.tipoCambio,extras},costoTotal:totalUSD,artsCostoDetalle:artsCosto,preciosVentaSim:preciosVenta});
     showToast("Costos guardados");
   };
+
+  const guardarPrecios=()=>{
+    updateCont({...cont,preciosVentaSim:preciosVenta});
+    showToast("Precios guardados");
+  };
+
   const campos=[{k:"despacho",m:"mDespacho",l:"Despacho"},{k:"naviera",m:"mNaviera",l:"Naviera"},{k:"despachante",m:"mDespachante",l:"Despachante"},{k:"losPrincipes",m:"mLosPrincipes",l:"Los Príncipes"},{k:"deposito",m:"mDeposito",l:"Depósito"},{k:"terminal",m:"mTerminal",l:"Terminal"},{k:"otros",m:"mOtros",l:"Otros"}];
+
   return(
     <div>
       {blue&&<div style={{background:"var(--color-background-success)",borderRadius:"var(--border-radius-md)",padding:"8px 12px",marginBottom:"1rem",fontSize:12,color:"var(--color-text-success)"}}>💵 Blue en tiempo real: ${fmt(blue)}</div>}
@@ -5089,58 +5096,164 @@ function TabCostos({cont,updateCont,showToast,blue}){
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Costo China</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form.costoChina||""} onChange={e=>setForm({...form,costoChina:e.target.value})} style={{flex:1,boxSizing:"border-box"}}/><select value={form.costoMoneda||"ARS"} onChange={e=>{const v=e.target.value;setForm(f=>({...f,costoMoneda:v}));}} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>
           {campos.map(c=>(<div key={c.k}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{c.l}</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form[c.k]||""} onChange={e=>{const v=e.target.value;setForm(f=>({...f,[c.k]:v}));}} style={{flex:1,boxSizing:"border-box"}}/><select value={form[c.m||"m"+c.k]||"ARS"} onChange={e=>{const v=e.target.value;setForm(f=>({...f,[c.m||"m"+c.k]:v}));}} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>))}
         </div>
-
-        {/* ── Gastos adicionales ── */}
+        {/* Gastos adicionales */}
         <div style={{borderTop:"0.5px solid var(--glass-border)",paddingTop:10,marginBottom:10}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text-secondary)"}}>Gastos adicionales</div>
             <button onClick={addExtra} style={{fontSize:11,padding:"4px 10px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer",fontWeight:600}}>+ Agregar</button>
           </div>
           {extras.length===0
-            ?<div style={{fontSize:11,color:"var(--text-secondary)",padding:"4px 0"}}>Sin gastos extra. Usá "+ Agregar" para sumar líneas libres.</div>
+            ?<div style={{fontSize:11,color:"var(--text-secondary)",padding:"4px 0"}}>Sin gastos extra.</div>
             :extras.map(x=>(
               <div key={x.id} style={{display:"grid",gridTemplateColumns:"1fr 120px 70px auto",gap:6,marginBottom:6,alignItems:"center"}}>
-                <input
-                  value={x.label} onChange={e=>updExtra(x.id,"label",e.target.value)}
-                  placeholder="Descripción (ej: Camión, Seguro...)"
-                  style={{fontSize:12}}/>
-                <input
-                  type="number" value={x.monto} onChange={e=>updExtra(x.id,"monto",e.target.value)}
-                  placeholder="0" style={{fontSize:12}}/>
-                <select value={x.moneda} onChange={e=>updExtra(x.id,"moneda",e.target.value)} style={{fontSize:12}}>
-                  <option value="ARS">$ARS</option>
-                  <option value="USD">USD</option>
-                </select>
+                <input value={x.label} onChange={e=>updExtra(x.id,"label",e.target.value)} placeholder="Descripción..." style={{fontSize:12}}/>
+                <input type="number" value={x.monto} onChange={e=>updExtra(x.id,"monto",e.target.value)} placeholder="0" style={{fontSize:12}}/>
+                <select value={x.moneda} onChange={e=>updExtra(x.id,"moneda",e.target.value)} style={{fontSize:12}}><option value="ARS">$ARS</option><option value="USD">USD</option></select>
                 <button onClick={()=>delExtra(x.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:16,padding:"0 4px",lineHeight:1}}>✕</button>
               </div>
             ))
           }
-          {extras.length>0&&extrasUSD>0&&(
-            <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:4}}>
-              Subtotal extras: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(extrasUSD)}</strong>
-            </div>
-          )}
+          {extras.length>0&&extrasUSD>0&&<div style={{fontSize:11,color:"var(--text-secondary)",marginTop:4}}>Subtotal extras: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(extrasUSD)}</strong></div>}
         </div>
-
         <div style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:10}}>
           <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Total costo estimado</div>
           <div style={{fontSize:18,fontWeight:500}}>{fmtUSD(totalUSD)}</div>
         </div>
         <button onClick={calcular} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>Calcular y guardar</button>
       </div>
+
+      {/* ── TABLA DE COSTOS + PRECIO DE VENTA SIMULADO ── */}
       {cont.artsCostoDetalle&&(
-        <div style={{overflowX:"auto"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-            <p style={{fontSize:12,fontWeight:500,margin:0}}>Costo por artículo</p>
+        <div>
+          {/* TC selector */}
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+            <p style={{fontSize:12,fontWeight:600,margin:0,color:"var(--text-primary)"}}>Costo por artículo</p>
             <label style={{fontSize:11,color:"var(--color-text-secondary)"}}>TC pesos:</label>
             <input type="number" value={tcPesos} onChange={e=>setTcPesos(e.target.value)} style={{width:80,fontSize:11,padding:"2px 6px"}}/>
+            <button onClick={guardarPrecios} style={{fontSize:11,padding:"4px 12px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer",marginLeft:"auto"}}>💾 Guardar precios</button>
           </div>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-            <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Artículo","% FOB","Costo USD","Costo/u USD","Costo/u $ARS"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:500,fontSize:11,color:"var(--color-text-secondary)"}}>{h}</th>)}</tr></thead>
-            <tbody>{cont.artsCostoDetalle.map(a=>{const ars=a.costoUnitario*Number(tcPesos||1450);return(<tr key={a.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
-              <td style={{padding:"6px 8px"}}>{a.nombre}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtPct(a.pct)}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(a.costoProporcional)}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(a.costoUnitario)}</td><td style={{padding:"6px 8px",fontWeight:500}}>{"$"+fmt(ars)}</td>
-            </tr>);})}</tbody>
-          </table>
+
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead>
+                <tr style={{background:"rgba(120,120,128,0.08)"}}>
+                  {["Artículo","% FOB","Costo/u USD","Costo/u $ARS","Precio venta $","Ganancia %"].map(h=>(
+                    <th key={h} style={{padding:"7px 8px",textAlign:"left",fontWeight:500,fontSize:10,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {cont.artsCostoDetalle.map(a=>{
+                  const costoARS=a.costoUnitario*tcP;
+                  const pventa=Number(preciosVenta[a.nombre]||0);
+                  const ganPct=pventa>0&&costoARS>0?((pventa-costoARS)/costoARS*100):null;
+                  const ganColor=ganPct===null?"var(--text-tertiary)":ganPct>=0?"var(--text-success)":"var(--text-danger)";
+                  return(
+                    <tr key={a.id||a.nombre} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
+                      <td style={{padding:"7px 8px",fontWeight:500,color:"var(--text-primary)"}}>{a.nombre}</td>
+                      <td style={{padding:"7px 8px",color:"var(--color-text-secondary)"}}>{fmtPct(a.pct)}</td>
+                      <td style={{padding:"7px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(a.costoUnitario)}</td>
+                      <td style={{padding:"7px 8px",fontWeight:500}}>${fmt(costoARS)}</td>
+                      <td style={{padding:"4px 8px"}}>
+                        <input
+                          type="number"
+                          value={preciosVenta[a.nombre]||""}
+                          onChange={e=>setPreciosVenta(p=>({...p,[a.nombre]:e.target.value}))}
+                          placeholder="$0"
+                          style={{width:100,fontSize:12,padding:"4px 6px"}}
+                        />
+                      </td>
+                      <td style={{padding:"7px 8px",fontWeight:700,color:ganColor,whiteSpace:"nowrap"}}>
+                        {ganPct===null?"—":((ganPct>=0?"+":"")+ganPct.toFixed(1)+"%")}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── PANEL DE SIMULACIÓN ── */}
+          {(()=>{
+            // Stock disponible por artículo (no vendido)
+            const stockDisponible={};
+            for(const art of (cont.articulos||[])){
+              stockDisponible[art.nombre]=Number(art.cantidad||0);
+            }
+
+            // Calc simulation
+            let simIngresosARS=0, simIngresosTotARS=0;
+            let simIngresosUSD=0;
+            let hayPrecio=false;
+
+            const simLineas=cont.artsCostoDetalle.map(a=>{
+              const pventa=Number(preciosVenta[a.nombre]||0);
+              const stock=stockDisponible[a.nombre]||0;
+              const costoARS=a.costoUnitario*tcP;
+              const costoTotalARS=costoARS*stock;
+              const ventaTotalARS=pventa*stock;
+              const ganARS=ventaTotalARS-costoTotalARS;
+              const ganUSD=pventa>0?ganARS/tcP:0;
+              if(pventa>0){
+                hayPrecio=true;
+                simIngresosARS+=ventaTotalARS;
+                simIngresosTotARS+=ganARS;
+                simIngresosUSD+=ganUSD;
+              }
+              return{nombre:a.nombre,stock,pventa,ventaTotalARS,ganARS,ganUSD,costoTotalARS};
+            });
+
+            if(!hayPrecio)return(
+              <div style={{marginTop:14,padding:"14px 16px",background:"rgba(120,120,128,0.06)",borderRadius:"var(--r-lg)",fontSize:12,color:"var(--text-secondary)",textAlign:"center"}}>
+                Cargá precios de venta arriba para ver la simulación de ganancia.
+              </div>
+            );
+
+            const costoTotalContenedor=cont.costoTotal||0;
+            const ganTotalUSD=simIngresosUSD;
+            const mi30USD=ganTotalUSD*0.30;
+            const pctGanContenedor=costoTotalContenedor>0?(ganTotalUSD/costoTotalContenedor*100):0;
+
+            return(
+              <div style={{marginTop:16,background:"linear-gradient(135deg,rgba(91,173,65,0.08),rgba(46,134,193,0.08))",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-lg)",padding:"16px 18px"}}>
+                <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-success)",marginBottom:14}}>📊 Simulación — si vendés el stock restante a estos precios</div>
+
+                {/* Detalle por artículo */}
+                <div style={{marginBottom:14}}>
+                  {simLineas.filter(l=>l.pventa>0).map(l=>(
+                    <div key={l.nombre} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"0.5px solid rgba(91,173,65,0.15)",fontSize:12}}>
+                      <span style={{color:"var(--text-secondary)"}}>{l.nombre} <strong style={{color:"var(--text-primary)"}}>×{fmt(l.stock)}</strong></span>
+                      <span style={{color:"var(--text-primary)"}}>
+                        ${fmt(l.ventaTotalARS)}
+                        <span style={{color:l.ganARS>=0?"var(--text-success)":"var(--text-danger)",marginLeft:8,fontWeight:600}}>
+                          ({l.ganARS>=0?"+":""}{fmtUSD(l.ganUSD)})
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Totales */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10}}>
+                  <div style={{background:"rgba(255,255,255,0.4)",backdropFilter:"blur(8px)",borderRadius:"var(--r-md)",padding:"10px 12px"}}>
+                    <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:4}}>Ganancia total</div>
+                    <div style={{fontSize:17,fontWeight:700,color:"var(--text-success)"}}>{fmtUSD(ganTotalUSD)}</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>${fmt(Math.round(ganTotalUSD*tcP))} ARS</div>
+                  </div>
+                  <div style={{background:"rgba(255,255,255,0.4)",backdropFilter:"blur(8px)",borderRadius:"var(--r-md)",padding:"10px 12px"}}>
+                    <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:4}}>% Ganancia sobre costo</div>
+                    <div style={{fontSize:17,fontWeight:700,color:pctGanContenedor>=0?"var(--text-success)":"var(--text-danger)"}}>{pctGanContenedor>=0?"+":""}{pctGanContenedor.toFixed(1)}%</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>del costo total del cont.</div>
+                  </div>
+                  <div style={{background:"rgba(255,255,255,0.4)",backdropFilter:"blur(8px)",borderRadius:"var(--r-md)",padding:"10px 12px"}}>
+                    <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:4}}>Tu 30%</div>
+                    <div style={{fontSize:17,fontWeight:700,color:"var(--text-info)"}}>{fmtUSD(mi30USD)}</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>${fmt(Math.round(mi30USD*tcP))} ARS</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
