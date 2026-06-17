@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.9.8 · 2026-06-17 -->
+  <!-- v2.9.9 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.9.8</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.9.9</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.9.8";
+const APP_VERSION = "v2.9.9";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2780,9 +2780,13 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
   const recientes8=recientes.slice(0,8);
 
   const tcBar=blue||1450;
+  // DJ: ganancia cobrada en ARS (para comparar en la misma escala)
+  const djGananciaCobradaUSD=djGananciaUSD||0;
+  const djGananciaCobradaARS=Math.round(djGananciaCobradaUSD*(blue||1450));
   const fuentes=[
-    {n:"Super Coating",v:totalRetSCPesos,c:"var(--text-success)"},
+    {n:"Super Coating",v:totalRetSCPesos,c:"var(--text-success)",sub:fmtUSD(totalRetSCPesos/(blue||1450))},
     {n:"BH Trade",v:bhCobradoTotal,c:"var(--text-info)"},
+    {n:"DJ",v:djGananciaCobradaARS,c:"var(--text-warning)",sub:fmtUSD(djGananciaCobradaUSD)},
   ];
   const maxBar=Math.max(...fuentes.map(f=>f.v),1);
 
