@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.8.7";
+const APP_VERSION = "v2.8.8";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4915,6 +4915,9 @@ function VentasView({data,save,showToast}){
   const [hasta,setHasta]=useState("");
   const [filtroArt,setFiltroArt]=useState("");
   const [filtroCli,setFiltroCli]=useState("");
+  // Modal edición de pedido
+  const [editPedido,setEditPedido]=useState(null); // {pedidoId, lineas:[{...venta}]}
+  const [editLineas,setEditLineas]=useState([]);
 
   const ARTS_UNICOS=[...new Set((data.ventas||[]).map(v=>v.articulo))].filter(Boolean).sort();
   const CLIENTES_UNICOS=[...new Set((data.ventas||[]).map(v=>v.cliente))].filter(Boolean).sort();
@@ -4934,7 +4937,28 @@ function VentasView({data,save,showToast}){
   const actualizarEstado=(id,estado)=>save({...data,ventas:data.ventas.map(v=>v.id===id?{...v,estado}:v)});
   const hayFiltros=desde||hasta||filtroArt||filtroCli;
 
-  // Group by pedidoId for "pedidos" view
+  // Abrir modal edición
+  const abrirEdicion=(p)=>{
+    setEditPedido(p);
+    setEditLineas(p.lineas.map(l=>({...l,precioVenta:l.precioVenta||0,cantidad:l.cantidad||0})));
+  };
+
+  // Guardar edición
+  const guardarEdicion=()=>{
+    if(!editPedido)return;
+    const tc=editLineas[0]?.tipoCambioUsado||1450;
+    const nuevasVentas=(data.ventas||[]).map(v=>{
+      const linea=editLineas.find(l=>l.id===v.id);
+      if(!linea)return v;
+      const total=Number(linea.cantidad)*Number(linea.precioVenta);
+      return{...v,articulo:linea.articulo,cantidad:Number(linea.cantidad),precioVenta:Number(linea.precioVenta),total,usd:total/tc};
+    });
+    save({...data,ventas:nuevasVentas});
+    setEditPedido(null);
+    showToast("Pedido actualizado");
+  };
+
+  // Group by pedidoId
   const pedidosMap=new Map();
   for(const v of ventasFilt){
     const pid=v.pedidoId||v.id;
@@ -4943,7 +4967,6 @@ function VentasView({data,save,showToast}){
     p.lineas.push(v);
     p.totalARS+=Number(v.total||0);
     p.totalUSD+=Number(v.usd||0);
-    // Use most recent state
     if(v.fecha>p.fecha)p.fecha=v.fecha;
   }
   const PEND_EST=["A despachar","A retirar Ezeiza","A retirar Once"];
@@ -4951,8 +4974,6 @@ function VentasView({data,save,showToast}){
   const _pedPend=_pedSorted.filter(p=>PEND_EST.includes(p.estado));
   const _pedDone=_pedSorted.filter(p=>!PEND_EST.includes(p.estado));
   const pedidos=[..._pedPend,..._pedDone];
-  const stBg={"Retirado":"var(--bg-tint-green)","A despachar":"var(--bg-tint-blue)","Despachado":"var(--bg-tint-blue)","A retirar Ezeiza":"var(--bg-tint-amber)","A retirar Once":"var(--bg-tint-amber)"};
-  const stCol={"Retirado":"var(--text-success)","A despachar":"var(--text-info)","Despachado":"var(--text-info)","A retirar Ezeiza":"var(--text-warning)","A retirar Once":"var(--text-warning)"};
 
   return(
     <div>
@@ -4961,8 +4982,45 @@ function VentasView({data,save,showToast}){
         <span style={{fontSize:11,color:"var(--text-secondary)"}}>{fmtUSD(totalUSD)}</span>
       </div>
 
-      {/* Vista toggle */}
-  
+      {/* Modal edición de pedido */}
+      {editPedido&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",overflowY:"auto"}}>
+          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:480,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",maxHeight:"90vh",overflowY:"auto"}}>
+            <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Editar pedido</h3>
+            <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{editPedido.cliente} · {editPedido.fecha}</p>
+            {editLineas.map((l,i)=>(
+              <div key={l.id} style={{background:"rgba(120,120,128,0.06)",borderRadius:"var(--r-md)",padding:"10px 12px",marginBottom:8}}>
+                <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text-secondary)",marginBottom:8}}>Línea {i+1}</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 80px 100px",gap:8}}>
+                  <div>
+                    <label style={{fontSize:10,color:"var(--text-secondary)",display:"block",marginBottom:3}}>Artículo</label>
+                    <select value={l.articulo} onChange={e=>setEditLineas(ls=>ls.map((x,j)=>j===i?{...x,articulo:e.target.value}:x))} style={{fontSize:12}}>
+                      {ARTS.map(a=><option key={a}>{a}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"var(--text-secondary)",display:"block",marginBottom:3}}>Cantidad</label>
+                    <input type="number" value={l.cantidad} onChange={e=>setEditLineas(ls=>ls.map((x,j)=>j===i?{...x,cantidad:e.target.value}:x))} style={{fontSize:12}}/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:"var(--text-secondary)",display:"block",marginBottom:3}}>Precio $</label>
+                    <input type="number" value={l.precioVenta} onChange={e=>setEditLineas(ls=>ls.map((x,j)=>j===i?{...x,precioVenta:e.target.value}:x))} style={{fontSize:12}}/>
+                  </div>
+                </div>
+                {l.cantidad&&l.precioVenta&&<div style={{fontSize:11,color:"var(--text-success)",marginTop:6,fontWeight:500}}>Subtotal: ${fmt(Number(l.cantidad)*Number(l.precioVenta))}</div>}
+              </div>
+            ))}
+            <div style={{fontSize:12,fontWeight:600,color:"var(--text-primary)",marginBottom:14,paddingTop:4}}>
+              Total: ${fmt(editLineas.reduce((a,l)=>a+Number(l.cantidad||0)*Number(l.precioVenta||0),0))}
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={guardarEdicion} style={{flex:1,padding:"10px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer",fontSize:13}}>Guardar cambios</button>
+              <button onClick={()=>setEditPedido(null)} style={{padding:"10px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",marginBottom:"1rem",boxShadow:"var(--glass-shadow-sm)"}}>
         <FiltroFechas desde={desde} setDesde={setDesde} hasta={hasta} setHasta={setHasta}/>
@@ -4979,8 +5037,8 @@ function VentasView({data,save,showToast}){
         {hayFiltros&&<button onClick={()=>{setDesde("");setHasta("");setFiltroArt("");setFiltroCli("");}} style={{marginTop:8,fontSize:11,padding:"4px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>✕ Limpiar filtros</button>}
       </div>
 
-      {/* PEDIDOS VIEW */}
-      {(pedidos.length===0
+      {/* Pedidos */}
+      {pedidos.length===0
         ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin pedidos.</div>
         :<div style={{display:"flex",flexDirection:"column",gap:8}}>
           {pedidos.map((p,pidx)=>{
@@ -4999,70 +5057,51 @@ function VentasView({data,save,showToast}){
                 background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
                 border:isPend?"1px solid "+glowColor+"88":"0.5px solid var(--glass-border)",
                 boxShadow:isPend?"0 0 12px "+glowColor+"44":"var(--glass-shadow-sm)",
-                borderRadius:"var(--r-lg)",padding:"14px 16px",
-                opacity:isPend?1:0.75,
+                borderRadius:"var(--r-lg)",padding:"14px 16px",opacity:isPend?1:0.75,
               }}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                <div>
-                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                    <div style={{fontWeight:600,fontSize:14,color:"var(--text-primary)"}}>{p.cliente}</div>
-                    {isPend&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:10,fontWeight:600,
-                      background:glowColor+"22",color:glowColor,border:"0.5px solid "+glowColor+"66"}}>
-                      {p.estado}
-                    </span>}
-                  </div>
-                  <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{p.fecha}</div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontWeight:700,fontSize:14,color:"var(--text-primary)"}}>${fmt(p.totalARS)}</div>
-                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>{fmtUSD(p.totalUSD)}</div>
-                </div>
-              </div>
-              {/* Líneas del pedido */}
-              <div style={{borderTop:"0.5px solid var(--glass-border)",paddingTop:8,marginTop:8}}>
-                {p.lineas.length===1
-                  ?<div style={{fontSize:12,color:"var(--text-secondary)"}}>{p.lineas[0].articulo} × {p.lineas[0].cantidad}</div>
-                  :<details style={{fontSize:12}}>
-                    <summary style={{cursor:"pointer",color:"var(--text-secondary)",listStyle:"none"}}>
-                      ▶ {p.lineas.length} artículos
-                    </summary>
-                    <div style={{marginTop:4,paddingLeft:8,display:"flex",flexDirection:"column",gap:2}}>
-                      {p.lineas.map(l=>(
-                        <div key={l.id} style={{display:"flex",gap:8,fontSize:11}}>
-                          <span style={{color:"var(--text-secondary)"}}>{l.articulo}</span>
-                          <span style={{fontWeight:500}}>×{l.cantidad}</span>
-                          <span style={{color:"var(--text-success)"}}>${fmt(l.total)}</span>
-                        </div>
-                      ))}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      <div style={{fontWeight:600,fontSize:14,color:"var(--text-primary)"}}>{p.cliente}</div>
+                      {isPend&&<span style={{fontSize:10,padding:"1px 7px",borderRadius:10,fontWeight:600,background:glowColor+"22",color:glowColor,border:"0.5px solid "+glowColor+"66"}}>{p.estado}</span>}
                     </div>
-                  </details>
-                }
-              </div>
-              {/* Selector de estado */}
-              <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
-                <select
-                  value={p.estado}
-                  onChange={e=>{
-                    const nuevoEstado=e.target.value;
-                    p.lineas.forEach(l=>{
-                      save({...data,ventas:(data.ventas||[]).map(v=>v.id===l.id?{...v,estado:nuevoEstado}:v)});
-                    });
-                  }}
-                  style={{fontSize:11,padding:"4px 8px",borderRadius:6,
-                    border:"0.5px solid var(--glass-border)",
-                    background:"var(--bg-card)",color:"var(--text-primary)"}}>
-                  {ESTADOS.map(s=><option key={s}>{s}</option>)}
-                </select>
-              </div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{p.fecha}</div>
+                  </div>
+                  <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                    <div style={{fontWeight:700,fontSize:14,color:"var(--text-primary)"}}>${fmt(p.totalARS)}</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>{fmtUSD(p.totalUSD)}</div>
+                    {/* Botón editar */}
+                    <button onClick={()=>abrirEdicion(p)} style={{fontSize:10,padding:"3px 8px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer",fontWeight:500}}>✏️ Editar</button>
+                  </div>
+                </div>
+                {/* Líneas con precio */}
+                <div style={{borderTop:"0.5px solid var(--glass-border)",paddingTop:8,marginTop:4}}>
+                  {p.lineas.map(l=>(
+                    <div key={l.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0",fontSize:12}}>
+                      <span style={{color:"var(--text-secondary)"}}>{l.articulo} <strong style={{color:"var(--text-primary)"}}>×{l.cantidad}</strong></span>
+                      <span style={{color:"var(--text-secondary)"}}>
+                        {l.precioVenta?<><span style={{color:"var(--text-primary)",fontWeight:500}}>${fmt(l.precioVenta)}/u</span> · ${fmt(Number(l.cantidad)*Number(l.precioVenta))}</>:""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {/* Estado selector */}
+                <div style={{display:"flex",justifyContent:"flex-end",marginTop:8}}>
+                  <select
+                    value={p.estado}
+                    onChange={e=>{const nuevoEstado=e.target.value;p.lineas.forEach(l=>actualizarEstado(l.id,nuevoEstado));}}
+                    style={{fontSize:11,padding:"4px 8px",borderRadius:6,border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",color:"var(--text-primary)"}}>
+                    {ESTADOS.map(s=><option key={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
             </React.Fragment>);
           })}
         </div>
-      )}
+      }
     </div>
   );
 }
-
 
 function CuentasView({data,save,showToast}){
   const [modal,setModal]=useState(null);
