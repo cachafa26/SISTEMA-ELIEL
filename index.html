@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.0.1 · 2026-06-17 -->
+  <!-- v3.0.2 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.1</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.2</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.0.1";
+const APP_VERSION = "v3.0.2";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2765,8 +2765,8 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
       moneda:g.moneda||"ARS",
       modulo:"Gasto",color:"var(--color-text-danger)"
     })),
-    // Operaciones FX — compra/venta de dólares
-    ...(data.fin?.fx||[]).flatMap(f=>[
+    // Operaciones FX — solo compra/venta, no ingreso_extra
+    ...(data.fin?.fx||[]).filter(f=>f.tipo==="compra"||f.tipo==="venta").flatMap(f=>[
       {
         id:f.id+"_ars",fecha:f.fecha,
         desc:(f.tipo==="compra"?"Compra USD":"Venta USD")+" · "+Number(f.cantUSD).toLocaleString("es-AR")+" USD @ $"+fmt(f.cotiz),
