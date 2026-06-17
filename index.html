@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.1.2 · 2026-06-17 -->
+  <!-- v3.1.3 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.1.2</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.1.3</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.1.2";
+const APP_VERSION = "v3.1.3";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1130,6 +1130,17 @@ function distribuir(items,contenedores,ventas){
   }
   return{resultado,errores};
 }
+// Ordena contenedores respetando data.contenedoresOrden si existe
+function sortConts(conts, orden){
+  if(!orden||orden.length===0) return [...conts].sort((a,b)=>b.id.localeCompare(a.id));
+  const map=Object.fromEntries(conts.map(c=>[c.id,c]));
+  const sorted=orden.map(id=>map[id]).filter(Boolean);
+  // Add any new containers not yet in order at the beginning
+  const inOrden=new Set(orden);
+  const nuevos=conts.filter(c=>!inOrden.has(c.id)).sort((a,b)=>b.id.localeCompare(a.id));
+  return [...nuevos,...sorted];
+}
+
 function precioPromedioUltimoMes(contId,artNombre,ventas){
   const desde=haceUnMes();
   const vs=(ventas||[]).filter(v=>v.contId===contId&&v.articulo===artNombre&&v.fecha>=desde&&Number(v.precioVenta||0)>0);
@@ -4917,7 +4928,7 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
           <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"2rem",textAlign:"center"}}>
             <p style={{color:"var(--text-secondary)",fontSize:14,margin:0}}>Creá tu primer contenedor.</p>
           </div>
-        ):[...(data.contenedores||[])].sort((a,b)=>b.id.localeCompare(a.id)).map(c=>{
+        ):sortConts(data.contenedores||[],data.contenedoresOrden).map(c=>{
           const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
           const ventasContFiltered=(data.ventas||[]).filter(v=>v.contId===c.id);
           const totalVCont=ventasContFiltered.reduce((a,v)=>a+Number(v.usd||0),0);
@@ -4968,36 +4979,202 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
 }
 
 function ContenedoresList({data,save,setContSel,setContTab,showToast}){
-  const [nuevo,setNuevo]=useState(false);const[nombre,setNombre]=useState("");
-  const crear=()=>{if(!nombre.trim())return;const c={id:Date.now().toString(),nombre:nombre.trim(),estado:"activo",articulos:[],costos:{},costoTotal:0,pesoTotal:0};save({...data,contenedores:[...(data.contenedores||[]),c]});setNuevo(false);setNombre("");showToast("Contenedor creado");};
+  const [nuevo,setNuevo]=useState(false);
+  const [nombre,setNombre]=useState("");
+  const [editOrden,setEditOrden]=useState(false);
+  const [ordenLocal,setOrdenLocal]=useState([]);
+  const dragIdx=useRef(null);
+  const dragOverIdx=useRef(null);
+
+  const conts=sortConts(data.contenedores||[], data.contenedoresOrden);
+
+  const crear=()=>{
+    if(!nombre.trim())return;
+    const c={id:Date.now().toString(),nombre:nombre.trim(),estado:"activo",articulos:[],costos:{},costoTotal:0,pesoTotal:0};
+    save({...data,contenedores:[...(data.contenedores||[]),c]});
+    setNuevo(false);setNombre("");showToast("Contenedor creado");
+  };
+
+  const iniciarEdicion=()=>{
+    setOrdenLocal(conts.map(c=>c.id));
+    setEditOrden(true);
+  };
+
+  const guardarOrden=()=>{
+    save({...data,contenedoresOrden:ordenLocal});
+    setEditOrden(false);
+    showToast("✓ Orden guardado");
+  };
+
+  // Drag handlers
+  const onDragStart=(e,i)=>{ dragIdx.current=i; e.dataTransfer.effectAllowed="move"; };
+  const onDragOver=(e,i)=>{ e.preventDefault(); dragOverIdx.current=i; };
+  const onDrop=()=>{
+    const from=dragIdx.current, to=dragOverIdx.current;
+    if(from===null||to===null||from===to)return;
+    const arr=[...ordenLocal];
+    const [moved]=arr.splice(from,1);
+    arr.splice(to,0,moved);
+    setOrdenLocal(arr);
+    dragIdx.current=null; dragOverIdx.current=null;
+  };
+
+  // Touch drag handlers (iOS style)
+  const touchY=useRef(0);
+  const touchFrom=useRef(null);
+  const [draggingIdx,setDraggingIdx]=useState(null);
+
+  const onTouchStart=(e,i)=>{ touchFrom.current=i; touchY.current=e.touches[0].clientY; setDraggingIdx(i); };
+  const onTouchMove=(e)=>{ e.preventDefault(); };
+  const onTouchEnd=(e,containerRefs)=>{
+    const endY=e.changedTouches[0].clientY;
+    const from=touchFrom.current;
+    if(from===null){setDraggingIdx(null);return;}
+    // Find target index by Y position
+    const els=containerRefs.current;
+    let to=from;
+    if(els){
+      for(let i=0;i<els.length;i++){
+        const rect=els[i]?.getBoundingClientRect();
+        if(rect&&endY>=rect.top&&endY<=rect.bottom){to=i;break;}
+      }
+    }
+    if(from!==to){
+      const arr=[...ordenLocal];
+      const [moved]=arr.splice(from,1);
+      arr.splice(to,0,moved);
+      setOrdenLocal(arr);
+    }
+    touchFrom.current=null;setDraggingIdx(null);
+  };
+  const itemRefs=useRef([]);
+
+  const contsOrdenados=editOrden
+    ? ordenLocal.map(id=>(data.contenedores||[]).find(c=>c.id===id)).filter(Boolean)
+    : conts;
+
   return(
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem",gap:8}}>
         <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Contenedores</h2>
-        <button onClick={()=>setNuevo(true)} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>+ Nuevo</button>
-      </div>
-      {nuevo&&(<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
-        <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej: 15vo CONT PAPEL" style={{width:"100%",marginBottom:8,boxSizing:"border-box"}} onKeyDown={e=>e.key==="Enter"&&crear()}/>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={crear} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>Crear</button>
-          <button onClick={()=>{setNuevo(false);setNombre("");}} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"transparent",color:"var(--color-text-secondary)"}}>Cancelar</button>
+        <div style={{display:"flex",gap:6}}>
+          {!editOrden&&(
+            <button onClick={iniciarEdicion} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",color:"var(--text-secondary)"}}>⠿ Ordenar</button>
+          )}
+          {editOrden&&(
+            <>
+              <button onClick={()=>setEditOrden(false)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)"}}>Cancelar</button>
+              <button onClick={guardarOrden} style={{fontSize:12,padding:"6px 14px",borderRadius:"var(--r-pill)",cursor:"pointer",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600}}>Guardar orden</button>
+            </>
+          )}
+          {!editOrden&&<button onClick={()=>setNuevo(true)} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>+ Nuevo</button>}
         </div>
-      </div>)}
-      {(data.contenedores||[]).length===0&&!nuevo&&<p style={{color:"var(--color-text-secondary)",fontSize:14}}>No hay contenedores todavía.</p>}
+      </div>
+
+      {editOrden&&(
+        <div style={{background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)",padding:"10px 14px",marginBottom:12,fontSize:12,color:"var(--text-info)"}}>
+          Arrastrá los contenedores para cambiar el orden. El orden se guardará en todos los módulos.
+        </div>
+      )}
+
+      {nuevo&&(
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",marginBottom:"1rem",boxShadow:"var(--glass-shadow-sm)"}}>
+          <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:6}}>Nombre del contenedor</label>
+          <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej: 15VO CONT PAPEL" onKeyDown={e=>e.key==="Enter"&&crear()} autoFocus/>
+          <div style={{display:"flex",gap:8,marginTop:10}}>
+            <button onClick={crear} style={{fontSize:13,padding:"8px 18px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer"}}>Crear</button>
+            <button onClick={()=>{setNuevo(false);setNombre("");}} style={{fontSize:13,padding:"8px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
       <div style={{display:"grid",gap:8}}>
-        {[...(data.contenedores||[])].sort((a,b)=>b.id.localeCompare(a.id)).map(c=>{
+        {contsOrdenados.length===0?(
+          <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"2rem",textAlign:"center"}}>
+            <p style={{color:"var(--text-secondary)",fontSize:14,margin:0}}>Creá tu primer contenedor.</p>
+          </div>
+        ):contsOrdenados.map((c,i)=>{
           const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
-          const costo=c.costoTotal||0;const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;const enG=costo>0&&cobUSD>costo;
-          return(<div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"12px 1rem",cursor:"pointer"}} onClick={()=>{setContSel(c);setContTab("stock");}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?6:0}}>
-              <div><div style={{fontWeight:500,fontSize:14}}>{c.nombre}</div><div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:1}}>{(c.articulos||[]).length+" artículos"}</div></div>
-              <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                <span style={{fontSize:11,padding:"2px 8px",borderRadius:"var(--border-radius-md)",background:enG?"var(--color-background-success)":costo===0?"var(--color-background-secondary)":"var(--color-background-warning)",color:enG?"var(--color-text-success)":costo===0?"var(--color-text-secondary)":"var(--color-text-warning)"}}>{costo===0?"Sin costo":enG?"✓ Ganancia":fmtPct(pct)}</span>
-                <button onClick={e=>{e.stopPropagation();if(window.confirm("¿Borrar '"+c.nombre+"'? Se eliminarán también sus ventas.")){save({...data,contenedores:data.contenedores.filter(x=>x.id!==c.id),ventas:(data.ventas||[]).filter(v=>v.contId!==c.id)});showToast("Contenedor eliminado");}}} style={{fontSize:11,padding:"3px 8px",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-danger)",background:"var(--color-background-danger)",color:"var(--color-text-danger)",flexShrink:0}}>Borrar</button>
+          const costo=c.costoTotal||0;
+          const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;
+          const enG=costo>0&&cobUSD>=costo;
+          const isDragging=draggingIdx===i;
+
+          if(editOrden){
+            return(
+              <div key={c.id}
+                ref={el=>itemRefs.current[i]=el}
+                draggable
+                onDragStart={e=>onDragStart(e,i)}
+                onDragOver={e=>onDragOver(e,i)}
+                onDrop={onDrop}
+                onTouchStart={e=>onTouchStart(e,i)}
+                onTouchMove={onTouchMove}
+                onTouchEnd={e=>onTouchEnd(e,itemRefs)}
+                style={{
+                  background:"var(--bg-card)",
+                  backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+                  border:isDragging?"0.5px solid var(--border-info)":"0.5px solid var(--glass-border)",
+                  borderRadius:"var(--r-lg)",
+                  padding:"12px 14px",
+                  boxShadow:isDragging?"0 8px 32px rgba(46,134,193,0.25)":"var(--glass-shadow-sm)",
+                  cursor:"grab",
+                  opacity:isDragging?0.6:1,
+                  transform:isDragging?"scale(1.02)":"scale(1)",
+                  transition:"box-shadow .15s, opacity .15s, transform .15s",
+                  display:"flex",alignItems:"center",gap:12,
+                  userSelect:"none",
+                }}>
+                <div style={{color:"var(--text-tertiary)",fontSize:18,flexShrink:0,cursor:"grab"}}>⠿</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</div>
+                  <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>
+                    {costo>0?(enG?"✓ En ganancia":fmtPct(pct)+" recuperado"):"Sin costo"}
+                  </div>
+                </div>
+                <div style={{fontSize:11,padding:"2px 9px",borderRadius:"var(--r-pill)",fontWeight:600,
+                  background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",
+                  color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)"}}>
+                  {costo===0?"Sin costo":enG?"✓ Ganancia":fmtPct(pct)}
+                </div>
               </div>
+            );
+          }
+
+          return(
+            <div key={c.id}
+              onClick={()=>{setContSel(c);setContTab("stock");}}
+              onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
+              onMouseLeave={e=>e.currentTarget.style.transform=""}
+              style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 14px",boxShadow:"var(--glass-shadow-sm)",cursor:"pointer",transition:"transform .12s"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:costo>0?6:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</span>
+                  <span style={{fontSize:11,color:"var(--text-secondary)"}}>→</span>
+                </div>
+                <span style={{fontSize:11,padding:"2px 9px",borderRadius:"var(--r-pill)",fontWeight:600,
+                  background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",
+                  color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)"}}>
+                  {costo===0?"Sin costo":enG?"✓ En ganancia":fmtPct(pct)+" recuperado"}
+                </span>
+              </div>
+              {costo>0&&(
+                <>
+                  <div style={{height:4,background:"rgba(120,120,128,0.15)",borderRadius:2,overflow:"hidden",margin:"6px 0"}}>
+                    <div style={{height:"100%",width:Math.min(100,pct)+"%",background:enG?"var(--text-success)":"#F47920",borderRadius:2,transition:"width .5s"}}/>
+                  </div>
+                  <div style={{display:"flex",gap:10,fontSize:11,color:"var(--text-secondary)",flexWrap:"wrap"}}>
+                    <span>Cobrado: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(cobUSD)}</strong></span>
+                    <span>Costo: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(costo)}</strong></span>
+                    {enG
+                      ?<span style={{color:"var(--text-success)",fontWeight:600}}>Gan: {fmtUSD(cobUSD-costo)}</span>
+                      :<span style={{color:"var(--text-warning)"}}>Faltan: {fmtUSD(costo-cobUSD)}</span>
+                    }
+                  </div>
+                </>
+              )}
             </div>
-            {costo>0&&(<><div style={{height:4,background:"rgba(120,120,128,0.08)",borderRadius:2,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:2}}/></div><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}><span>{fmtPct(pct)+" cobrado"}</span><span>{enG?"+"+((cobUSD-costo)/costo*100).toFixed(1)+"% · 30%: "+fmtUSD((cobUSD-costo)*0.3):"Faltan "+fmtUSD(costo-cobUSD)}</span></div></>)}
-          </div>);
+          );
         })}
       </div>
     </div>
