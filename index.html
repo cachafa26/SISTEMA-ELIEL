@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.9.7 · 2026-06-17 -->
+  <!-- v2.9.8 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.9.7</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.9.8</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.9.7";
+const APP_VERSION = "v2.9.8";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -5289,7 +5289,23 @@ function VentasView({data,save,showToast}){
 
   const totalUSD=ventasFilt.reduce((a,v)=>a+Number(v.usd||0),0);
   const eliminar=id=>{save({...data,ventas:data.ventas.filter(v=>v.id!==id)});showToast("Eliminada");};
-  const actualizarEstado=(id,estado)=>save({...data,ventas:data.ventas.map(v=>v.id===id?{...v,estado}:v)});
+  const actualizarEstado=(id,estado)=>{
+    // Buscar la venta para obtener su pedidoId
+    const venta=(data.ventas||[]).find(v=>v.id===id);
+    const pid=venta?.pedidoId||id;
+    // Actualizar todas las ventas del mismo pedido
+    const nuevasVentas=(data.ventas||[]).map(v=>{
+      const vPid=v.pedidoId||v.id;
+      return vPid===pid?{...v,estado}:v;
+    });
+    // Sincronizar despacho con el mismo pedidoId
+    const despEstado=estado==="Despachado"?"Despachado":"Pendiente";
+    const nuevosDespachos=(data.despachos||[]).map(d=>{
+      const dPid=d.pedidoId||d.id;
+      return dPid===pid?{...d,estado:despEstado}:d;
+    });
+    save({...data,ventas:nuevasVentas,despachos:nuevosDespachos});
+  };
   const hayFiltros=desde||hasta||filtroArt||filtroCli;
 
   // Abrir modal edición
