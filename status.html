@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v2.9.6 · 2026-06-17 -->
+  <!-- v2.9.7 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.9.6</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v2.9.7</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.9.6";
+const APP_VERSION = "v2.9.7";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1108,14 +1108,15 @@ function distribuir(items,contenedores,ventas){
       const art=(c.articulos||[]).find(a=>a.nombre===item.nombre);
       const sd=Number(art.cantidad)-stockDisp(c.id,item.nombre,ventas);
       const vUSD=(ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+Number(v.usd||0),0);
-      const costo=c.costoTotal||0;const enG=costo>0&&vUSD>costo;const pct=costo>0?vUSD/costo:0;
+      const costo=c.costoTotal||0;
+      const enG=costo>0&&vUSD>=costo;
+      const pct=costo>0?vUSD/costo:0;
       return{c,sd,enG,pct};
     }).sort((a,b)=>{
-      // 1. Containers in profit first
-      if(a.enG!==b.enG)return b.enG-a.enG;
-      // 2. Both in profit: oldest first (lowest id = created first)
+      // 1. En ganancia → siempre primero, más viejo primero si hay varios
+      if(a.enG!==b.enG)return a.enG?-1:1;
       if(a.enG&&b.enG)return Number(a.c.id)-Number(b.c.id)||a.c.id.localeCompare(b.c.id);
-      // 3. Neither in profit: closest to profit first (highest pct)
+      // 2. Sin ganancia → mayor porcentaje de recupero primero
       return b.pct-a.pct;
     });
     const total=cs.reduce((a,x)=>a+x.sd,0);
