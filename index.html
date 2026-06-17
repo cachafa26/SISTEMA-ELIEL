@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.7.9";
+const APP_VERSION = "v2.8.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2788,7 +2788,7 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
                 <div style={{fontSize:10,color:"var(--color-text-secondary)"}}>{m.fecha} · <span style={{color:m.color}}>{m.modulo}</span></div>
               </div>
               <div style={{fontSize:13,fontWeight:500,color:m.monto>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>
-                {m.monto>=0?(m.moneda==="USD"?"USD "+fmtUSD(m.monto):"$"+fmt(m.monto)):(m.moneda==="USD"?"-USD "+fmtUSD(Math.abs(m.monto)):"-$"+fmt(Math.abs(m.monto)))}
+                {m.monto>=0?(m.moneda==="USD"?fmtUSD(m.monto):"$"+fmt(m.monto)):(m.moneda==="USD"?"-"+fmtUSD(Math.abs(m.monto)):"-$"+fmt(Math.abs(m.monto)))}
               </div>
             </div>
           ))}
@@ -3086,7 +3086,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     monedaCobro:e.monedaCobro||"USD",cobro:String(e.cobro||""),
     monedaCosto:e.monedaCosto||"ARS",costo:String(e.costo||""),
     sena:String(e.sena||""),notas:e.notas||"",
-  });setTab("confirmados");};
+  });setTab("nuevo");};
 
   const eliminarEvento=id=>save({...data,dj:{...data.dj,eventos:eventos.filter(e=>e.id!==id)}});
   const actualizarEstado=(id,estado)=>save({...data,dj:{...data.dj,eventos:eventos.map(x=>x.id===id?{...x,estado}:x)}});
@@ -3567,7 +3567,23 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
             </div>
             <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Notas</label><input value={form.notas} onChange={e=>setForm(f=>({...f,notas:e.target.value}))} placeholder="Rider, detalles..."/></div>
           </div>
-          <div style={{display:"flex",gap:8}}>
+          
+            {/* Sección de pagos registrados - solo al editar */}
+            {editId&&(()=>{
+              const eventoEdit=eventos.find(e=>e.id===editId);
+              const pagosEdit=eventoEdit?.pagos||[];
+              if(pagosEdit.length===0) return null;
+              return(<div style={{gridColumn:"1/-1",marginBottom:8,background:"rgba(120,120,128,0.06)",borderRadius:"var(--r-md)",padding:"10px 12px"}}>
+                <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text-secondary)",marginBottom:6}}>Pagos registrados</div>
+                {pagosEdit.map(p=>(
+                  <div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"3px 0",borderBottom:"0.5px solid var(--glass-border)"}}>
+                    <span style={{color:"var(--text-secondary)"}}>{p.fecha} — {p.concepto||"Pago"}{p.nota?" ("+p.nota+")":""}</span>
+                    <span style={{fontWeight:600,color:"var(--text-success)"}}>{p.moneda==="ARS"?"$"+fmt(p.monto):fmtUSD(p.montoUSD||p.monto)}</span>
+                  </div>
+                ))}
+              </div>);
+            })()}
+            <div style={{display:"flex",gap:8}}>
             <button onClick={guardarEvento} style={{fontSize:13,padding:"9px 20px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer",boxShadow:"0 4px 14px rgba(24,95,165,0.35)"}}>{editId?"Actualizar":"Guardar evento"}</button>
             {editId&&<button onClick={()=>{setEditId(null);setForm(initForm);setTab("confirmados");}} style={{fontSize:13,padding:"9px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>}
           </div>
