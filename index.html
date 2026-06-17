@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.9.4";
+const APP_VERSION = "v2.9.5";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2697,6 +2697,10 @@ function SearchModal({data,onClose,goModulo,setView}){
 // ══════════════════════════════════════════════════════════════════════════
 function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,bhCobradoTotal,djGanancia,djCobrado,djEventos,djGananciaUSD,djCobradoUSD,djRealizados,totalGastos,totalGastosARS,totalGastosUSD,totalIngresos,totalRetSCPesos,totalVentaUSD,totalCobUSD,stockUni,goModulo}){
   const [verTodo,setVerTodo]=useState(false);
+  const [fDesde,setFDesde]=useState("");
+  const [fHasta,setFHasta]=useState("");
+  const [fMoneda,setFMoneda]=useState("ambas");   // "ARS"|"USD"|"ambas"
+  const [fTipo,setFTipo]=useState("ambos");       // "ingreso"|"egreso"|"ambos"
   const tcActual=blue||1450;
   const balance=totalIngresos-totalGastos;
   const djSaldoPendiente=(djEventos||[]).filter(e=>e.estado==="Confirmado").reduce((a,e)=>a+Number(e.saldo||0),0);
@@ -2852,7 +2856,7 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
               background:"rgba(0,0,0,0.55)",
               backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",
               display:"flex",alignItems:"flex-start",justifyContent:"center",
-              padding:"5vh 1rem 1rem",overflowY:"auto",
+              padding:"4vh 1rem 1rem",
             }}>
               <div onClick={e=>e.stopPropagation()} style={{
                 background:"var(--bg-modal)",
@@ -2860,80 +2864,167 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
                 border:"0.5px solid var(--glass-border)",
                 boxShadow:"var(--glass-shadow-lg)",
                 borderRadius:"var(--r-xl)",
-                width:"100%",maxWidth:520,
-                padding:"22px 24px",
+                width:"100%",maxWidth:540,
+                display:"flex",flexDirection:"column",
+                maxHeight:"88vh",
                 animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)",
-                maxHeight:"80vh",display:"flex",flexDirection:"column",
               }}>
-                {/* Header */}
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexShrink:0}}>
-                  <div>
-                    <div style={{fontSize:15,fontWeight:700,color:"var(--text-primary)",letterSpacing:"-.01em"}}>Todos los movimientos</div>
-                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{todosMovimientos.length} movimientos registrados</div>
+
+                {/* ── Header fijo ── */}
+                <div style={{padding:"20px 22px 0",flexShrink:0}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                    <div>
+                      <div style={{fontSize:16,fontWeight:700,color:"var(--text-primary)",letterSpacing:"-.01em"}}>Todos los movimientos</div>
+                      <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>{todosMovimientos.length} registrados</div>
+                    </div>
+                    <button onClick={()=>setVerTodo(false)} style={{
+                      width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",
+                      background:"var(--bg-card)",cursor:"pointer",fontSize:14,
+                      color:"var(--text-secondary)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                    }}>✕</button>
                   </div>
-                  <button onClick={()=>setVerTodo(false)} style={{
-                    width:30,height:30,borderRadius:"50%",
+
+                  {/* ── Filtros ── */}
+                  <div style={{
+                    background:"rgba(120,120,128,0.07)",
                     border:"0.5px solid var(--glass-border)",
-                    background:"var(--bg-card)",cursor:"pointer",
-                    fontSize:14,color:"var(--text-secondary)",
-                    display:"flex",alignItems:"center",justifyContent:"center",
-                    flexShrink:0,
-                  }}>✕</button>
+                    borderRadius:"var(--r-lg)",
+                    padding:"12px 14px",
+                    marginBottom:14,
+                    display:"flex",flexDirection:"column",gap:10,
+                  }}>
+                    {/* Rango de fechas */}
+                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                      <span style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",minWidth:40}}>Desde</span>
+                      <input type="date" value={fDesde} onChange={e=>setFDesde(e.target.value)}
+                        style={{flex:1,minWidth:120,fontSize:12,padding:"5px 8px"}}/>
+                      <span style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)"}}>Hasta</span>
+                      <input type="date" value={fHasta} onChange={e=>setFHasta(e.target.value)}
+                        style={{flex:1,minWidth:120,fontSize:12,padding:"5px 8px"}}/>
+                      {(fDesde||fHasta)&&(
+                        <button onClick={()=>{setFDesde("");setFHasta("");}} style={{
+                          fontSize:11,padding:"4px 8px",borderRadius:"var(--r-pill)",
+                          border:"0.5px solid var(--glass-border)",background:"none",
+                          color:"var(--text-secondary)",cursor:"pointer",flexShrink:0,
+                        }}>✕</button>
+                      )}
+                    </div>
+                    {/* Moneda + Tipo */}
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {/* Moneda pills */}
+                      {[["ambas","💰 Ambas"],["ARS","$ Pesos"],["USD","USD"]].map(([v,l])=>(
+                        <button key={v} onClick={()=>setFMoneda(v)} style={{
+                          fontSize:11,padding:"5px 12px",borderRadius:"var(--r-pill)",cursor:"pointer",fontWeight:fMoneda===v?700:400,
+                          border:"0.5px solid "+(fMoneda===v?"var(--border-info)":"var(--glass-border)"),
+                          background:fMoneda===v?"var(--bg-tint-blue)":"none",
+                          color:fMoneda===v?"var(--text-info)":"var(--text-secondary)",
+                          transition:"all .15s",
+                        }}>{l}</button>
+                      ))}
+                      <div style={{width:"0.5px",background:"var(--glass-border)",margin:"0 2px"}}/>
+                      {/* Tipo pills */}
+                      {[["ambos","↕ Ambos"],["ingreso","↑ Ingresos"],["egreso","↓ Egresos"]].map(([v,l])=>(
+                        <button key={v} onClick={()=>setFTipo(v)} style={{
+                          fontSize:11,padding:"5px 12px",borderRadius:"var(--r-pill)",cursor:"pointer",fontWeight:fTipo===v?700:400,
+                          border:"0.5px solid "+(fTipo===v?(v==="ingreso"?"var(--border-success)":v==="egreso"?"var(--border-danger)":"var(--glass-border)"):"var(--glass-border)"),
+                          background:fTipo===v?(v==="ingreso"?"var(--bg-tint-green)":v==="egreso"?"var(--bg-tint-red)":"rgba(120,120,128,0.1)"):"none",
+                          color:fTipo===v?(v==="ingreso"?"var(--text-success)":v==="egreso"?"var(--text-danger)":"var(--text-primary)"):"var(--text-secondary)",
+                          transition:"all .15s",
+                        }}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                {/* Lista scrolleable */}
-                <div style={{overflowY:"auto",flex:1}}>
-                  {todosMovimientos.length===0
-                    ?<p style={{color:"var(--text-secondary)",fontSize:13,textAlign:"center",padding:"2rem 0"}}>Sin movimientos aún.</p>
-                    :(()=>{
-                      // Ordenar por id (timestamp) desc para orden exacto dentro del mismo día
-                      const sorted=[...todosMovimientos].sort((a,b)=>{
-                        const fd=b.fecha.localeCompare(a.fecha);
-                        if(fd!==0)return fd;
-                        return (b.id||"z").localeCompare(a.id||"z");
-                      });
-                      // Agrupar por fecha
-                      const byDate={};
-                      sorted.forEach(m=>{
-                        const d=m.fecha||"Sin fecha";
-                        if(!byDate[d])byDate[d]=[];
-                        byDate[d].push(m);
-                      });
-                      const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
-                      const hoyStr=new Date().toISOString().split("T")[0];
-                      const ayer=new Date(); ayer.setDate(ayer.getDate()-1);
-                      const ayerStr=ayer.toISOString().split("T")[0];
-                      const fmtFecha=d=>d===hoyStr?"Hoy":d===ayerStr?"Ayer":new Date(d+"T12:00:00").toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"});
-                      return dates.map(fecha=>(
-                        <div key={fecha} style={{marginBottom:4}}>
-                          {/* Separador de día */}
+
+                {/* ── Lista scrolleable ── */}
+                <div style={{overflowY:"auto",flex:1,padding:"0 22px 20px"}}>
+                  {(()=>{
+                    // Aplicar filtros
+                    const filtered=todosMovimientos.filter(m=>{
+                      if(fDesde&&m.fecha<fDesde)return false;
+                      if(fHasta&&m.fecha>fHasta)return false;
+                      if(fMoneda!=="ambas"&&m.moneda!==fMoneda)return false;
+                      if(fTipo==="ingreso"&&m.monto<0)return false;
+                      if(fTipo==="egreso"&&m.monto>=0)return false;
+                      return true;
+                    });
+                    // Ordenar por fecha desc, luego por id desc (timestamp ms)
+                    const sorted=[...filtered].sort((a,b)=>{
+                      const fd=b.fecha.localeCompare(a.fecha);
+                      if(fd!==0)return fd;
+                      return (b.id||"z").localeCompare(a.id||"z");
+                    });
+                    if(sorted.length===0)return(
+                      <div style={{textAlign:"center",padding:"2.5rem 0",color:"var(--text-secondary)",fontSize:13}}>
+                        Sin movimientos con los filtros aplicados.
+                      </div>
+                    );
+                    // Agrupar por fecha
+                    const byDate={};
+                    sorted.forEach(m=>{
+                      const d=m.fecha||"Sin fecha";
+                      if(!byDate[d])byDate[d]=[];
+                      byDate[d].push(m);
+                    });
+                    const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+                    const hoyStr=new Date().toISOString().split("T")[0];
+                    const ayerD=new Date();ayerD.setDate(ayerD.getDate()-1);
+                    const ayerStr=ayerD.toISOString().split("T")[0];
+                    const fmtFecha=d=>{
+                      if(d===hoyStr)return"Hoy";
+                      if(d===ayerStr)return"Ayer";
+                      return new Date(d+"T12:00:00").toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"});
+                    };
+                    // Totales del filtro actual
+                    const totIng=sorted.filter(m=>m.monto>0);
+                    const totEgr=sorted.filter(m=>m.monto<0);
+                    return(<>
+                      {/* Resumen del filtro */}
+                      {sorted.length>0&&(
+                        <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+                          <div style={{fontSize:11,padding:"4px 10px",borderRadius:"var(--r-pill)",background:"var(--bg-tint-green)",color:"var(--text-success)",fontWeight:500}}>
+                            {totIng.length} ingresos
+                          </div>
+                          <div style={{fontSize:11,padding:"4px 10px",borderRadius:"var(--r-pill)",background:"var(--bg-tint-red)",color:"var(--text-danger)",fontWeight:500}}>
+                            {totEgr.length} egresos
+                          </div>
+                          <div style={{fontSize:11,color:"var(--text-secondary)",padding:"4px 0"}}>{sorted.length} total</div>
+                        </div>
+                      )}
+                      {/* Grupos por día */}
+                      {dates.map(fecha=>(
+                        <div key={fecha} style={{marginBottom:8}}>
                           <div style={{
-                            fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",
-                            color:"var(--text-secondary)",
-                            padding:"10px 0 5px",
                             display:"flex",alignItems:"center",gap:8,
+                            padding:"8px 0 5px",
                           }}>
-                            <span>{fmtFecha(fecha)}</span>
+                            <span style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{fmtFecha(fecha)}</span>
                             <div style={{flex:1,height:"0.5px",background:"var(--glass-border)"}}/>
                           </div>
-                          {/* Movimientos del día */}
                           {byDate[fecha].map((m,i)=>(
                             <div key={m.id||i} style={{
                               display:"flex",justifyContent:"space-between",alignItems:"center",
-                              padding:"8px 10px",marginBottom:3,
+                              padding:"8px 12px",marginBottom:4,
                               borderRadius:"var(--r-md)",
-                              background:"rgba(120,120,128,0.04)",
-                              border:"0.5px solid var(--glass-border)",
+                              background:m.monto>=0?"rgba(91,173,65,0.05)":"rgba(192,57,43,0.05)",
+                              border:"0.5px solid "+(m.monto>=0?"rgba(91,173,65,0.15)":"rgba(192,57,43,0.12)"),
+                              transition:"background .1s",
                             }}>
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:12,color:"var(--text-primary)",fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.desc}</div>
-                                <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>
-                                  <span style={{color:m.color,fontWeight:600}}>{m.modulo}</span>
+                                <div style={{fontSize:10,marginTop:2,display:"flex",alignItems:"center",gap:5}}>
+                                  <span style={{
+                                    color:m.color,fontWeight:600,
+                                    padding:"1px 6px",borderRadius:"var(--r-pill)",
+                                    background:m.color+"18",
+                                  }}>{m.modulo}</span>
+                                  <span style={{color:"var(--text-secondary)"}}>{m.moneda}</span>
                                 </div>
                               </div>
                               <div style={{
-                                fontSize:13,fontWeight:600,
-                                color:m.monto>=0?"var(--color-text-success)":"var(--color-text-danger)",
-                                flexShrink:0,marginLeft:12,
+                                fontSize:13,fontWeight:700,
+                                color:m.monto>=0?"var(--text-success)":"var(--text-danger)",
+                                flexShrink:0,marginLeft:14,
                               }}>
                                 {m.monto>=0
                                   ?(m.moneda==="USD"?fmtUSD(m.monto):"$"+fmt(m.monto))
@@ -2943,9 +3034,9 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
                             </div>
                           ))}
                         </div>
-                      ));
-                    })()
-                  }
+                      ))}
+                    </>);
+                  })()}
                 </div>
               </div>
             </div>
