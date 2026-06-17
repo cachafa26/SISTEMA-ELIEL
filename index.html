@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.0.5 · 2026-06-17 -->
+  <!-- v3.0.6 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.5</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.6</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.0.5";
+const APP_VERSION = "v3.0.6";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2834,6 +2834,32 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
               <Card label="BH Trade pendiente" value={"$"+fmt(bhPendienteCobro)} sub={"Cobrado: $"+fmt(bhCobradoTotal)} color={bhPendienteCobro>0?"var(--text-warning)":undefined} onClick={()=>goModulo("bhtrade")}/>
               <Card label="Mi 30% SC en pesos" value={"$"+fmt(mi30Pesos)} sub={fmtUSD(pendienteRetiro)+" · TC $"+fmt(tc)} color={mi30Pesos>0?"var(--text-success)":undefined} onClick={()=>goModulo("supercoating")}/>
             </div>
+            {/* ── TOTAL PENDIENTE DE RETIRO ── */}
+            {(()=>{
+              const totalPendARS=mi30Pesos+(bhPendienteCobro||0);
+              if(totalPendARS<=0)return null;
+              return(
+                <div style={{
+                  display:"flex",justifyContent:"space-between",alignItems:"center",
+                  background:"linear-gradient(135deg,rgba(244,121,32,0.12),rgba(91,173,65,0.12))",
+                  border:"0.5px solid rgba(244,121,32,0.25)",
+                  borderRadius:"var(--r-lg)",padding:"12px 16px",
+                  marginBottom:"1.25rem",
+                }}>
+                  <div>
+                    <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-warning)",marginBottom:2}}>Total pendiente de retiro</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>Mi 30% SC + BH pendiente</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:20,fontWeight:700,color:"var(--text-warning)",letterSpacing:"-.01em"}}>${fmt(totalPendARS)}</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:1}}>
+                      SC: ${fmt(mi30Pesos)} · BH: ${fmt(bhPendienteCobro||0)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* ── SECCIÓN 2: Patrimonio USD ── */}
             <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Patrimonio (USD)</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.5rem"}}>
