@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.6.5";
+const APP_VERSION = "v2.6.6";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4165,7 +4165,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
                 <button onClick={e=>{e.stopPropagation();if(window.confirm("¿Borrar '"+c.nombre+"'? Se eliminarán también sus ventas.")){save({...data,contenedores:data.contenedores.filter(x=>x.id!==c.id),ventas:(data.ventas||[]).filter(v=>v.contId!==c.id)});showToast("Contenedor eliminado");}}} style={{fontSize:11,padding:"3px 8px",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-danger)",background:"var(--color-background-danger)",color:"var(--color-text-danger)",flexShrink:0}}>Borrar</button>
               </div>
             </div>
-            {costo>0&&(<><div style={{height:4,background:"rgba(120,120,128,0.08)",borderRadius:2,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:2}}/></div><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}><span>{fmtPct(pct)+" cobrado"}</span>{!enG&&<span style={{color:"var(--color-text-warning)",fontWeight:500}}>{"Faltan "+fmtUSD(costo-cobUSD)}</span>}</div></>)}
+            {costo>0&&(<><div style={{height:4,background:"rgba(120,120,128,0.08)",borderRadius:2,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:2}}/></div><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}><span>{fmtPct(pct)+" cobrado"}</span>{enG?<span style={{color:"var(--text-success)",fontWeight:600}}>{"+"+((cobUSD-costo)/costo*100).toFixed(1)+"% · 30%: "+fmtUSD((cobUSD-costo)*0.3)}</span>:<span style={{color:"var(--color-text-warning)",fontWeight:500}}>{"Faltan "+fmtUSD(costo-cobUSD)}</span></div></>)}
           </div>);
         })}
       </div>
@@ -5158,17 +5158,21 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
         {[...(data.contenedores||[])].sort((a,b)=>b.id.localeCompare(a.id)).map(c=>{
           const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
           const facturadoUSD=ventasCont.reduce((a,v)=>a+ventaUSD(v,tcActual),0);
+          const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
           const costo=c.costoTotal||0;
-          const ganancia=Math.max(0,facturadoUSD-costo);
+          const enG=costo>0&&cobUSD>=costo;
+          const ganancia=Math.max(0,cobUSD-costo);
+          const ganPct=costo>0?(cobUSD-costo)/costo*100:0;
           const mi30c=ganancia*0.3;
-          const pct=costo>0?Math.min(100,facturadoUSD/costo*100):0;
+          const pct=costo>0?Math.min(100,cobUSD/costo*100):0;
           return(
             <div key={c.id} style={{marginBottom:12,paddingBottom:12,borderBottom:"0.5px solid var(--glass-border)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                 <span style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</span>
-                <span style={{fontSize:12,fontWeight:600,color:ganancia>0?"var(--text-success)":"var(--text-warning)"}}>
-                  Mi 30%: {fmtUSD(mi30c)}
-                </span>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:enG?"var(--text-success)":"var(--text-warning)"}}>Mi 30%: {fmtUSD(mi30c)}</div>
+                  {enG&&<div style={{fontSize:11,color:"var(--text-success)"}}>+{ganPct.toFixed(1)}% ganancia</div>}
+                </div>
               </div>
               <div style={{display:"flex",gap:12,fontSize:11,color:"var(--text-secondary)",flexWrap:"wrap",marginBottom:6}}>
                 <span>Facturado: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(facturadoUSD)}</strong></span>
