@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.0.4 · 2026-06-17 -->
+  <!-- v3.0.5 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.4</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.5</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.0.4";
+const APP_VERSION = "v3.0.5";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -5957,8 +5957,8 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1rem"}}>
         <MC label="30% total devengado"  value={fmtUSD(mi30Total)}/>
         <MC label="Ya retirado"          value={fmtUSD(totalRetirado)}/>
-        <MC label="Pendiente de cobrar"  value={fmtUSD(pendienteRetiro)}  green={pendienteRetiro>0}
-            sub={"≈ $"+fmt(pendienteRetiro*tcActual)+" ARS"}/>
+        <MC label="Pendiente de cobrar"  value={"$"+fmt(Math.round(pendienteRetiro*tcActual))+" ARS"}  green={pendienteRetiro>0}
+            sub={fmtUSD(pendienteRetiro)}/>
         <MC label="Cotización blue"      value={"$"+fmt(tcActual)}  info sub="por dólar"/>
       </div>
 
