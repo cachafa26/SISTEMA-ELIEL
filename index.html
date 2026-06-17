@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.6.6";
+const APP_VERSION = "v2.6.7";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4165,7 +4165,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
                 <button onClick={e=>{e.stopPropagation();if(window.confirm("¿Borrar '"+c.nombre+"'? Se eliminarán también sus ventas.")){save({...data,contenedores:data.contenedores.filter(x=>x.id!==c.id),ventas:(data.ventas||[]).filter(v=>v.contId!==c.id)});showToast("Contenedor eliminado");}}} style={{fontSize:11,padding:"3px 8px",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-danger)",background:"var(--color-background-danger)",color:"var(--color-text-danger)",flexShrink:0}}>Borrar</button>
               </div>
             </div>
-            {costo>0&&(<><div style={{height:4,background:"rgba(120,120,128,0.08)",borderRadius:2,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:2}}/></div><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}><span>{fmtPct(pct)+" cobrado"}</span>{enG?<span style={{color:"var(--text-success)",fontWeight:600}}>{"+"+((cobUSD-costo)/costo*100).toFixed(1)+"% · 30%: "+fmtUSD((cobUSD-costo)*0.3)}</span>:<span style={{color:"var(--color-text-warning)",fontWeight:500}}>{"Faltan "+fmtUSD(costo-cobUSD)}</span></div></>)}
+            {costo>0&&(<><div style={{height:4,background:"rgba(120,120,128,0.08)",borderRadius:2,overflow:"hidden",marginBottom:4}}><div style={{height:"100%",width:pct+"%",background:enG?"var(--color-text-success)":"var(--color-border-info)",borderRadius:2}}/></div><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--color-text-secondary)"}}><span>{fmtPct(pct)+" cobrado"}</span><span>{enG?"+"+((cobUSD-costo)/costo*100).toFixed(1)+"% · 30%: "+fmtUSD((cobUSD-costo)*0.3):"Faltan "+fmtUSD(costo-cobUSD)}</span></div></>)}
           </div>);
         })}
       </div>
