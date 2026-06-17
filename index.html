@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.9.1";
+const APP_VERSION = "v2.9.2";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2742,10 +2742,11 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
       moneda:r.moneda||"ARS",montoUSD:Number(r.montoUSD||0),
       modulo:"Super Coating",color:"var(--color-text-success)"
     })),
-    // Gastos personales — ARS
+    // Gastos personales — en su moneda original
     ...(data.fin?.gastos||[]).map(g=>({
       id:g.id,fecha:g.fecha,desc:g.desc,
-      monto:-g.monto,moneda:"ARS",
+      monto:g.moneda==="USD"?-Number(g.montoOriginal||0):-g.monto,
+      moneda:g.moneda||"ARS",
       modulo:"Gasto",color:"var(--color-text-danger)"
     })),
     // Operaciones FX — compra/venta de dólares
@@ -2801,19 +2802,19 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
             {/* ── SECCIÓN 1: Flujo mensual ARS ── */}
             <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Flujo mensual (pesos)</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.25rem"}}>
+              <Card label="Balance ARS" value={"$"+fmt(balanceARS)} color={balanceARS>=0?"var(--text-success)":"var(--text-danger)"}/>
               <Card label="Ingresos totales" value={"$"+fmt(ingresoARS)} sub="SC retirado + BH cobrado"/>
               <Card label="Gastos personales" value={"$"+fmt(gastoARS)} color={gastoARS>0?"var(--text-danger)":undefined}/>
-              <Card label="Balance ARS" value={"$"+fmt(balanceARS)} color={balanceARS>=0?"var(--text-success)":"var(--text-danger)"}/>
               <Card label="BH Trade pendiente" value={"$"+fmt(bhPendienteCobro)} sub={"Cobrado: $"+fmt(bhCobradoTotal)} color={bhPendienteCobro>0?"var(--text-warning)":undefined} onClick={()=>goModulo("bhtrade")}/>
               <Card label="Mi 30% SC en pesos" value={"$"+fmt(mi30Pesos)} sub={fmtUSD(pendienteRetiro)+" · TC $"+fmt(tc)} color={mi30Pesos>0?"var(--text-success)":undefined} onClick={()=>goModulo("supercoating")}/>
             </div>
             {/* ── SECCIÓN 2: Patrimonio USD ── */}
             <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Patrimonio (USD)</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.5rem"}}>
-              <Card label="Ingresos en USD" value={fmtUSD(ingresosUSD)} sub={"SC+BH+DJ cobrado en USD"} color={ingresosUSD>0?"var(--text-success)":undefined}/>
-              <Card label="DJ pendiente cobrar" value={fmtUSD(djSaldoPendiente)} sub={(djEventos||[]).filter(e=>e.estado==="Confirmado").length+" eventos confirmados"} color={djSaldoPendiente>0?"var(--text-warning)":undefined} onClick={()=>goModulo("dj")}/>
-              <Card label="Egresos en USD" value={fmtUSD(egresoUSD)} sub="gastos registrados en USD" color={egresoUSD>0?"var(--text-danger)":undefined}/>
               <Card label="Balance USD" value={fmtUSD(balanceUSD)} color={balanceUSD>=0?"var(--text-success)":"var(--text-danger)"} sub={balanceUSD>=0?"superávit":"déficit"}/>
+              <Card label="Ingresos en USD" value={fmtUSD(ingresosUSD)} sub="SC+BH+DJ cobrado en USD" color={ingresosUSD>0?"var(--text-success)":undefined}/>
+              <Card label="Egresos en USD" value={fmtUSD(egresoUSD)} sub="gastos en USD" color={egresoUSD>0?"var(--text-danger)":undefined}/>
+              <Card label="DJ pendiente cobrar" value={fmtUSD(djSaldoPendiente)} sub={(djEventos||[]).filter(e=>e.estado==="Confirmado").length+" eventos confirmados"} color={djSaldoPendiente>0?"var(--text-warning)":undefined} onClick={()=>goModulo("dj")}/>
             </div>
           </>
         );
@@ -4182,8 +4183,10 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0,marginLeft:12}}>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-danger)"}}>-${fmt(g.monto)}</div>
-                  {g.moneda==="USD"&&<div style={{fontSize:10,color:"var(--color-text-secondary)"}}>{fmtUSD(g.montoOriginal||0)}</div>}
+                  <div style={{fontSize:13,fontWeight:500,color:"var(--color-text-danger)"}}>
+                    {g.moneda==="USD"?"-"+fmtUSD(g.montoOriginal||0):"-$"+fmt(g.monto)}
+                  </div>
+                  {g.moneda==="ARS"&&g.cotiz&&<div style={{fontSize:10,color:"var(--color-text-secondary)"}}>{fmtUSD(g.montoOriginal||0)} @ ${fmt(g.cotiz)}</div>}
                 </div>
                 <button onClick={()=>eliminar(g.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:14,padding:"2px 4px",borderRadius:4,lineHeight:1}}>✕</button>
               </div>
