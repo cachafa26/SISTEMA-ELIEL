@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.7.8";
+const APP_VERSION = "v2.7.9";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -2679,6 +2679,11 @@ function SearchModal({data,onClose,goModulo,setView}){
 function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,djGanancia,djCobrado,djEventos,djGananciaUSD,djCobradoUSD,djRealizados,totalGastos,totalIngresos,totalVentaUSD,totalCobUSD,stockUni,goModulo}){
   const tcActual=blue||1450;
   const balance=totalIngresos-totalGastos;
+  // Pendiente DJ: suma de saldos de eventos confirmados futuros
+  const djSaldoPendiente=(djEventos||[]).filter(e=>e.estado==="Confirmado").reduce((a,e)=>a+Number(e.saldo||0),0);
+  // Pendiente BH: calculado en App y pasado como prop - usar bhTotalAnio-djCobradoUSD workaround
+  const bhCobradoTotal=(data.bh?.cobros||[]).reduce((a,c)=>a+Number(c.monto||0),0);
+  const bhPendienteCobro=Math.max(0,bhTotalAnio-bhCobradoTotal);
   const Card=({label,value,sub,color,onClick})=>(
     <div onClick={onClick}
       style={{
@@ -2697,16 +2702,18 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
 
   // movimientos recientes de los 3 módulos
   const recientes=[
-    // Cobros de BH Trade
-    ...(data.bh?.cobros||[]).map(c=>({fecha:c.fecha,desc:"Cobro BH Trade"+(c.nota?" — "+c.nota:""),monto:Number(c.monto||0),modulo:"BH Trade",color:"var(--color-text-info)"})),
-    // Ganancias DJ cobradas: eventos que tienen al menos un pago registrado, mostrar la gananciaUSD convertida
-    ...(data.dj?.eventos||[]).filter(e=>(e.pagos||[]).length>0).map(e=>{
-      const totalCobrado=(e.pagos||[]).reduce((a,p)=>a+Number(p.montoUSD||p.monto||0),0);
-      return {fecha:(e.pagos||[]).slice(-1)[0]?.fecha||e.fecha, desc:"Cobro DJ — "+e.nombre, monto:Math.round(totalCobrado*tcActual), modulo:"DJ", color:"var(--color-text-warning)"};
-    }),
+    // Cobros de BH Trade - en su moneda original
+    ...(data.bh?.cobros||[]).map(c=>({id:c.id,fecha:c.fecha,desc:"Cobro BH Trade"+(c.nota?" — "+c.nota:""),monto:Number(c.monto||0),moneda:c.moneda||"ARS",modulo:"BH Trade",color:"var(--color-text-info)"})),
+    // Pagos DJ - cada pago individual en su moneda
+    ...(data.dj?.eventos||[]).flatMap(e=>(e.pagos||[]).map(p=>({
+      id:p.id,fecha:p.fecha,
+      desc:"Cobro DJ — "+e.nombre+(p.concepto?" ("+p.concepto+")":""),
+      monto:Number(p.monto||0),moneda:p.moneda||"USD",
+      modulo:"DJ",color:"var(--color-text-warning)"
+    }))),
     // Retiros de Mi 30% SC
-    ...(data.retiros||[]).map(r=>({fecha:r.fecha,desc:"Retiro 30% SC"+(r.nota?" — "+r.nota:""),monto:r.montoPesos||Math.round((r.montoUSD||0)*tcActual),modulo:"Super Coating",color:"var(--color-text-success)"})),
-    ...(data.fin?.gastos||[]).map(g=>({fecha:g.fecha,desc:g.desc,monto:-g.monto,modulo:"Gasto",color:"var(--color-text-danger)"})),
+    ...(data.retiros||[]).map(r=>({id:r.id,fecha:r.fecha,desc:"Retiro 30% SC"+(r.nota?" — "+r.nota:""),monto:r.montoPesos||Math.round((r.montoUSD||0)*tcActual),moneda:"ARS",modulo:"Super Coating",color:"var(--color-text-success)"})),
+    ...(data.fin?.gastos||[]).map(g=>({id:g.id,fecha:g.fecha,desc:g.desc,monto:-g.monto,moneda:"ARS",modulo:"Gasto",color:"var(--color-text-danger)"})),
   ].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||"")).slice(0,8);
 
   const tcBar=blue||1450;
@@ -2739,13 +2746,13 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
               <Card label="Ingresos totales" value={"$"+fmt(ingresoARS)} sub="3 fuentes 2026"/>
               <Card label="Gastos personales" value={"$"+fmt(gastoARS)} color={gastoARS>0?"var(--text-danger)":undefined}/>
               <Card label="Balance ARS" value={"$"+fmt(balanceARS)} color={balanceARS>=0?"var(--text-success)":"var(--text-danger)"}/>
-              <Card label="BH Trade — mes" value={"$"+fmt(bhSueldo)} sub="a cobrar este mes" onClick={()=>goModulo("bhtrade")}/>
+              <Card label="BH Trade pendiente" value={"$"+fmt(bhPendienteCobro)} sub={"Cobrado: $"+fmt(bhCobradoTotal)} color={bhPendienteCobro>0?"var(--text-warning)":undefined} onClick={()=>goModulo("bhtrade")}/>
             </div>
             {/* USD wealth */}
             <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Ahorro / patrimonio (USD)</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:"1.5rem"}}>
               <Card label="Mi 30% SC pendiente" value={fmtUSD(pendienteRetiro)} sub={"≈$"+fmt(pendienteRetiro*tc)+" ARS"} color={pendienteRetiro>0?"var(--text-success)":undefined} onClick={()=>goModulo("supercoating")}/>
-              <Card label="DJ ganancia USD" value={fmtUSD(djGananciaUSD)} sub={djEventos.filter(e=>e.estado==="Realizado").length+" eventos"} color={djGananciaUSD>0?"var(--text-success)":undefined} onClick={()=>goModulo("dj")}/>
+              <Card label="DJ pendiente cobrar" value={fmtUSD(djSaldoPendiente)} sub={(djEventos||[]).filter(e=>e.estado==="Confirmado").length+" eventos confirmados"} color={djSaldoPendiente>0?"var(--text-warning)":undefined} onClick={()=>goModulo("dj")}/>
               <Card label="SC facturado USD" value={fmtUSD(totalVentaUSD||0)} sub="total ventas"/>
               <Card label="SC cobrado USD" value={fmtUSD(totalCobUSD||0)} sub="efectivamente cobrado"/>
             </div>
@@ -2781,7 +2788,7 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
                 <div style={{fontSize:10,color:"var(--color-text-secondary)"}}>{m.fecha} · <span style={{color:m.color}}>{m.modulo}</span></div>
               </div>
               <div style={{fontSize:13,fontWeight:500,color:m.monto>=0?"var(--color-text-success)":"var(--color-text-danger)"}}>
-                {m.monto>=0?"$"+fmt(m.monto):"-$"+fmt(Math.abs(m.monto))}
+                {m.monto>=0?(m.moneda==="USD"?"USD "+fmtUSD(m.monto):"$"+fmt(m.monto)):(m.moneda==="USD"?"-USD "+fmtUSD(Math.abs(m.monto)):"-$"+fmt(Math.abs(m.monto)))}
               </div>
             </div>
           ))}
