@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.0.0 · 2026-06-17 -->
+  <!-- v3.0.1 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.1</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.0.0";
+const APP_VERSION = "v3.0.1";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4282,9 +4282,9 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
           </div>
         )}
         {/* Historial FX */}
-        {(data.fin?.fx||[]).length>0&&(
+        {(data.fin?.fx||[]).filter(f=>f.tipo==="compra"||f.tipo==="venta").length>0&&(
           <div style={{marginTop:showFX?12:0}}>
-            {[...(data.fin?.fx||[])].sort((a,b)=>b.ts-a.ts).map(f=>(
+            {[...(data.fin?.fx||[])].filter(f=>f.tipo==="compra"||f.tipo==="venta").sort((a,b)=>b.ts-a.ts).map(f=>(
               <div key={f.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderTop:"0.5px solid var(--glass-border)",fontSize:12}}>
                 <div style={{flex:1}}>
                   <span style={{fontWeight:600,color:f.tipo==="compra"?"var(--text-info)":"var(--text-success)"}}>{f.tipo==="compra"?"Compra":"Venta"} USD</span>
