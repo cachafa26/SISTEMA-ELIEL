@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.0.9 · 2026-06-17 -->
+  <!-- v3.1.0 · 2026-06-17 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.0.9</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.1.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1044,7 +1044,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.0.9";
+const APP_VERSION = "v3.1.0";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -3409,6 +3409,155 @@ function EditPagoInline({eventoId,eventos,data,save,showToast,blue}){
 }
 
 
+
+// ── DeudoresDJ: pestaña de deudores del módulo DJ ────────────────────────
+function DeudoresDJ({eventos,data,save,showToast,blue}){
+  const [modalPago,setModalPago]=useState(null); // evento
+  const [formPago,setFormPago]=useState({monto:"",moneda:"USD",fecha:hoy(),concepto:"Saldo",nota:""});
+
+  const tc=blue||1450;
+
+  // Eventos con saldo pendiente (confirmados + fecha pasada con saldo)
+  const deudores=eventos.filter(e=>{
+    if(e.estado==="Pendiente")return false;
+    const cobrado=(e.pagos||[]).reduce((a,p)=>a+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
+    const saldo=Math.max(0,Number(e.cobroUSD||0)-cobrado);
+    return saldo>0;
+  }).map(e=>{
+    const cobrado=(e.pagos||[]).reduce((a,p)=>a+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
+    const saldo=Math.max(0,Number(e.cobroUSD||0)-cobrado);
+    return{...e,cobradoUSD:cobrado,saldoUSD:saldo};
+  }).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+
+  const totalDeudaUSD=deudores.reduce((a,e)=>a+e.saldoUSD,0);
+
+  const registrarPago=()=>{
+    if(!formPago.monto||!modalPago)return;
+    const montoN=Number(formPago.monto);
+    const montoUSD=formPago.moneda==="ARS"?montoN/tc:montoN;
+    const pagos=[...(modalPago.pagos||[]),{
+      id:Date.now().toString(),fecha:formPago.fecha,
+      concepto:formPago.concepto,monto:montoN,
+      moneda:formPago.moneda,montoUSD,nota:formPago.nota
+    }];
+    const totalPagadoUSD=pagos.reduce((a,p)=>a+p.montoUSD,0);
+    const nuevoSaldo=Math.max(0,Number(modalPago.cobroUSD||0)-totalPagadoUSD);
+    const updEvento={...modalPago,pagos,saldo:nuevoSaldo,senaUSD:totalPagadoUSD};
+    save({...data,dj:{...data.dj,eventos:(data.dj?.eventos||[]).map(e=>e.id===modalPago.id?updEvento:e)}});
+    setModalPago(null);
+    setFormPago({monto:"",moneda:"USD",fecha:hoy(),concepto:"Saldo",nota:""});
+    showToast("✓ Pago registrado");
+  };
+
+  if(deudores.length===0)return(
+    <div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)"}}>
+      ✓ Sin deudores — todos los eventos están saldados
+    </div>
+  );
+
+  return(
+    <div>
+      {/* Resumen */}
+      <div style={{background:"linear-gradient(135deg,rgba(192,57,43,0.10),rgba(178,80,0,0.10))",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid rgba(192,57,43,0.25)",borderRadius:"var(--r-lg)",padding:"14px 18px",marginBottom:"1rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-danger)",marginBottom:3}}>Total adeudado</div>
+          <div style={{fontSize:22,fontWeight:700,color:"var(--text-danger)",letterSpacing:"-.01em"}}>{fmtUSD(totalDeudaUSD)}</div>
+          <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>≈ ${fmt(Math.round(totalDeudaUSD*tc))} ARS · {deudores.length} evento{deudores.length>1?"s":""}</div>
+        </div>
+      </div>
+
+      {/* Modal pago */}
+      {modalPago&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"22px",width:"100%",maxWidth:360,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
+            <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Registrar pago</h3>
+            <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{modalPago.nombre} · Saldo: {fmtUSD(modalPago.saldoUSD)}</p>
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto</label>
+              <div style={{display:"flex",gap:6}}>
+                <select value={formPago.moneda} onChange={e=>setFormPago(f=>({...f,moneda:e.target.value}))} style={{width:70,flexShrink:0}}>
+                  <option value="USD">USD</option><option value="ARS">ARS</option>
+                </select>
+                <input type="number" value={formPago.monto} onChange={e=>setFormPago(f=>({...f,monto:e.target.value}))} placeholder="0" autoFocus inputMode="decimal"/>
+              </div>
+            </div>
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Concepto</label>
+              <select value={formPago.concepto} onChange={e=>setFormPago(f=>({...f,concepto:e.target.value}))}>
+                {["Saldo","2da cuota","Pago parcial","Pago total","Resto"].map(c=><option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label>
+              <input type="date" value={formPago.fecha} onChange={e=>setFormPago(f=>({...f,fecha:e.target.value}))}/>
+            </div>
+            <div style={{marginBottom:16}}>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota (opcional)</label>
+              <input value={formPago.nota} onChange={e=>setFormPago(f=>({...f,nota:e.target.value}))} placeholder="Transferencia, efectivo..."/>
+            </div>
+            {formPago.monto&&formPago.moneda&&(
+              <div style={{fontSize:11,color:"var(--text-info)",marginBottom:12,padding:"7px 10px",background:"var(--bg-tint-blue)",borderRadius:"var(--r-md)"}}>
+                = {formPago.moneda==="USD"?fmtUSD(Number(formPago.monto)):"USD "+fmt(Number(formPago.monto)/tc)+" al TC $"+fmt(tc)}
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={registrarPago} style={{flex:1,fontSize:13,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:600,cursor:"pointer"}}>✓ Registrar</button>
+              <button onClick={()=>setModalPago(null)} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de deudores */}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {deudores.map(e=>{
+          const fechaPasada=e.fecha<hoy();
+          return(
+            <div key={e.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid rgba(192,57,43,0.3)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:14,color:"var(--text-primary)",marginBottom:3}}>{e.nombre}</div>
+                  <div style={{fontSize:11,color:"var(--text-secondary)"}}>{e.fecha}{fechaPasada?" · ":""}
+                    {fechaPasada&&<span style={{color:"var(--text-danger)",fontWeight:600}}>Fecha pasada</span>}
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:15,fontWeight:700,color:"var(--text-danger)"}}>Debe {fmtUSD(e.saldoUSD)}</div>
+                  <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:1}}>≈ ${fmt(Math.round(e.saldoUSD*tc))} ARS</div>
+                </div>
+              </div>
+              {/* Detalle cobros */}
+              <div style={{display:"flex",gap:16,fontSize:11,color:"var(--text-secondary)",marginBottom:10,flexWrap:"wrap"}}>
+                <span>Total evento: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(e.cobroUSD||0)}</strong></span>
+                <span>Cobrado: <strong style={{color:"var(--text-success)"}}>{fmtUSD(e.cobradoUSD)}</strong></span>
+                <span>Saldo: <strong style={{color:"var(--text-danger)"}}>{fmtUSD(e.saldoUSD)}</strong></span>
+              </div>
+              {/* Historial pagos */}
+              {(e.pagos||[]).length>0&&(
+                <div style={{marginBottom:10,padding:"8px 10px",background:"rgba(91,173,65,0.05)",borderRadius:"var(--r-md)"}}>
+                  {(e.pagos||[]).map(p=>(
+                    <div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"2px 0",color:"var(--text-secondary)"}}>
+                      <span>💳 {p.concepto||"Pago"} · {p.fecha}{p.nota?" · "+p.nota:""}</span>
+                      <span style={{color:"var(--text-success)",fontWeight:600}}>+{p.moneda==="USD"?fmtUSD(p.montoUSD):"$"+fmt(p.monto)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={()=>{
+                setModalPago(e);
+                setFormPago({monto:String(Math.round(e.saldoUSD*100)/100),moneda:"USD",fecha:hoy(),concepto:"Saldo",nota:""});
+              }} style={{fontSize:12,padding:"7px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:600,cursor:"pointer"}}>
+                + Registrar pago
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 function DJView({data,save,showToast,blue,onGenerarDoc}){
   const tc=blue||1450;
   const initForm={nombre:"",fecha:hoy(),estado:"Confirmado",
@@ -3829,6 +3978,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
           <TabBtn id="presupuestos" label="Presupuestos" count={presupuestos.filter(p=>p.estado==="Pendiente").length}/>
           <TabBtn id="confirmados"  label="Confirmados"  count={confirmados.length}/>
           <TabBtn id="realizados"   label="Historial"    count={realizados.length}/>
+          <TabBtn id="deudores"     label="Deudores"     count={eventos.filter(e=>e.saldo>0&&e.estado==="Confirmado").length}/>
         </div>
         <button onClick={()=>setTab(tab==="nuevo"?"confirmados":"nuevo")} style={{
           flexShrink:0,padding:"8px 14px",borderRadius:"var(--r-lg)",border:"none",cursor:"pointer",
@@ -3954,6 +4104,11 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
             </div>
           ))}
         </div>
+      )}
+
+      {/* ── TAB: DEUDORES ── */}
+      {tab==="deudores"&&(
+        <DeudoresDJ eventos={eventos} data={data} save={save} showToast={showToast} blue={blue}/>
       )}
 
       {/* ── TAB: NUEVO EVENTO (manual) ── */}
