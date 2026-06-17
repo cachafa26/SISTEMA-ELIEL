@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.7.5";
+const APP_VERSION = "v2.7.7";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -1388,12 +1388,14 @@ function App(){
 
   // Calculos DJ globales
   const djEventos=data.dj?.eventos||[];
-  // Solo cuenta eventos con pagos reales registrados (length > 0)
+  // Solo cuenta eventos que NO están Pendientes y tienen pagos reales
   const djCobradoUSD=djEventos.reduce((a,e)=>{
+    if(e.estado==="Pendiente") return a; // excluir presupuestos pendientes
     const pagado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0);
-    return a+pagado; // 0 si no hay pagos - sin fantasmas
+    return a+pagado;
   },0);
   const djGananciaUSD=djEventos.reduce((a,e)=>{
+    if(e.estado==="Pendiente") return a;
     const pagado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0);
     return a+(pagado>0?Math.max(0,pagado-Number(e.costoUSD||0)):0);
   },0);
@@ -3033,12 +3035,13 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const realizados=[...eventos.filter(e=>e.estado==="Realizado"||(e.estado==="Confirmado"&&e.fecha<hoy2))].sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.id||"").localeCompare(a.id||""));
 
 
-  // Totales: SOLO eventos con pagos reales (pagos[].montoUSD > 0)
+  // Totales: excluir Pendientes, solo pagos reales
   const cobroTotal=eventos.reduce((a,e)=>{
-    const pagado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0);
-    return a+pagado;
+    if(e.estado==="Pendiente") return a;
+    return a+(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0);
   },0);
   const ganTotal=eventos.reduce((a,e)=>{
+    if(e.estado==="Pendiente") return a;
     const pagado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0);
     return a+(pagado>0?Math.max(0,pagado-Number(e.costoUSD||0)):0);
   },0);
@@ -3415,6 +3418,13 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
       {/* ── TAB: PRESUPUESTOS ── */}
       {tab==="presupuestos"&&(
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {/* Limpiar eventos huérfanos */}
+          {eventos.filter(e=>e.estado==="Pendiente").length>0&&(
+            <div style={{background:"var(--bg-tint-red)",border:"0.5px solid var(--border-danger)",borderRadius:"var(--r-lg)",padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+              <span style={{fontSize:12,color:"var(--text-danger)"}}>⚠ {eventos.filter(e=>e.estado==="Pendiente").length} evento(s) con datos incorrectos en la base de datos</span>
+              <button onClick={()=>{if(window.confirm("¿Limpiar eventos con estado inválido?"))save({...data,dj:{...data.dj,eventos:(data.dj?.eventos||[]).filter(e=>e.estado!=="Pendiente")}});}} style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:"0.5px solid var(--border-danger)",background:"var(--bg-card)",color:"var(--text-danger)",cursor:"pointer",flexShrink:0}}>Limpiar</button>
+            </div>
+          )}
           {/* Botón nuevo presupuesto */}
           <button onClick={()=>setShowFormPres(f=>!f)} style={{alignSelf:"flex-start",fontSize:12,padding:"7px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,var(--accent-primary),var(--accent-secondary))",color:"#fff",cursor:"pointer",fontWeight:600}}>
             {showFormPres?"✕ Cancelar":"+ Nuevo presupuesto"}
