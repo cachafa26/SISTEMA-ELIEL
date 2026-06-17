@@ -1041,7 +1041,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v2.8.4";
+const APP_VERSION = "v2.8.5";
 const APP_BUILD   = "2026-06-16";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
@@ -4561,7 +4561,6 @@ function TabCostos({cont,updateCont,showToast,blue}){
     terminal:"",mTerminal:"ARS",
     otros:"",mOtros:"USD",
     ..._savedCostos,
-    // Restore moneda fields with fallbacks if not saved
     mDespacho:_savedCostos.mDespacho||"ARS",
     mNaviera:_savedCostos.mNaviera||"ARS",
     mDespachante:_savedCostos.mDespachante||"USD",
@@ -4570,16 +4569,23 @@ function TabCostos({cont,updateCont,showToast,blue}){
     mTerminal:_savedCostos.mTerminal||"ARS",
     mOtros:_savedCostos.mOtros||"USD",
   });
+  // Gastos adicionales: array de {id, label, monto, moneda}
+  const [extras,setExtras]=useState(()=>_savedCostos.extras||[]);
   const [tcPesos,setTcPesos]=useState(tcDef);
   const tc=Number(form.tipoCambio)||1450;
-  const toUSD=p=>Number(p||0)/tc;
-  const chinaUSD=form.costoMoneda==="USD"?Number(form.costoChina||0):toUSD(form.costoChina);
   const toUSDf=(val,mon)=>mon==="USD"?Number(val||0):Number(val||0)/tc;
-  const totalUSD=chinaUSD+toUSDf(form.despacho,form.mDespacho)+toUSDf(form.naviera,form.mNaviera)+toUSDf(form.despachante,form.mDespachante)+toUSDf(form.losPrincipes,form.mLosPrincipes)+toUSDf(form.deposito,form.mDeposito)+toUSDf(form.terminal,form.mTerminal)+toUSDf(form.otros,form.mOtros);
+  const chinaUSD=form.costoMoneda==="USD"?Number(form.costoChina||0):toUSDf(form.costoChina,"ARS");
+  const extrasUSD=extras.reduce((a,x)=>a+toUSDf(x.monto,x.moneda),0);
+  const totalUSD=chinaUSD+toUSDf(form.despacho,form.mDespacho)+toUSDf(form.naviera,form.mNaviera)+toUSDf(form.despachante,form.mDespachante)+toUSDf(form.losPrincipes,form.mLosPrincipes)+toUSDf(form.deposito,form.mDeposito)+toUSDf(form.terminal,form.mTerminal)+toUSDf(form.otros,form.mOtros)+extrasUSD;
+
+  const addExtra=()=>setExtras(ex=>[...ex,{id:Date.now().toString(),label:"",monto:"",moneda:"ARS"}]);
+  const updExtra=(id,field,val)=>setExtras(ex=>ex.map(x=>x.id===id?{...x,[field]:val}:x));
+  const delExtra=id=>setExtras(ex=>ex.filter(x=>x.id!==id));
+
   const calcular=()=>{
     const fobTot=(cont.articulos||[]).reduce((a,x)=>a+Number(x.precio||0)*Number(x.cantidad),0);
     const artsCosto=(cont.articulos||[]).map(art=>{const tot=Number(art.precio||0)*Number(art.cantidad);const pct=fobTot>0?tot/fobTot:0;return{...art,pct:pct*100,costoProporcional:totalUSD*pct,costoUnitario:art.cantidad>0?(totalUSD*pct)/art.cantidad:0};});
-    updateCont({...cont,costos:{...form,tipoCambioFijado:form.tipoCambio},costoTotal:totalUSD,artsCostoDetalle:artsCosto});
+    updateCont({...cont,costos:{...form,tipoCambioFijado:form.tipoCambio,extras},costoTotal:totalUSD,artsCostoDetalle:artsCosto});
     showToast("Costos guardados");
   };
   const campos=[{k:"despacho",m:"mDespacho",l:"Despacho"},{k:"naviera",m:"mNaviera",l:"Naviera"},{k:"despachante",m:"mDespachante",l:"Despachante"},{k:"losPrincipes",m:"mLosPrincipes",l:"Los Príncipes"},{k:"deposito",m:"mDeposito",l:"Depósito"},{k:"terminal",m:"mTerminal",l:"Terminal"},{k:"otros",m:"mOtros",l:"Otros"}];
@@ -4592,6 +4598,39 @@ function TabCostos({cont,updateCont,showToast,blue}){
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Costo China</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form.costoChina||""} onChange={e=>setForm({...form,costoChina:e.target.value})} style={{flex:1,boxSizing:"border-box"}}/><select value={form.costoMoneda||"ARS"} onChange={e=>{const v=e.target.value;setForm(f=>({...f,costoMoneda:v}));}} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>
           {campos.map(c=>(<div key={c.k}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{c.l}</label><div style={{display:"flex",gap:6,marginTop:2}}><input type="number" value={form[c.k]||""} onChange={e=>{const v=e.target.value;setForm(f=>({...f,[c.k]:v}));}} style={{flex:1,boxSizing:"border-box"}}/><select value={form[c.m||"m"+c.k]||"ARS"} onChange={e=>{const v=e.target.value;setForm(f=>({...f,[c.m||"m"+c.k]:v}));}} style={{width:70}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div></div>))}
         </div>
+
+        {/* ── Gastos adicionales ── */}
+        <div style={{borderTop:"0.5px solid var(--glass-border)",paddingTop:10,marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{fontSize:11,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text-secondary)"}}>Gastos adicionales</div>
+            <button onClick={addExtra} style={{fontSize:11,padding:"4px 10px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer",fontWeight:600}}>+ Agregar</button>
+          </div>
+          {extras.length===0
+            ?<div style={{fontSize:11,color:"var(--text-secondary)",padding:"4px 0"}}>Sin gastos extra. Usá "+ Agregar" para sumar líneas libres.</div>
+            :extras.map(x=>(
+              <div key={x.id} style={{display:"grid",gridTemplateColumns:"1fr 120px 70px auto",gap:6,marginBottom:6,alignItems:"center"}}>
+                <input
+                  value={x.label} onChange={e=>updExtra(x.id,"label",e.target.value)}
+                  placeholder="Descripción (ej: Camión, Seguro...)"
+                  style={{fontSize:12}}/>
+                <input
+                  type="number" value={x.monto} onChange={e=>updExtra(x.id,"monto",e.target.value)}
+                  placeholder="0" style={{fontSize:12}}/>
+                <select value={x.moneda} onChange={e=>updExtra(x.id,"moneda",e.target.value)} style={{fontSize:12}}>
+                  <option value="ARS">$ARS</option>
+                  <option value="USD">USD</option>
+                </select>
+                <button onClick={()=>delExtra(x.id)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:16,padding:"0 4px",lineHeight:1}}>✕</button>
+              </div>
+            ))
+          }
+          {extras.length>0&&extrasUSD>0&&(
+            <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:4}}>
+              Subtotal extras: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(extrasUSD)}</strong>
+            </div>
+          )}
+        </div>
+
         <div style={{background:"rgba(120,120,128,0.08)",borderRadius:"var(--border-radius-md)",padding:"0.6rem",marginBottom:10}}>
           <div style={{fontSize:11,color:"var(--color-text-secondary)"}}>Total costo estimado</div>
           <div style={{fontSize:18,fontWeight:500}}>{fmtUSD(totalUSD)}</div>
@@ -4609,8 +4648,7 @@ function TabCostos({cont,updateCont,showToast,blue}){
             <thead><tr style={{background:"rgba(120,120,128,0.08)"}}>{["Artículo","% FOB","Costo USD","Costo/u USD","Costo/u $ARS"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:500,fontSize:11,color:"var(--color-text-secondary)"}}>{h}</th>)}</tr></thead>
             <tbody>{cont.artsCostoDetalle.map(a=>{const ars=a.costoUnitario*Number(tcPesos||1450);return(<tr key={a.id} style={{borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
               <td style={{padding:"6px 8px"}}>{a.nombre}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtPct(a.pct)}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(a.costoProporcional)}</td><td style={{padding:"6px 8px",color:"var(--color-text-secondary)"}}>{fmtUSD(a.costoUnitario)}</td><td style={{padding:"6px 8px",fontWeight:500}}>{"$"+fmt(ars)}</td>
-            </tr>);})}
-            </tbody>
+            </tr>);})}</tbody>
           </table>
         </div>
       )}
