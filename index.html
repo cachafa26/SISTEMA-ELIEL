@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.5.0 · 2026-06-18 -->
+  <!-- v3.5.1 · 2026-06-18 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -614,7 +614,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.5.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.5.1</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1060,7 +1060,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.5.0";
+const APP_VERSION = "v3.5.1";
 const APP_BUILD   = "2026-06-18";
 
 // ── SC Reporte PDF ─────────────────────────────────────────────────
@@ -1780,6 +1780,14 @@ function App(){
   },0);
   const djGanancia=djGananciaUSD; // alias for backward compat
   const djCobrado=djCobradoUSD;
+  // DJ cobrado en ARS: pagos ARS directamente + pagos USD convertidos a ARS
+  const djCobradoARS=djEventos.reduce((a,e)=>{
+    if(e.estado==="Pendiente") return a;
+    return a+(e.pagos||[]).reduce((s,p)=>{
+      if(p.moneda==="ARS") return s+Number(p.monto||0);
+      return s+Number(p.montoUSD||0)*(blue||1450);
+    },0);
+  },0);
 
   // Calculos Finanzas
   // Gastos ARS: gastos en pesos + pesos gastados en compra de USD
@@ -1794,7 +1802,7 @@ function App(){
   const totalRetSCPesos=(data.retiros||[]).reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0);
   // Ingresos ARS: solo lo efectivamente cobrado/retirado en pesos + ingresos extra en ARS
   const ingresosExtraARSTotal=(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="ARS").reduce((a,f)=>a+Number(f.monto||0),0);
-  const totalIngresos=totalRetSCPesos+bhCobradoTotal+ingresosExtraARSTotal; // SC retirado + BH cobrado + extras ARS
+  const totalIngresos=totalRetSCPesos+bhCobradoTotal+djCobradoARS+ingresosExtraARSTotal; // SC retirado + BH cobrado + DJ cobrado ARS + extras ARS
 
   // Módulos de navegación superior
   const modulos=[
@@ -3268,7 +3276,7 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
             <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Flujo mensual (pesos)</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.25rem"}}>
               <Card label="Balance ARS" value={"$"+fmt(balanceARS)} color={balanceARS>=0?"var(--text-success)":"var(--text-danger)"}/>
-              <Card label="Ingresos totales" value={"$"+fmt(ingresoARS)} sub="SC retirado + BH cobrado"/>
+              <Card label="Ingresos totales" value={"$"+fmt(ingresoARS)} sub="SC + BH + DJ cobrado"/>
               <Card label="Gastos personales" value={"$"+fmt(gastoARS)} color={gastoARS>0?"var(--text-danger)":undefined}/>
               <Card label="BH Trade pendiente" value={"$"+fmt(bhPendienteCobro)} sub={"Cobrado: $"+fmt(bhCobradoTotal)} color={bhPendienteCobro>0?"var(--text-warning)":undefined} onClick={()=>goModulo("bhtrade")}/>
               <Card label="Mi 30% SC en pesos" value={"$"+fmt(mi30Pesos)} sub={fmtUSD(pendienteRetiro)+" · TC $"+fmt(tc)} color={mi30Pesos>0?"var(--text-success)":undefined} onClick={()=>goModulo("supercoating")}/>
