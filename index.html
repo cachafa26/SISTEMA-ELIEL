@@ -6632,70 +6632,71 @@ function ReportesView({data,save,showToast}){
   const [tab,setTab]=useState("generar");
   const [loading,setLoading]=useState(false);
   const [loadingMsg,setLoadingMsg]=useState("");
-  const [ventasHist,setVentasHist]=useState([]);
-  const [histLoaded,setHistLoaded]=useState(false);
   const [importando,setImportando]=useState(false);
   const [importMsg,setImportMsg]=useState("");
-  const [historialImportado,setHistorialImportado]=useState(false);
+  const [ultimoReporte,setUltimoReporte]=useState(null); // {html, semana, fecha}
   const [reportes,setReportes]=useState([]);
   const fileRef=useRef();
 
-  useEffect(()=>{
-    const rows=data.ventasHistoricas||[];
-    setVentasHist(rows);
-    setHistLoaded(true);
-    const reps=data.reportesSC||[];
-    setReportes([...reps].reverse().slice(0,10).map((r,i)=>({id:i,...r})));
-  },[data]);
+  const ventasHist=data.ventasHistoricas||[];
+  const histTiene=ventasHist.length>0;
 
-  // ── Importar Excel ────────────────────────────────────────────
+  useEffect(()=>{
+    const reps=data.reportesSC||[];
+    const lista=[...reps].reverse().slice(0,10).map((r,i)=>({id:i,...r}));
+    setReportes(lista);
+    if(lista.length>0)setUltimoReporte(lista[0]);
+  },[data.reportesSC]);
+
+  // ── Importar Excel ───────────────────────────────────────────
   const handleImport=async(e)=>{
-    const file=e.target.files[0];
-    if(!file)return;
+    const file=e.target.files[0];if(!file)return;
     setImportando(true);setImportMsg("Leyendo archivo...");
     try{
       const XLSX=window.XLSX;
       if(!XLSX)throw new Error("Librería XLSX no disponible");
       const buf=await file.arrayBuffer();
-      const wb=XLSX.read(buf,{type:"array",cellDates:true});
+      // cellDates:false para obtener seriales y convertir manualmente
+      const wb=XLSX.read(buf,{type:"array",cellDates:false});
       const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{raw:true});
-      // Convertir fecha serial de Excel a YYYY-MM-DD
-      const excelDateToStr=n=>{
-        if(!n)return null;
-        if(typeof n==="string"&&n.includes("-"))return n.substring(0,10);
-        const d=new Date(Math.round((Number(n)-25569)*86400*1000));
+      const rows=XLSX.utils.sheet_to_json(ws,{raw:true,defval:null});
+      const excelSerial=n=>{
+        if(n===null||n===undefined||n==="")return null;
+        if(typeof n==="string"&&n.match(/^\d{4}-\d{2}-\d{2}/))return n.substring(0,10);
+        const num=Number(n);
+        if(isNaN(num)||num<1000)return null; // not a date serial
+        const d=new Date(Math.round((num-25569)*86400*1000));
+        if(isNaN(d.getTime()))return null;
         return d.toISOString().split("T")[0];
       };
-      const clean=rows
-        .filter(r=>{
-          const art=r["ARTÍCULO"]||r["ARTICULO"]||r[Object.keys(r).find(k=>k.includes("RTIC"))||""];
-          return art&&String(art).trim()!=="TOTAL GENERAL"&&String(art).trim()!==""&&(r["CLIENTE"]||r["Cliente"])&&(r["TOTAL EN PESOS"]||r["Total en Pesos"]);
-        })
-        .map(r=>{
-          const artKey=Object.keys(r).find(k=>k.includes("RTIC")||k==="ARTÍCULO")||"ARTÍCULO";
-          const cliKey=Object.keys(r).find(k=>k.includes("LIENT"))||"CLIENTE";
-          const totKey=Object.keys(r).find(k=>k.includes("TOTAL")&&k.includes("PESO"))||"TOTAL EN PESOS";
-          const cantKey=Object.keys(r).find(k=>k.includes("ANTIDAD"))||"CANTIDAD";
-          const precKey=Object.keys(r).find(k=>k.includes("RECIO"))||"PRECIO VENTA";
-          const fechKey=Object.keys(r).find(k=>k.includes("ECHA"))||"FECHA";
-          return{
-            fecha:excelDateToStr(r[fechKey]),
-            articulo:String(r[artKey]||"").trim(),
-            cantidad:Number(r[cantKey]||0),
-            cliente:String(r[cliKey]||"").trim().toUpperCase(),
-            precioVenta:Number(r[precKey]||0),
-            total:Number(r[totKey]||0),
-            fuente:"excel"
-          };
-        })
-        .filter(r=>r.fecha&&r.total>0&&r.articulo);
-      if(clean.length===0)throw new Error("No se encontraron filas válidas. Verificá que el Excel tenga las columnas: FECHA, ARTÍCULO, CANTIDAD, CLIENTE, PRECIO VENTA, TOTAL EN PESOS");
-      setImportMsg("Guardando "+clean.length+" registros en Firebase...");
+      const findKey=(row,keywords)=>Object.keys(row).find(k=>keywords.some(kw=>k.toUpperCase().includes(kw)))||null;
+      const clean=[];
+      for(const row of rows){
+        const artKey=findKey(row,["RTIC","ARTIC"]);
+        const cliKey=findKey(row,["LIENT"]);
+        const totKey=findKey(row,["TOTAL","PESO"]);
+        const cantKey=findKey(row,["ANTID"]);
+        const precKey=findKey(row,["RECIO"]);
+        const fechKey=findKey(row,["ECHA"]);
+        const art=artKey?String(row[artKey]||"").trim():"";
+        const cli=cliKey?String(row[cliKey]||"").trim().toUpperCase():"";
+        const tot=totKey?Number(row[totKey]||0):0;
+        const fecha=fechKey?excelSerial(row[fechKey]):null;
+        if(!art||art==="TOTAL GENERAL"||!cli||!tot||!fecha)continue;
+        clean.push({
+          fecha,
+          articulo:art,
+          cantidad:Number(cantKey?row[cantKey]||0:0),
+          cliente:cli,
+          precioVenta:Number(precKey?row[precKey]||0:0),
+          total:tot,
+          fuente:"excel"
+        });
+      }
+      if(clean.length===0)throw new Error("No se encontraron filas válidas. Verificá las columnas: FECHA, ARTÍCULO, CANTIDAD, CLIENTE, PRECIO VENTA, TOTAL EN PESOS");
+      setImportMsg("Guardando "+clean.length+" registros...");
       await save({...data,ventasHistoricas:clean});
-      setVentasHist(clean);
-      setHistorialImportado(true);
-      setImportMsg("✓ "+clean.length+" registros importados. Ya podés generar reportes.");
+      setImportMsg("✓ "+clean.length+" registros importados correctamente.");
       showToast("✓ Histórico importado");
     }catch(err){
       setImportMsg("⚠ Error: "+err.message);
@@ -6705,28 +6706,39 @@ function ReportesView({data,save,showToast}){
     }
   };
 
-  // ── Calcular métricas ─────────────────────────────────────────
-  const calcularMetricas=()=>{
-    const todasVentas=[...ventasHist,...(data.ventas||[])];
-    const hoy=new Date();
+  // ── Calcular métricas (recibe ventasHist como param para evitar stale closure) ──
+  const calcularMetricas=(vh)=>{
+    const todasVentas=[...vh,...(data.ventas||[])];
+    const hoy=new Date("2026-06-18"); // fecha actual del sistema
 
+    const normalFecha=f=>{
+      if(!f)return null;
+      const s=String(f);
+      if(s.match(/^\d{4}-\d{2}-\d{2}/))return s.substring(0,10);
+      return null;
+    };
+
+    // Ventas por mes
     const porMes={};
     todasVentas.forEach(v=>{
-      if(!v.fecha)return;
-      const mes=String(v.fecha).substring(0,7);
+      const f=normalFecha(v.fecha);if(!f)return;
+      const mes=f.substring(0,7);
       porMes[mes]=(porMes[mes]||0)+Number(v.total||0);
     });
     const mesesOrdenados=Object.entries(porMes).sort((a,b)=>a[0].localeCompare(b[0]));
 
+    // Por cliente — con fecha normalizada
     const porCliente={};
     todasVentas.forEach(v=>{
       if(!v.cliente||!v.total)return;
       const cl=String(v.cliente).trim().toUpperCase();
-      if(!porCliente[cl])porCliente[cl]={total:0,ultimaCompra:"",fechas:[]};
+      if(!porCliente[cl])porCliente[cl]={total:0,ultima:"",fechas:[]};
       porCliente[cl].total+=Number(v.total||0);
-      const f=String(v.fecha||"");
-      if(f>porCliente[cl].ultimaCompra)porCliente[cl].ultimaCompra=f;
-      if(f)porCliente[cl].fechas.push(f);
+      const f=normalFecha(v.fecha);
+      if(f){
+        if(f>porCliente[cl].ultima)porCliente[cl].ultima=f;
+        porCliente[cl].fechas.push(f);
+      }
     });
     const topClientes=Object.entries(porCliente)
       .sort((a,b)=>b[1].total-a[1].total).slice(0,15)
@@ -6734,10 +6746,11 @@ function ReportesView({data,save,showToast}){
         const fs=[...new Set(d.fechas)].sort();
         const diffs=fs.slice(1).map((f,i)=>Math.round((new Date(f)-new Date(fs[i]))/86400000));
         const frecProm=diffs.length?Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length):null;
-        const diasSin=d.ultimaCompra?Math.round((hoy-new Date(d.ultimaCompra))/86400000):null;
-        return{nombre,total:d.total,ultimaCompra:d.ultimaCompra,frecProm,diasSin};
+        const diasSin=d.ultima?Math.round((hoy-new Date(d.ultima))/86400000):null;
+        return{nombre,total:Math.round(d.total),ultima:d.ultima,frecProm,diasSin};
       });
 
+    // Top productos
     const porProd={};
     todasVentas.forEach(v=>{
       if(!v.articulo)return;
@@ -6745,262 +6758,319 @@ function ReportesView({data,save,showToast}){
       porProd[v.articulo].total+=Number(v.total||0);
       porProd[v.articulo].cantidad+=Number(v.cantidad||0);
     });
-    const topProd=Object.entries(porProd).sort((a,b)=>b[1].total-a[1].total).slice(0,8).map(([n,d])=>({nombre:n,...d}));
+    const topProd=Object.entries(porProd).sort((a,b)=>b[1].total-a[1].total).slice(0,8)
+      .map(([n,d])=>({nombre:n,total:Math.round(d.total),cantidad:Math.round(d.cantidad)}));
 
+    // Stock actual
     const stockActual={};
     for(const c of data.contenedores||[]){
       for(const art of c.articulos||[]){
-        const vendido=(data.ventas||[]).filter(v=>v.contId===c.id&&v.articulo===art.nombre).reduce((a,v)=>a+Number(v.cantidad||0),0);
+        const vendido=(data.ventas||[]).filter(v=>v.contId===c.id&&v.articulo===art.nombre)
+          .reduce((a,v)=>a+Number(v.cantidad||0),0);
         const disp=Math.max(0,Number(art.cantidad||0)-vendido);
         if(disp>0)stockActual[art.nombre]=(stockActual[art.nombre]||0)+disp;
       }
     }
 
+    // Contenedores
     const estadoConts=(data.contenedores||[]).map(c=>{
       const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>{
         const tot=Number(v.total||0);if(!tot)return a;
-        const pag=Number(v.pago||0)+(data.pagos||[]).filter(p=>p.ventaId===v.id).reduce((x,p)=>x+Number(p.monto||0),0);
+        const pag=Number(v.pago||0)+(data.pagos||[]).filter(p=>p.ventaId===v.id)
+          .reduce((x,p)=>x+Number(p.monto||0),0);
         return a+Number(v.usd||0)*Math.min(1,pag/tot);
       },0);
       const costo=c.costoTotal||0;
-      return{nombre:c.nombre,cobUSD:Math.round(cobUSD),costo,pct:costo>0?Math.round(cobUSD/costo*100):null,enGanancia:costo>0&&cobUSD>=costo};
+      return{nombre:c.nombre,cobUSD:Math.round(cobUSD),costo,
+        pct:costo>0?Math.round(cobUSD/costo*100):null,
+        enGanancia:costo>0&&cobUSD>=costo};
     });
 
-    const totalHistorico=todasVentas.reduce((a,v)=>a+Number(v.total||0),0);
-    const fecha30=new Date(hoy);fecha30.setDate(fecha30.getDate()-30);
-    const u30str=fecha30.toISOString().split("T")[0];
-    const ventasU30=todasVentas.filter(v=>v.fecha&&String(v.fecha)>=u30str).reduce((a,v)=>a+Number(v.total||0),0);
-    const fecha60=new Date(hoy);fecha60.setDate(fecha60.getDate()-60);
-    const u60str=fecha60.toISOString().split("T")[0];
-    const ventasU60=todasVentas.filter(v=>v.fecha&&String(v.fecha)>=u60str&&String(v.fecha)<u30str).reduce((a,v)=>a+Number(v.total||0),0);
-    const tendenciaPct=ventasU60>0?Math.round((ventasU30-ventasU60)/ventasU60*100):0;
+    // Períodos para tendencia
+    const f30=new Date(hoy);f30.setDate(f30.getDate()-30);
+    const f60=new Date(hoy);f60.setDate(f60.getDate()-60);
+    const s30=f30.toISOString().split("T")[0];
+    const s60=f60.toISOString().split("T")[0];
+    const hoyStr=hoy.toISOString().split("T")[0];
+    const u30=todasVentas.filter(v=>{const f=normalFecha(v.fecha);return f&&f>=s30&&f<=hoyStr;})
+      .reduce((a,v)=>a+Number(v.total||0),0);
+    const u30_60=todasVentas.filter(v=>{const f=normalFecha(v.fecha);return f&&f>=s60&&f<s30;})
+      .reduce((a,v)=>a+Number(v.total||0),0);
+    const tendPct=u30_60>0?Math.round((u30-u30_60)/u30_60*100):0;
+    const totalHist=todasVentas.reduce((a,v)=>a+Number(v.total||0),0);
 
-    return{mesesOrdenados,topClientes,topProd,stockActual,estadoConts,totalHistorico,ventasU30,tendenciaPct,totalRegistros:todasVentas.length,ventasHistLen:ventasHist.length};
+    // Clientes dormidos (>45 días, >$1M)
+    const dormidos=topClientes
+      .filter(c=>c.diasSin!==null&&c.diasSin>45&&c.total>1000000)
+      .sort((a,b)=>b.total-a.total).slice(0,6);
+
+    return{mesesOrdenados,topClientes,topProd,stockActual,estadoConts,
+      totalHist:Math.round(totalHist),u30:Math.round(u30),tendPct,
+      totalRegistros:todasVentas.length,ventasHistLen:vh.length,dormidos,
+      hoyStr};
   };
 
-  // ── Construir HTML del PDF (fiel al mockup aprobado) ─────────
-  const construirPDF=(a,m)=>{
+  // ── Construir PDF fiel al mockup aprobado ─────────────────────
+  const construirPDF=(textos,m)=>{
     const fmt2=n=>Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
     const hoy=new Date().toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric"});
     const PAPEL=["30GR 1,60 X 600","35GR 1,60 X 500","42GR 1,60 X 300","61GR 1,60 X 300","52GR 1,10 X 100","80GR 1,60 X 300","80GR 1,10 X 100"];
-    const CMYK_=["NEGRO","CYAN","MAGENTA","AMARILLO"];
-    const PRO_=["NEGRO PRO","CYAN PRO","MAGENTA PRO","AMARILLO PRO"];
-    const tCol={NEGRO:"#555",CYAN:"#2E86C1",MAGENTA:"#C2185B",AMARILLO:"#9A7700","NEGRO PRO":"#3a3a5c","CYAN PRO":"#1565C0","MAGENTA PRO":"#880E4F","AMARILLO PRO":"#6D4C00"};
-    const spapel=Object.entries(m.stockActual).filter(([n])=>PAPEL.includes(n));
-    const scmyk=Object.entries(m.stockActual).filter(([n])=>CMYK_.includes(n));
-    const spro=Object.entries(m.stockActual).filter(([n])=>PRO_.includes(n));
-    const totalPapelStock=spapel.reduce((s,[,v])=>s+v,0)||1;
-    const tPct=a.kpis&&typeof a.kpis.tendenciaPct==="number"?a.kpis.tendenciaPct:m.tendenciaPct;
+    const CMYK=["NEGRO","CYAN","MAGENTA","AMARILLO"];
+    const PRO=["NEGRO PRO","CYAN PRO","MAGENTA PRO","AMARILLO PRO"];
+    const tCol={NEGRO:"#555",CYAN:"#2E86C1",MAGENTA:"#C2185B",AMARILLO:"#9A7700",
+      "NEGRO PRO":"#3a3a5c","CYAN PRO":"#1565C0","MAGENTA PRO":"#880E4F","AMARILLO PRO":"#6D4C00"};
+    const sPapel=Object.entries(m.stockActual).filter(([n])=>PAPEL.includes(n));
+    const sCMYK=Object.entries(m.stockActual).filter(([n])=>CMYK.includes(n));
+    const sPRO=Object.entries(m.stockActual).filter(([n])=>PRO.includes(n));
+    const totPapel=sPapel.reduce((s,[,v])=>s+v,0)||1;
 
-    const accCard=(ac,tagBg,tagColor,tagLabel)=>
+    const secLabel=(txt,col)=>"<div style='font-size:9px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:"+(col||"#9ca3af")+";display:flex;align-items:center;gap:10px;margin-bottom:16px'><span>"+txt+"</span><span style='flex:1;height:1px;background:"+(col||"#e9ecef")+";display:inline-block;opacity:.35;margin-left:4px'></span></div>";
+
+    const accCard=(ac,tagBg,tagCol,tagTxt)=>
       "<div style='display:flex;gap:14px;align-items:flex-start;background:#fff;border:1px solid #e9ecef;border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.05)'>"
       +"<div style='font-size:22px;line-height:1.1;flex-shrink:0'>"+(ac.icono||"▸")+"</div>"
-      +"<div style='flex:1'>"
-      +"<div style='display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px'>"
+      +"<div style='flex:1'><div style='display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px'>"
       +"<div style='font-size:12.5px;font-weight:700;color:#1a1a2e;line-height:1.3'>"+(ac.titulo||"")+"</div>"
-      +"<span style='flex-shrink:0;font-size:9px;font-weight:800;padding:3px 10px;border-radius:20px;letter-spacing:.8px;background:"+tagBg+";color:"+tagColor+";border:1px solid "+tagColor+"33'>"+tagLabel+"</span>"
-      +"</div>"
-      +"<div style='font-size:11.5px;color:#4b5563;line-height:1.65'>"+(ac.detalle||"")+"</div>"
-      +"</div></div>";
+      +"<span style='flex-shrink:0;font-size:9px;font-weight:800;padding:3px 10px;border-radius:20px;letter-spacing:.8px;background:"+tagBg+";color:"+tagCol+";border:1px solid "+tagCol+"33'>"+tagTxt+"</span>"
+      +"</div><div style='font-size:11.5px;color:#4b5563;line-height:1.65'>"+(ac.detalle||"")+"</div></div></div>";
 
-    const papelCards=spapel.map(([n,c])=>{
-      const pct=Math.round(c/totalPapelStock*100);
+    const papelCards=sPapel.map(([n,c])=>{
+      const pct=Math.round(c/totPapel*100);
       const al=c<15?"low":c<40?"mid":"ok";
       const col=al==="low"?"#c0392b":al==="mid"?"#b25000":"#1a7f3c";
       const bg=al==="low"?"#fdf2f2":al==="mid"?"#fff8f0":"#f0faf4";
-      return "<div style='background:"+bg+";border:1px solid "+col+"22;border-radius:12px;padding:15px 16px'>"
-        +"<div style='font-size:10px;font-weight:600;color:#6b7280;letter-spacing:.03em;margin-bottom:5px'>"+n+"</div>"
-        +"<div style='font-size:30px;font-weight:800;color:"+col+";line-height:1;letter-spacing:-.02em'>"+fmt2(c)+"<span style='font-size:13px;font-weight:400;color:#9ca3af;margin-left:3px'>u.</span></div>"
-        +"<div style='height:4px;background:#e5e7eb;border-radius:4px;margin-top:10px;overflow:hidden'><div style='width:"+Math.min(100,pct)+"%%;height:100%%;background:"+col+";border-radius:4px;opacity:.75'></div></div>"
-        +"<div style='font-size:9px;font-weight:700;color:"+col+";margin-top:6px'>"+(al==="low"?"⚠ BAJO":al==="mid"?"● Medio":"● OK")+"</div>"
-        +"</div>";
+      return "<div style='background:"+bg+";border:1px solid "+col+"20;border-radius:12px;padding:14px 16px'>"
+        +"<div style='font-size:10px;font-weight:600;color:#6b7280;margin-bottom:4px'>"+n+"</div>"
+        +"<div style='font-size:28px;font-weight:800;color:"+col+";line-height:1;letter-spacing:-.02em'>"+fmt2(c)+"<span style='font-size:12px;font-weight:400;color:#9ca3af;margin-left:3px'>u.</span></div>"
+        +"<div style='height:4px;background:#e5e7eb;border-radius:4px;margin-top:10px;overflow:hidden'><div style='width:"+Math.min(100,pct)+"%%;height:100%%;background:"+col+";border-radius:4px;opacity:.7'></div></div>"
+        +"<div style='font-size:9px;font-weight:700;color:"+col+";margin-top:6px'>"+(al==="low"?"⚠ BAJO":al==="mid"?"● Medio":"● OK")+"</div></div>";
     }).join("");
 
-    const tCard=([n,c])=>{
-      const col=tCol[n]||"#333";const nm=n.replace(" PRO","");
-      return "<div style='background:"+col+"10;border:1px solid "+col+"28;border-radius:12px;padding:14px 16px'>"
+    const tCard=([n,c])=>{const col=tCol[n]||"#333";const nm=n.replace(" PRO","");
+      return "<div style='background:"+col+"0f;border:1px solid "+col+"25;border-radius:12px;padding:14px 16px'>"
         +"<div style='font-size:10px;font-weight:800;color:"+col+";text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px'>"+nm+"</div>"
-        +"<div style='font-size:28px;font-weight:800;color:"+col+";line-height:1;letter-spacing:-.02em'>"+fmt2(c)+"<span style='font-size:11px;font-weight:400;opacity:.6;margin-left:3px'>u.</span></div>"
-        +"<div style='height:3px;background:#e5e7eb;border-radius:3px;margin-top:9px;overflow:hidden'><div style='width:"+Math.min(100,c*3)+"%%;height:100%%;background:"+col+";border-radius:3px;opacity:.55'></div></div>"
-        +"</div>";
+        +"<div style='font-size:26px;font-weight:800;color:"+col+";line-height:1;letter-spacing:-.02em'>"+fmt2(c)+"<span style='font-size:10px;font-weight:400;opacity:.6;margin-left:3px'>u.</span></div>"
+        +"<div style='height:3px;background:#e5e7eb;border-radius:3px;margin-top:9px;overflow:hidden'><div style='width:"+Math.min(100,c*3)+"%%;height:100%%;background:"+col+";border-radius:3px;opacity:.5'></div></div></div>";
     };
 
-    const dormidos=(a.clientesDormidos||[]).map(c=>
-      "<tr>"
-      +"<td style='padding:10px 12px;font-weight:700;color:#1a1a2e;font-size:11.5px'>"+(c.nombre||"")+"</td>"
-      +"<td style='padding:10px 12px;font-size:11.5px;color:#c0392b;font-weight:700'>"+(c.diasInactivo||"?")+" días</td>"
-      +"<td style='padding:10px 12px;font-size:11px;color:#6b7280'>"+(c.ultimaCompra||"")+"</td>"
-      +"<td style='padding:10px 12px;font-size:11.5px;font-weight:700;color:#1a7f3c'>$"+fmt2(c.historialTotal||0)+"</td>"
-      +"<td style='padding:10px 12px;font-size:11px;color:#4b5563'>"+(c.producto||"")+"</td>"
-      +"<td style='padding:10px 12px;font-size:11px;color:#1a5fa5'>"+(c.accion||"")+"</td>"
+    const maxMes=Math.max(...m.mesesOrdenados.slice(-12).map(x=>x[1]),1);
+    const mesesRows=m.mesesOrdenados.slice(-12).reverse().map(([mes,total])=>{
+      const pct=Math.round(total/maxMes*100);
+      return "<tr><td style='padding:8px 12px;font-size:11.5px;color:#4b5563;font-weight:500'>"+mes+"</td>"
+        +"<td style='padding:8px 12px;font-size:12px;font-weight:700;color:#1a1a2e;white-space:nowrap'>$"+fmt2(total)+"</td>"
+        +"<td style='padding:8px 12px;width:45%%'><div style='height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden'><div style='width:"+pct+"%%;height:100%%;background:linear-gradient(90deg,#F47920,#e8640a);border-radius:4px'></div></div></td></tr>";
+    }).join("");
+
+    // Top 5 clientes bar chart
+    const maxCli=m.topClientes[0]?m.topClientes[0].total:1;
+    const cliRows=m.topClientes.slice(0,5).map((c,i)=>{
+      const pct=Math.round(c.total/maxCli*100);
+      const colors=["#F47920","#5BAD41","#2E86C1","#8b5cf6","#e11d48"];
+      return "<div style='display:flex;align-items:center;gap:12px;margin-bottom:10px'>"
+        +"<div style='width:22px;height:22px;border-radius:6px;background:"+colors[i]+"1a;color:"+colors[i]+";font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0'>"+(i+1)+"</div>"
+        +"<div style='flex:1;min-width:0'>"
+        +"<div style='font-size:11.5px;font-weight:600;color:#1a1a2e;margin-bottom:3px'>"+c.nombre+"</div>"
+        +"<div style='height:6px;background:#f3f4f6;border-radius:4px;overflow:hidden'><div style='width:"+pct+"%%;height:100%%;background:"+colors[i]+";border-radius:4px'></div></div>"
+        +"</div>"
+        +"<div style='text-align:right;flex-shrink:0'>"
+        +"<div style='font-size:11.5px;font-weight:700;color:#1a1a2e'>$"+fmt2(c.total)+"</div>"
+        +"<div style='font-size:9px;color:#9ca3af;margin-top:1px'>última: "+c.ultima+" ("+c.diasSin+"d)</div>"
+        +"</div></div>";
+    }).join("");
+
+    const dormidosRows=m.dormidos.map(c=>
+      "<tr><td style='padding:9px 12px;font-weight:700;color:#1a1a2e;font-size:11.5px'>"+c.nombre+"</td>"
+      +"<td style='padding:9px 12px;font-size:11.5px;color:#c0392b;font-weight:700'>"+c.diasSin+" días</td>"
+      +"<td style='padding:9px 12px;font-size:11px;color:#6b7280'>"+c.ultima+"</td>"
+      +"<td style='padding:9px 12px;font-size:11.5px;font-weight:700;color:#1a7f3c'>$"+fmt2(c.total)+"</td>"
+      +"<td style='padding:9px 12px;font-size:11px;color:#4b5563'>"+(textos.accionDormidos&&textos.accionDormidos[c.nombre]||"Contactar")+"</td>"
       +"</tr>"
     ).join("");
 
-    const maxMes=Math.max(...m.mesesOrdenados.slice(-12).map(x=>x[1]),1);
-    const meses=m.mesesOrdenados.slice(-12).reverse().map(([mes,total])=>{
-      const pct=Math.round(total/maxMes*100);
-      return "<tr>"
-        +"<td style='padding:8px 12px;font-size:11.5px;color:#4b5563;font-weight:500'>"+mes+"</td>"
-        +"<td style='padding:8px 12px;font-size:12px;font-weight:700;color:#1a1a2e;white-space:nowrap'>$"+fmt2(total)+"</td>"
-        +"<td style='padding:8px 12px;width:45%%'><div style='height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden'><div style='width:"+pct+"%%;height:100%%;background:linear-gradient(90deg,#F47920,#e8640a);border-radius:4px'></div></div></td>"
-        +"</tr>";
-    }).join("");
-
-    const secLabel=(txt,col)=>"<div style='font-size:9px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:"+(col||"#9ca3af")+";display:flex;align-items:center;gap:10px;margin-bottom:16px'><span>"+txt+"</span><span style='flex:1;height:1px;background:"+(col||"#e9ecef")+"33;display:block'></span></div>";
+    const tPct=m.tendPct;
 
     return "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
-      +"<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,'Segoe UI',sans-serif;background:#f5f5f7;color:#1a1a2e;-webkit-print-color-adjust:exact;print-color-adjust:exact}@media print{body{background:#fff}@page{margin:14mm size:A4}}.page{max-width:860px;margin:24px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 48px rgba(0,0,0,.12)}@media print{.page{margin:0;border-radius:0;box-shadow:none}}table{width:100%%;border-collapse:collapse}th{font-size:9px;font-weight:700;color:#9ca3af;letter-spacing:.1em;text-transform:uppercase;padding:8px 12px;border-bottom:1.5px solid #f3f4f6;text-align:left;background:#fafafa}tr:nth-child(even) td{background:#fafafa}td{color:#374151}</style>"
-      +"</head><body><div class='page'>"
+    +"<style>*{margin:0;padding:0;box-sizing:border-box}"
+    +"body{font-family:-apple-system,'Segoe UI',sans-serif;background:#f5f5f7;color:#1a1a2e;-webkit-print-color-adjust:exact;print-color-adjust:exact}"
+    +"@media print{body{background:#fff}@page{margin:14mm size:A4}.page{margin:0;border-radius:0;box-shadow:none}}"
+    +".page{max-width:860px;margin:24px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 48px rgba(0,0,0,.12)}"
+    +"table{width:100%%;border-collapse:collapse}th{font-size:9px;font-weight:700;color:#9ca3af;letter-spacing:.1em;text-transform:uppercase;padding:8px 12px;border-bottom:1.5px solid #f3f4f6;text-align:left;background:#fafafa}"
+    +"tr:nth-child(even) td{background:#fafafa}td{color:#374151}"
+    +"</style></head><body><div class='page'>"
 
-      // HEADER
-      +"<div style='background:linear-gradient(135deg,#1a1a2e 0%%,#16213e 100%%;padding:32px 40px 28px;display:flex;justify-content:space-between;align-items:center'>"
-      +"<div><div style='font-size:10px;font-weight:800;letter-spacing:.25em;color:#F47920;text-transform:uppercase;margin-bottom:7px'>Super Coating · Sistema Eliel</div>"
-      +"<div style='font-size:28px;font-weight:800;color:#fff;letter-spacing:-.04em'>Reporte <span style=\"color:#F47920\">Semanal</span></div>"
-      +"<div style='font-size:11.5px;color:#6b7280;margin-top:5px'>"+(a.semana||"")+" · "+fmt2(m.totalRegistros)+" registros analizados</div></div>"
-      +"<div style='background:rgba(244,121,32,.15);border:1.5px solid rgba(244,121,32,.35);border-radius:12px;padding:12px 20px;text-align:right'>"
-      +"<div style='font-size:9px;font-weight:800;color:#F47920;letter-spacing:.15em;text-transform:uppercase'>GENERADO</div>"
-      +"<div style='font-size:13px;color:#fff;margin-top:4px;font-weight:600'>"+hoy+"</div></div>"
-      +"</div>"
+    // HEADER
+    +"<div style='background:linear-gradient(135deg,#1a1a2e 0%%,#16213e 100%%);padding:32px 40px 28px;display:flex;justify-content:space-between;align-items:center'>"
+    +"<div><div style='font-size:10px;font-weight:800;letter-spacing:.25em;color:#F47920;text-transform:uppercase;margin-bottom:7px'>Super Coating · Sistema Eliel</div>"
+    +"<div style='font-size:28px;font-weight:800;color:#fff;letter-spacing:-.04em'>Reporte <span style=\"color:#F47920\">Semanal</span></div>"
+    +"<div style='font-size:11.5px;color:#6b7280;margin-top:5px'>"+textos.semana+" · "+fmt2(m.totalRegistros)+" registros analizados</div></div>"
+    +"<div style='background:rgba(244,121,32,.15);border:1.5px solid rgba(244,121,32,.35);border-radius:12px;padding:12px 20px;text-align:right'>"
+    +"<div style='font-size:9px;font-weight:800;color:#F47920;letter-spacing:.15em;text-transform:uppercase'>GENERADO</div>"
+    +"<div style='font-size:13px;color:#fff;margin-top:4px;font-weight:600'>"+hoy+"</div></div></div>"
 
-      // KPIs
-      +"<div style='display:grid;grid-template-columns:repeat(4,1fr);background:#f3f4f6;gap:1px;border-bottom:1px solid #e9ecef'>"
-      +"<div style='background:#fff;padding:20px 22px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#F47920,#fbbf24)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.12em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Ventas últimos 30 días</div><div style='font-size:19px;font-weight:800;color:#1a1a2e;letter-spacing:-.02em'>$"+fmt2(m.ventasU30)+"</div><div style='font-size:10.5px;color:"+(tPct>=0?"#1a7f3c":"#c0392b")+";margin-top:4px;font-weight:600'>"+(tPct>=0?"▲":"▼")+" "+Math.abs(tPct)+"% vs período ant.</div></div>"
-      +"<div style='background:#fff;padding:20px 22px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#10b981,#34d399)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.12em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Facturación histórica</div><div style='font-size:19px;font-weight:800;color:#1a1a2e;letter-spacing:-.02em'>$"+fmt2(m.totalHistorico)+"</div><div style='font-size:10.5px;color:#6b7280;margin-top:4px'>"+fmt2(m.totalRegistros)+" operaciones totales</div></div>"
-      +"<div style='background:#fff;padding:20px 22px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#8b5cf6,#a78bfa)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.12em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Cliente #1</div><div style='font-size:14px;font-weight:800;color:#1a1a2e;letter-spacing:-.01em'>"+(m.topClientes[0]?m.topClientes[0].nombre:"—")+"</div><div style='font-size:10.5px;color:#6b7280;margin-top:4px'>$"+fmt2(m.topClientes[0]?m.topClientes[0].total:0)+" histórico</div></div>"
-      +"<div style='background:#fff;padding:20px 22px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2E86C1,#5b9bd5)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.12em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Contenedores activos</div><div style='font-size:19px;font-weight:800;color:#1a1a2e'>"+m.estadoConts.length+"</div><div style='font-size:10.5px;color:#1a7f3c;margin-top:4px'>"+m.estadoConts.filter(c=>c.enGanancia).length+" en ganancia</div></div>"
-      +"</div>"
+    // KPIs
+    +"<div style='display:grid;grid-template-columns:repeat(4,1fr);background:#f3f4f6;gap:1px;border-bottom:1px solid #e9ecef'>"
+    +"<div style='background:#fff;padding:20px 22px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#F47920,#fbbf24)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.12em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Ventas últimos 30 días</div><div style='font-size:19px;font-weight:800;color:#1a1a2e;letter-spacing:-.02em'>$"+fmt2(m.u30)+"</div><div style='font-size:10.5px;color:"+(tPct>=0?"#1a7f3c":"#c0392b")+";margin-top:4px;font-weight:600'>"+(tPct>=0?"▲":"▼")+" "+Math.abs(tPct)+"% vs mes ant.</div></div>"
+    +"<div style='background:#fff;padding:20px 22px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#10b981,#34d399)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.12em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Facturación histórica</div><div style='font-size:19px;font-weight:800;color:#1a1a2e;letter-spacing:-.02em'>$"+fmt2(m.totalHist)+"</div><div style='font-size:10.5px;color:#6b7280;margin-top:4px'>"+fmt2(m.totalRegistros)+" operaciones totales</div></div>"
+    +"<div style='background:#fff;padding:20px 22px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#8b5cf6,#a78bfa)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.12em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Cliente #1</div><div style='font-size:14px;font-weight:800;color:#1a1a2e;letter-spacing:-.01em'>"+(m.topClientes[0]?m.topClientes[0].nombre:"—")+"</div><div style='font-size:10.5px;color:#6b7280;margin-top:4px'>$"+fmt2(m.topClientes[0]?m.topClientes[0].total:0)+" histórico</div></div>"
+    +"<div style='background:#fff;padding:20px 22px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2E86C1,#5b9bd5)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.12em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Contenedores activos</div><div style='font-size:19px;font-weight:800;color:#1a1a2e'>"+m.estadoConts.length+"</div><div style='font-size:10.5px;color:#1a7f3c;margin-top:4px'>"+m.estadoConts.filter(c=>c.enGanancia).length+" en ganancia</div></div>"
+    +"</div>"
 
-      // BODY
-      +"<div style='padding:32px 40px'>"
+    +"<div style='padding:32px 40px'>"
 
-      // STOCK
-      +"<div style='margin-bottom:32px'>"
-      +secLabel("Stock disponible · Snapshot")
-      +(spapel.length>0?"<div style='font-size:10px;font-weight:700;color:#4b5563;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px'>📄 Papel</div><div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:18px'>"+papelCards+"</div>":"")
-      +((scmyk.length>0||spro.length>0)?"<div style='display:grid;grid-template-columns:1fr 1fr;gap:16px'>"
-        +(scmyk.length>0?"<div><div style='font-size:10px;font-weight:700;color:#2E86C1;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px'>🖨 Tinta CMYK</div><div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>"+scmyk.map(tCard).join("")+"</div></div>":"")
-        +(spro.length>0?"<div><div style='font-size:10px;font-weight:700;color:#9A7700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px'>✦ Tinta CMYK PRO</div><div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>"+spro.map(tCard).join("")+"</div></div>":"")
+    // STOCK
+    +"<div style='margin-bottom:32px'>"+secLabel("Stock disponible · Snapshot")
+    +(sPapel.length>0?"<div style='font-size:10px;font-weight:700;color:#4b5563;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px'>📄 Papel</div><div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:18px'>"+papelCards+"</div>":"")
+    +((sCMYK.length>0||sPRO.length>0)
+      ?"<div style='display:grid;grid-template-columns:1fr 1fr;gap:16px'>"
+        +(sCMYK.length>0?"<div><div style='font-size:10px;font-weight:700;color:#2E86C1;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px'>🖨 Tinta CMYK</div><div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>"+sCMYK.map(tCard).join("")+"</div></div>":"")
+        +(sPRO.length>0?"<div><div style='font-size:10px;font-weight:700;color:#9A7700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px'>✦ Tinta CMYK PRO</div><div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>"+sPRO.map(tCard).join("")+"</div></div>":"")
         +"</div>":"")
-      +"</div>"
+    +"</div>"
 
-      // DIAGNÓSTICO
-      +"<div style='margin-bottom:32px'>"
-      +secLabel("Diagnóstico de la semana")
-      +"<div style='background:#fafafa;border:1px solid #f3f4f6;border-left:4px solid #F47920;border-radius:0 12px 12px 0;padding:16px 20px;font-size:12.5px;color:#374151;line-height:1.8'>"+(a.diagnostico||"")+"</div>"
-      +"</div>"
+    // DIAGNÓSTICO
+    +"<div style='margin-bottom:32px'>"+secLabel("Diagnóstico de la semana")
+    +"<div style='background:#fafafa;border:1px solid #f3f4f6;border-left:4px solid #F47920;border-radius:0 12px 12px 0;padding:16px 20px;font-size:12.5px;color:#374151;line-height:1.8'>"+textos.diagnostico+"</div></div>"
 
-      // ACCIONES INMEDIATAS
-      +"<div style='margin-bottom:28px'>"
-      +secLabel("Acciones inmediatas","#c0392b")
-      +(a.accionesInmediatas||[]).map(ac=>accCard(ac,"#fdf2f2","#c0392b","HOY")).join("")
-      +"</div>"
+    // TOP PRODUCTOS + TOP CLIENTES (2 columnas como en el mockup)
+    +"<div style='display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px'>"
+    // Productos
+    +"<div>"+secLabel("Top productos")
+    +m.topProd.slice(0,5).map((p,i)=>{
+      const maxP=m.topProd[0].total;const pct=Math.round(p.total/maxP*100);
+      const ranks=["#F47920","#9ca3af","#cd7c32","#6b7280","#6b7280"];
+      return "<div style='display:flex;align-items:center;gap:10px;margin-bottom:9px'>"
+        +"<div style='width:20px;height:20px;border-radius:5px;background:"+ranks[i]+"1a;color:"+ranks[i]+";font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0'>"+(i+1)+"</div>"
+        +"<div style='flex:1;min-width:0'><div style='font-size:11px;font-weight:600;color:#1a1a2e;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>"+p.nombre+"</div>"
+        +"<div style='height:5px;background:#f3f4f6;border-radius:3px;overflow:hidden'><div style='width:"+pct+"%%;height:100%%;background:"+ranks[i]+";border-radius:3px'></div></div></div>"
+        +"<div style='font-size:11px;font-weight:700;color:#1a1a2e;flex-shrink:0'>$"+fmt2(p.total)+"</div></div>";
+    }).join("")+"</div>"
+    // Clientes
+    +"<div>"+secLabel("Top clientes")+cliRows+"</div>"
+    +"</div>"
 
-      // ACCIONES SEMANA
-      +"<div style='margin-bottom:28px'>"
-      +secLabel("Esta semana","#b25000")
-      +(a.accionesSemana||[]).map(ac=>accCard(ac,"#fff8f0","#b25000","ESTA SEMANA")).join("")
-      +"</div>"
+    // ACCIONES INMEDIATAS
+    +"<div style='margin-bottom:28px'>"+secLabel("Acciones inmediatas","#c0392b")
+    +(textos.accionesInmediatas||[]).map(ac=>accCard(ac,"#fdf2f2","#c0392b","HOY")).join("")+"</div>"
 
-      // ACCIONES MES
-      +((a.accionesMes||[]).length>0
-        ?"<div style='margin-bottom:28px'>"+secLabel("Este mes","#1a5fa5")+(a.accionesMes||[]).map(ac=>accCard(ac,"#eff6ff","#1a5fa5","ESTE MES")).join("")+"</div>"
-        :"")
+    // ACCIONES SEMANA
+    +"<div style='margin-bottom:28px'>"+secLabel("Esta semana","#b25000")
+    +(textos.accionesSemana||[]).map(ac=>accCard(ac,"#fff8f0","#b25000","ESTA SEMANA")).join("")+"</div>"
 
-      // CLIENTES DORMIDOS
-      +(dormidos
-        ?"<div style='margin-bottom:32px'>"+secLabel("Clientes dormidos · Oportunidad de reactivación")
+    // ACCIONES MES
+    +((textos.accionesMes||[]).length>0
+      ?"<div style='margin-bottom:28px'>"+secLabel("Este mes","#1a5fa5")
+        +(textos.accionesMes||[]).map(ac=>accCard(ac,"#eff6ff","#1a5fa5","ESTE MES")).join("")+"</div>"
+      :"")
+
+    // CLIENTES DORMIDOS
+    +(m.dormidos.length>0
+      ?"<div style='margin-bottom:32px'>"+secLabel("Clientes dormidos · Oportunidad de reactivación")
         +"<div style='border:1px solid #e9ecef;border-radius:12px;overflow:hidden'>"
-        +"<table><thead><tr><th>Cliente</th><th>Sin comprar</th><th>Última compra</th><th>Historial</th><th>Producto</th><th>Acción sugerida</th></tr></thead>"
-        +"<tbody>"+dormidos+"</tbody></table></div></div>"
-        :"")
+        +"<table><thead><tr><th>Cliente</th><th>Sin comprar</th><th>Última compra</th><th>Historial</th><th>Acción sugerida</th></tr></thead>"
+        +"<tbody>"+dormidosRows+"</tbody></table></div></div>"
+      :"")
 
-      // EVOLUCIÓN MENSUAL
-      +"<div style='margin-bottom:32px'>"
-      +secLabel("Evolución mensual · Últimos 12 meses")
-      +"<div style='border:1px solid #e9ecef;border-radius:12px;overflow:hidden'>"
-      +"<table><thead><tr><th>Mes</th><th>Ventas</th><th>Proporción vs mejor mes</th></tr></thead><tbody>"+meses+"</tbody></table></div>"
-      +"</div>"
+    // EVOLUCIÓN MENSUAL
+    +"<div style='margin-bottom:32px'>"+secLabel("Evolución mensual · Últimos 12 meses")
+    +"<div style='border:1px solid #e9ecef;border-radius:12px;overflow:hidden'>"
+    +"<table><thead><tr><th>Mes</th><th>Ventas</th><th>Proporción vs mejor mes</th></tr></thead>"
+    +"<tbody>"+mesesRows+"</tbody></table></div></div>"
 
-      // PROYECCIONES
-      +"<div style='margin-bottom:32px'>"
-      +secLabel("Proyecciones")
-      +"<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px'>"
-      +"<div style='background:#f0faf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px;text-align:center'><div style='font-size:9px;font-weight:800;color:#9ca3af;letter-spacing:.15em;text-transform:uppercase;margin-bottom:9px'>Mes actual</div><div style='font-size:16px;font-weight:800;color:#1a7f3c;line-height:1.2'>"+(a.proyecciones?a.proyecciones.mesActual:"—")+"</div></div>"
-      +"<div style='background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:18px;text-align:center'><div style='font-size:9px;font-weight:800;color:#9ca3af;letter-spacing:.15em;text-transform:uppercase;margin-bottom:9px'>Mes siguiente</div><div style='font-size:16px;font-weight:800;color:#1a5fa5;line-height:1.2'>"+(a.proyecciones?a.proyecciones.mesSiguiente:"—")+"</div></div>"
-      +"<div style='background:#fff8f0;border:1px solid #fed7aa;border-radius:12px;padding:18px;text-align:center'><div style='font-size:9px;font-weight:800;color:#9ca3af;letter-spacing:.15em;text-transform:uppercase;margin-bottom:9px'>Riesgo principal</div><div style='font-size:11px;font-weight:600;color:#b25000;line-height:1.5'>"+(a.proyecciones?a.proyecciones.riesgo:"—")+"</div></div>"
-      +"</div></div>"
+    // PROYECCIONES
+    +"<div style='margin-bottom:32px'>"+secLabel("Proyecciones")
+    +"<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px'>"
+    +"<div style='background:#f0faf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px;text-align:center'><div style='font-size:9px;font-weight:800;color:#9ca3af;letter-spacing:.15em;text-transform:uppercase;margin-bottom:9px'>Mes actual</div><div style='font-size:16px;font-weight:800;color:#1a7f3c;line-height:1.2'>"+textos.proyMesActual+"</div></div>"
+    +"<div style='background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:18px;text-align:center'><div style='font-size:9px;font-weight:800;color:#9ca3af;letter-spacing:.15em;text-transform:uppercase;margin-bottom:9px'>Mes siguiente</div><div style='font-size:16px;font-weight:800;color:#1a5fa5;line-height:1.2'>"+textos.proyMesSig+"</div></div>"
+    +"<div style='background:#fff8f0;border:1px solid #fed7aa;border-radius:12px;padding:18px;text-align:center'><div style='font-size:9px;font-weight:800;color:#9ca3af;letter-spacing:.15em;text-transform:uppercase;margin-bottom:9px'>Riesgo principal</div><div style='font-size:11px;font-weight:600;color:#b25000;line-height:1.5'>"+textos.riesgo+"</div></div>"
+    +"</div></div>"
 
-      // INSIGHT ESTRATÉGICO
-      +"<div style='margin-bottom:8px'>"
-      +secLabel("Insight estratégico","#8b5cf6")
-      +"<div style='background:linear-gradient(135deg,rgba(139,92,246,.05) 0%%,rgba(244,121,32,.04) 100%%);border:1px solid #e9d5ff;border-radius:12px;padding:18px 20px;font-size:12.5px;color:#374151;line-height:1.8'>"+(a.insightEstrategico||"")+"</div>"
-      +"</div>"
+    // INSIGHT ESTRATÉGICO
+    +"<div style='margin-bottom:8px'>"+secLabel("Insight estratégico","#8b5cf6")
+    +"<div style='background:linear-gradient(135deg,rgba(139,92,246,.05),rgba(244,121,32,.04));border:1px solid #e9d5ff;border-radius:12px;padding:18px 20px;font-size:12.5px;color:#374151;line-height:1.8'>"+textos.insight+"</div></div>"
 
-      +"</div>"
-
-      // FOOTER
-      +"<div style='border-top:1px solid #f3f4f6;padding:16px 40px;display:flex;justify-content:space-between;align-items:center;background:#fafafa'>"
-      +"<div style='font-size:10px;color:#9ca3af'><strong style=\"color:#6b7280\">Sistema Eliel</strong> · Super Coating · Análisis IA por Claude Sonnet</div>"
-      +"<div style='font-size:10px;color:#9ca3af'>"+hoy+"</div>"
-      +"</div>"
-      +"</div></body></html>";
+    +"</div>"
+    +"<div style='border-top:1px solid #f3f4f6;padding:16px 40px;display:flex;justify-content:space-between;align-items:center;background:#fafafa'>"
+    +"<div style='font-size:10px;color:#9ca3af'><strong style=\"color:#6b7280\">Sistema Eliel</strong> · Super Coating · Análisis IA por Claude Sonnet</div>"
+    +"<div style='font-size:10px;color:#9ca3af'>"+hoy+"</div></div>"
+    +"</div></body></html>";
   };
 
   // ── Generar reporte ───────────────────────────────────────────
   const generarReporte=async()=>{
-    if(ventasHist.length===0&&(data.ventas||[]).length===0){
+    const vh=data.ventasHistoricas||[];
+    if(vh.length===0&&(data.ventas||[]).length===0){
       showToast("⚠ No hay datos. Importá el Excel primero.");return;
     }
     setLoading(true);setLoadingMsg("Calculando métricas...");
     try{
-      const m=calcularMetricas();
+      // Pasar ventasHist directamente, no desde estado
+      const m=calcularMetricas(vh);
       setLoadingMsg("Enviando a Claude...");
-      const prompt="Sos el asesor comercial experto de Super Coating. USÁ SOLO los datos reales que te paso. NO inventes ni estimes datos que no están. Sé ESPECÍFICO con nombres de clientes y productos.\n\n"
-        +"DATOS AL "+new Date().toLocaleDateString("es-AR")+":\n"
-        +"- Total registros: "+m.totalRegistros+" ("+m.ventasHistLen+" históricos + "+(m.totalRegistros-m.ventasHistLen)+" en sistema)\n"
-        +"- Facturación histórica total: $"+Math.round(m.totalHistorico).toLocaleString("es-AR")+"\n"
-        +"- Ventas últimos 30 días: $"+Math.round(m.ventasU30).toLocaleString("es-AR")+"\n"
-        +"- Tendencia vs 30 días anteriores: "+(m.tendenciaPct>=0?"+":"")+m.tendenciaPct+"%\n\n"
-        +"EVOLUCIÓN MENSUAL (últimos 12 meses):\n"
-        +m.mesesOrdenados.slice(-12).map(([mes,total])=>"  "+mes+": $"+Math.round(total).toLocaleString("es-AR")).join("\n")+"\n\n"
-        +"TOP 15 CLIENTES (historial completo real):\n"
-        +m.topClientes.map((c,i)=>"  "+(i+1)+". "+c.nombre+": $"+Math.round(c.total).toLocaleString("es-AR")
-          +" | última compra: "+c.ultimaCompra+" (hace "+c.diasSin+" días)"
-          +(c.frecProm?" | frecuencia: cada "+c.frecProm+" días":"")).join("\n")+"\n\n"
-        +"TOP PRODUCTOS por facturación:\n"
-        +m.topProd.map((p,i)=>"  "+(i+1)+". "+p.nombre+": $"+Math.round(p.total).toLocaleString("es-AR")+" | "+Math.round(p.cantidad)+" u.").join("\n")+"\n\n"
-        +"STOCK ACTUAL:\n"+(Object.entries(m.stockActual).map(([n,c])=>"  "+n+": "+c+" u.").join("\n")||"  Sin stock")+"\n\n"
-        +"CONTENEDORES:\n"+m.estadoConts.map(c=>"  "+c.nombre+": cobrado USD "+c.cobUSD.toLocaleString()+" / inversión USD "+c.costo.toLocaleString()+(c.pct!==null?" ("+c.pct+"%)":"")+(c.enGanancia?" ✓ EN GANANCIA":" pendiente")).join("\n")+"\n\n"
-        +"Respondé SOLO JSON (sin markdown ni texto extra):\n"
-        +'{"semana":"Semana del [lunes de esta semana] al [domingo]","diagnostico":"Exactamente 4-5 oraciones. Usá los números reales de arriba. Mencioná tendencia vs mes anterior, qué clientes están activos, qué productos mueven más. NO inventes.","kpis":{"tendenciaPct":NÚMERO},"accionesInmediatas":[{"icono":"📞","titulo":"Llamar a NOMBRE_REAL — descripción","detalle":"Detalle con días sin comprar reales, producto real, monto real"}],"accionesSemana":[{"icono":"📦","titulo":"...","detalle":"..."}],"accionesMes":[{"icono":"📈","titulo":"...","detalle":"..."}],"clientesDormidos":[{"nombre":"NOMBRE","diasInactivo":NÚMERO,"ultimaCompra":"FECHA","historialTotal":NÚMERO,"producto":"producto real","accion":"texto concreto"}],"proyecciones":{"mesActual":"monto estimado con justificación","mesSiguiente":"monto estimado con justificación","riesgo":"riesgo específico identificado en datos"},"insightEstrategico":"3-4 oraciones con el insight más importante basado en los datos reales."}\n'
-        +"Reglas: accionesInmediatas max 3, accionesSemana max 3, accionesMes max 2. clientesDormidos: SOLO clientes con más de 45 días inactivos Y historial > $1.000.000, max 6, ordenados por historialTotal descendente. Los datos de días y montos deben coincidir exactamente con los datos que te pasé arriba.";
+
+      // Claude solo escribe los textos — los números ya los tenemos
+      const prompt="Sos asesor de Super Coating. Basándote SOLO en estos datos reales, escribí el análisis en español argentino.\n\n"
+        +"DATOS VERIFICADOS ("+m.hoyStr+"):\n"
+        +"- Facturación histórica: $"+m.totalHist.toLocaleString("es-AR")+"\n"
+        +"- Ventas últimos 30 días: $"+m.u30.toLocaleString("es-AR")+" ("+(m.tendPct>=0?"+":"")+m.tendPct+"% vs período anterior)\n"
+        +"- Total registros analizados: "+m.totalRegistros+"\n\n"
+        +"TOP 10 CLIENTES CON DATOS EXACTOS:\n"
+        +m.topClientes.slice(0,10).map((c,i)=>"  "+(i+1)+". "+c.nombre+": $"+c.total.toLocaleString("es-AR")+" | última compra: "+c.ultima+" | hace exactamente "+c.diasSin+" días"+(c.frecProm?" | compra cada "+c.frecProm+" días en promedio":"")).join("\n")+"\n\n"
+        +"CLIENTES DORMIDOS (más de 45 días sin comprar, historial > $1M):\n"
+        +m.dormidos.map(c=>"  - "+c.nombre+": última compra "+c.ultima+", hace "+c.diasSin+" días, historial $"+c.total.toLocaleString("es-AR")).join("\n")+"\n\n"
+        +"TOP PRODUCTOS:\n"
+        +m.topProd.slice(0,5).map((p,i)=>"  "+(i+1)+". "+p.nombre+": $"+p.total.toLocaleString("es-AR")+" | "+p.cantidad+" u.").join("\n")+"\n\n"
+        +"STOCK ACTUAL:\n"
+        +Object.entries(m.stockActual).map(([n,c])=>"  "+n+": "+c+" u.").join("\n")+"\n\n"
+        +"CONTENEDORES:\n"
+        +m.estadoConts.map(c=>"  "+c.nombre+": "+c.cobUSD.toLocaleString("es-AR")+" USD cobrado / "+c.costo.toLocaleString("es-AR")+" USD inversión"+(c.pct!==null?" ("+c.pct+"%)":"")+(c.enGanancia?" — EN GANANCIA":" — pendiente recupero")).join("\n")+"\n\n"
+        +"Respondé SOLO JSON, sin markdown:\n"
+        +"{\n"
+        +"  \"semana\": \"Semana del [lunes de la semana actual] al [domingo]\",\n"
+        +"  \"diagnostico\": \"5-6 oraciones. Usá los números exactos de arriba. Mencioná la tendencia, los clientes más activos, el producto que más mueve. NO repitas los datos crudos, interpretálos.\",\n"
+        +"  \"accionesInmediatas\": [\n"
+        +"    {\"icono\": \"📞\", \"titulo\": \"Llamar a NOMBRE_REAL — motivo específico\", \"detalle\": \"Detalle con datos exactos del cliente: días sin comprar, producto, ticket promedio, qué decirle\"}\n"
+        +"  ],\n"
+        +"  \"accionesSemana\": [\n"
+        +"    {\"icono\": \"📦\", \"titulo\": \"...\", \"detalle\": \"...\"}\n"
+        +"  ],\n"
+        +"  \"accionesMes\": [\n"
+        +"    {\"icono\": \"📈\", \"titulo\": \"...\", \"detalle\": \"...\"}\n"
+        +"  ],\n"
+        +"  \"accionDormidos\": {\"NOMBRE_CLIENTE\": \"texto de acción específico para ese cliente\"},\n"
+        +"  \"proyMesActual\": \"estimación en pesos con contexto breve\",\n"
+        +"  \"proyMesSig\": \"estimación en pesos con contexto breve\",\n"
+        +"  \"riesgo\": \"riesgo específico basado en datos\",\n"
+        +"  \"insight\": \"3-4 oraciones con el hallazgo más importante de los datos. Usá números reales.\"\n"
+        +"}\n"
+        +"Reglas estrictas:\n"
+        +"- accionesInmediatas: exactamente 3 items. Siempre basados en clientes de la lista con sus días exactos.\n"
+        +"- accionesSemana: exactamente 3 items.\n"
+        +"- accionesMes: exactamente 2 items.\n"
+        +"- accionDormidos: un objeto con clave=nombre_cliente y valor=acción concreta para cada cliente dormido listado.\n"
+        +"- En ningún campo inventes datos. Solo usá los que te pasé.";
 
       const resp=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:4000,messages:[{role:"user",content:prompt}]})
+        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:3000,messages:[{role:"user",content:prompt}]})
       });
       if(!resp.ok){const t=await resp.text();throw new Error("API "+resp.status+": "+t.slice(0,200));}
       const apiData=await resp.json();
       const raw=(apiData.content&&apiData.content[0]&&apiData.content[0].text)||"";
       if(!raw)throw new Error("Respuesta vacía de Claude");
       setLoadingMsg("Construyendo reporte...");
-      let analisis;
-      try{analisis=JSON.parse(raw.replace(/```json|```/g,"").trim());}
-      catch(e){throw new Error("Error parseando JSON de Claude. Respuesta: "+raw.slice(0,300));}
-      const html=construirPDF(analisis,m);
-      // Guardar en data
-      try{
-        const lista=[...(data.reportesSC||[])];
-        lista.push({fecha:new Date().toISOString(),semana:analisis.semana||"",html,diagnostico:analisis.diagnostico||""});
-        await save({...data,reportesSC:lista.slice(-10)});
-        setReportes([...lista].reverse().slice(0,10).map((r,i)=>({id:i,...r})));
-      }catch(e){console.warn("No se guardó el reporte",e);}
-      // Abrir directamente en ventana nueva
-      const win=window.open("","_blank");
-      win.document.write(html);win.document.close();
+      let textos;
+      try{textos=JSON.parse(raw.replace(/```json|```/g,"").trim());}
+      catch(e){throw new Error("Error parseando JSON: "+raw.slice(0,200));}
+
+      const html=construirPDF(textos,m);
+
+      // Guardar
+      const lista=[...(data.reportesSC||[])];
+      lista.push({fecha:new Date().toISOString(),semana:textos.semana||"",html});
+      await save({...data,reportesSC:lista.slice(-10)});
+      setUltimoReporte({html,semana:textos.semana||"",fecha:new Date().toISOString()});
       showToast("✓ Reporte generado");
-      setTab("historial");
     }catch(err){
       showToast("⚠ "+err.message);
       console.error(err);
@@ -7009,10 +7079,7 @@ function ReportesView({data,save,showToast}){
     }
   };
 
-  const verReporte=(html)=>{
-    const win=window.open("","_blank");
-    win.document.write(html);win.document.close();
-  };
+  const abrirPDF=(html)=>{const w=window.open("","_blank");w.document.write(html);w.document.close();};
 
   const TabBtn2=({id,label})=>(
     <button onClick={()=>setTab(id)} style={{background:"none",border:"none",padding:"10px 14px",cursor:"pointer",fontSize:12,fontWeight:tab===id?700:400,color:tab===id?"var(--text-primary)":"var(--text-secondary)",borderBottom:tab===id?"2px solid var(--sc-orange)":"2px solid transparent",transition:"all .15s"}}>
@@ -7025,57 +7092,73 @@ function ReportesView({data,save,showToast}){
       <div style={{marginBottom:20}}>
         <div style={{fontSize:22,fontWeight:700,letterSpacing:"-.02em",color:"var(--text-primary)",marginBottom:3}}>📊 Reportes</div>
         <div style={{fontSize:12,color:"var(--text-secondary)"}}>
-          {histLoaded?(ventasHist.length>0?ventasHist.length.toLocaleString("es-AR")+" ventas históricas · "+(data.ventas||[]).length.toLocaleString("es-AR")+" en sistema":"Sin historial importado · Importá el Excel para análisis completo"):"Cargando..."}
+          {histTiene?ventasHist.length.toLocaleString("es-AR")+" históricos · "+(data.ventas||[]).length.toLocaleString("es-AR")+" en sistema":"Sin historial — importá el Excel para análisis completo"}
         </div>
       </div>
 
       <div style={{display:"flex",gap:0,borderBottom:"0.5px solid var(--glass-border)",marginBottom:20}}>
         <TabBtn2 id="generar" label="Generar"/>
         <TabBtn2 id="historial" label={"Historial"+(reportes.length>0?" ("+reportes.length+")":"")}/>
-        {(!historialImportado&&ventasHist.length===0)&&<TabBtn2 id="importar" label="⬆ Importar Excel"/>}
+        {!histTiene&&<TabBtn2 id="importar" label="⬆ Importar Excel"/>}
       </div>
 
+      {/* TAB GENERAR */}
       {tab==="generar"&&(
         <div>
           {loading?(
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"4rem 2rem",gap:16}}>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"4rem 2rem",gap:16}}>
               <div style={{width:44,height:44,borderRadius:"50%",border:"3px solid rgba(244,121,32,.15)",borderTopColor:"var(--sc-orange)",animation:"sp .8s linear infinite"}}/>
               <div style={{fontSize:14,fontWeight:600,color:"var(--text-primary)"}}>{loadingMsg}</div>
-              <div style={{fontSize:12,color:"var(--text-secondary)"}}>Analizando {((ventasHist.length)+(data.ventas||[]).length).toLocaleString("es-AR")} registros...</div>
+              <div style={{fontSize:12,color:"var(--text-secondary)"}}>Analizando {(ventasHist.length+(data.ventas||[]).length).toLocaleString("es-AR")} registros...</div>
             </div>
           ):(
             <div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
                 {[
                   {l:"Ventas históricas",v:ventasHist.length,s:"registros del Excel"},
                   {l:"Ventas en sistema",v:(data.ventas||[]).length,s:"registros Firebase"},
-                  {l:"Total a analizar",v:ventasHist.length+(data.ventas||[]).length,s:"registros combinados",hi:true}
+                  {l:"Total a analizar",v:ventasHist.length+(data.ventas||[]).length,s:"combinados",hi:true}
                 ].map(k=>(
                   <div key={k.l} style={{background:k.hi?"var(--bg-tint-orange)":"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:k.hi?"0.5px solid rgba(244,121,32,.35)":"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"18px 20px",boxShadow:"var(--glass-shadow-sm)"}}>
                     <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:k.hi?"var(--sc-orange)":"var(--text-secondary)",marginBottom:8}}>{k.l}</div>
-                    <div style={{fontSize:30,fontWeight:700,letterSpacing:"-.03em",color:k.hi?"var(--sc-orange)":"var(--text-primary)",lineHeight:1}}>{k.v.toLocaleString("es-AR")}</div>
-                    <div style={{fontSize:10,color:k.hi?"var(--sc-orange)":"var(--text-secondary)",opacity:k.hi?.8:1,marginTop:4}}>{k.s}</div>
+                    <div style={{fontSize:28,fontWeight:700,color:k.hi?"var(--sc-orange)":"var(--text-primary)",lineHeight:1}}>{k.v.toLocaleString("es-AR")}</div>
+                    <div style={{fontSize:10,color:k.hi?"var(--sc-orange)":"var(--text-secondary)",opacity:.8,marginTop:4}}>{k.s}</div>
                   </div>
                 ))}
               </div>
-              {ventasHist.length===0&&(
-                <div style={{background:"var(--bg-tint-amber)",border:"0.5px solid var(--color-border-warning)",borderRadius:"var(--r-lg)",padding:"12px 16px",marginBottom:20,fontSize:12,color:"var(--text-warning)"}}>
-                  ⚠ Sin historial importado. El reporte se generará solo con datos del sistema actual. Para análisis completo, importá el Excel.
+              {!histTiene&&(
+                <div style={{background:"var(--bg-tint-amber)",border:"0.5px solid var(--color-border-warning)",borderRadius:"var(--r-lg)",padding:"12px 16px",marginBottom:16,fontSize:12,color:"var(--text-warning)"}}>
+                  ⚠ Sin historial importado. El reporte se generará solo con datos del sistema actual.
                 </div>
               )}
-              <button onClick={generarReporte} style={{width:"100%",padding:"16px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#fff",border:"none",borderRadius:"var(--r-xl)",fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 24px rgba(244,121,32,.4)",letterSpacing:"-.01em",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+              <button onClick={generarReporte} style={{width:"100%",padding:"16px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#fff",border:"none",borderRadius:"var(--r-xl)",fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 24px rgba(244,121,32,.4)",letterSpacing:"-.01em",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontFamily:"inherit"}}>
                 <span style={{fontSize:18}}>✦</span> Generar reporte con análisis IA
               </button>
-              <div style={{fontSize:11,color:"var(--text-secondary)",textAlign:"center",marginTop:8}}>Se abre en una nueva pestaña listo para imprimir o descargar como PDF · ~15 seg</div>
+              <div style={{fontSize:11,color:"var(--text-secondary)",textAlign:"center",marginTop:8}}>El reporte se abre en pestaña nueva · ~15 segundos</div>
+
+              {/* Último reporte generado */}
+              {ultimoReporte&&(
+                <div style={{marginTop:20,background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"16px 20px",boxShadow:"var(--glass-shadow-sm)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:600,color:"var(--text-success)",marginBottom:3}}>✓ Último reporte generado</div>
+                    <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",marginBottom:2}}>{ultimoReporte.semana||"Reporte"}</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>{ultimoReporte.fecha?new Date(ultimoReporte.fecha).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}</div>
+                  </div>
+                  <button onClick={()=>abrirPDF(ultimoReporte.html)} style={{flexShrink:0,padding:"9px 18px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#fff",border:"none",borderRadius:"var(--r-pill)",fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 2px 12px rgba(244,121,32,.35)",fontFamily:"inherit"}}>
+                    ⬇ Abrir PDF
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
 
+      {/* TAB HISTORIAL */}
       {tab==="historial"&&(
         <div>
           {reportes.length===0?(
-            <div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin reportes generados aún.</div>
+            <div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",borderRadius:"var(--r-xl)",border:"0.5px solid var(--glass-border)"}}>Sin reportes generados aún.</div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {reportes.map(r=>(
@@ -7084,7 +7167,7 @@ function ReportesView({data,save,showToast}){
                     <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",marginBottom:3}}>{r.semana||"Reporte"}</div>
                     <div style={{fontSize:11,color:"var(--text-secondary)"}}>{r.fecha?new Date(r.fecha).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}</div>
                   </div>
-                  <button onClick={()=>verReporte(r.html)} style={{flexShrink:0,padding:"8px 16px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#fff",border:"none",borderRadius:"var(--r-pill)",fontSize:12,fontWeight:600,cursor:"pointer",boxShadow:"0 2px 10px rgba(244,121,32,.3)"}}>
+                  <button onClick={()=>abrirPDF(r.html)} style={{flexShrink:0,padding:"8px 16px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#fff",border:"none",borderRadius:"var(--r-pill)",fontSize:12,fontWeight:600,cursor:"pointer",boxShadow:"0 2px 10px rgba(244,121,32,.3)",fontFamily:"inherit"}}>
                     ⬇ Abrir PDF
                   </button>
                 </div>
@@ -7094,15 +7177,16 @@ function ReportesView({data,save,showToast}){
         </div>
       )}
 
+      {/* TAB IMPORTAR */}
       {tab==="importar"&&(
         <div>
           <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"28px 32px",boxShadow:"var(--glass-shadow)",marginBottom:16}}>
             <div style={{fontSize:15,fontWeight:700,color:"var(--text-primary)",marginBottom:6}}>Importar historial desde Excel</div>
             <div style={{fontSize:12,color:"var(--text-secondary)",marginBottom:20,lineHeight:1.7}}>
               Columnas requeridas: <strong>FECHA · ARTÍCULO · CANTIDAD · CLIENTE · PRECIO VENTA · TOTAL EN PESOS</strong><br/>
-              Los datos se guardan en Firebase dentro de <code style={{background:"rgba(120,120,128,.1)",padding:"1px 6px",borderRadius:4,fontSize:11}}>eliel/datos</code> — no afecta ventas, stock ni deudas existentes.
+              Se guarda en Firebase junto con el resto de los datos — no toca ventas, stock ni deudas existentes.
             </div>
-            <div style={{border:"2px dashed rgba(244,121,32,.3)",borderRadius:"var(--r-lg)",padding:"28px",textAlign:"center",marginBottom:16,cursor:"pointer",background:"var(--bg-tint-orange)"}} onClick={()=>fileRef.current&&fileRef.current.click()}>
+            <div style={{border:"2px dashed rgba(244,121,32,.3)",borderRadius:"var(--r-lg)",padding:"28px",textAlign:"center",marginBottom:importMsg?16:0,cursor:"pointer",background:"var(--bg-tint-orange)"}} onClick={()=>fileRef.current&&fileRef.current.click()}>
               <div style={{fontSize:28,marginBottom:8}}>📂</div>
               <div style={{fontSize:13,fontWeight:600,color:"var(--sc-orange)",marginBottom:4}}>Seleccionar archivo Excel</div>
               <div style={{fontSize:11,color:"var(--text-secondary)"}}>Formatos: .xlsx · .xls</div>
@@ -7123,7 +7207,6 @@ function ReportesView({data,save,showToast}){
     </div>
   );
 }
-
 
 function DespachosView({data,save,showToast}){
   const [manual,setManual]=useState(false);
