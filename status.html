@@ -352,10 +352,28 @@ function BarraProgreso({pct,enGanancia}){
   );
 }
 
-// ── DASHBOARD: contenedores ordenados más nuevo → más viejo ───────────────
+// ── helpers stock clasificados ─────────────────────────────────────────────
+const TINTA_NAMES=["NEGRO","CYAN","MAGENTA","AMARILLO"];
+const TINTA_PRO_NAMES=["NEGRO PRO","CYAN PRO","MAGENTA PRO","AMARILLO PRO"];
+function clasificarStock(stockUni){
+  const papel={},cmyk={},cmykPro={};
+  Object.entries(stockUni).filter(([,v])=>v>0).forEach(([n,c])=>{
+    if(TINTA_PRO_NAMES.includes(n))cmykPro[n]=c;
+    else if(TINTA_NAMES.includes(n))cmyk[n]=c;
+    else papel[n]=c;
+  });
+  return{papel,cmyk,cmykPro};
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────
 function ViewDashboard({data,stockUni,lastUpdate,setView}){
   const conts=sortConts(data.contenedores||[],data.contenedoresOrden);
-  const stockTotal=Object.values(stockUni).reduce((a,v)=>a+v,0);
+  const {papel,cmyk,cmykPro}=clasificarStock(stockUni);
+
+  const totalPapel=Object.values(papel).reduce((a,v)=>a+v,0);
+  const totalCMYK=Object.values(cmyk).reduce((a,v)=>a+v,0);
+  const totalCMYKPro=Object.values(cmykPro).reduce((a,v)=>a+v,0);
+
   const resumen=conts.map(c=>{
     const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
     const costo=c.costoTotal||0;
@@ -370,111 +388,356 @@ function ViewDashboard({data,stockUni,lastUpdate,setView}){
     return{c,cobUSD,costo,pct,enG,stockCont};
   });
 
+  // tinta pill colors
+  const tintaColor={NEGRO:"#636366",CYAN:"#2E86C1",MAGENTA:"#C2185B",AMARILLO:"#B8860B"};
+  const tintaProColor={"NEGRO PRO":"#4A4A6A","CYAN PRO":"#1565C0","MAGENTA PRO":"#880E4F","AMARILLO PRO":"#6D4C00"};
+  const tintaBg={NEGRO:"rgba(99,99,102,0.1)",CYAN:"rgba(46,134,193,0.12)",MAGENTA:"rgba(194,24,91,0.1)",AMARILLO:"rgba(184,134,11,0.1)"};
+  const tintaProBg={"NEGRO PRO":"rgba(74,74,106,0.12)","CYAN PRO":"rgba(21,101,192,0.12)","MAGENTA PRO":"rgba(136,14,79,0.1)","AMARILLO PRO":"rgba(109,76,0,0.1)"};
+  const tintaBorder={NEGRO:"rgba(99,99,102,0.22)",CYAN:"rgba(46,134,193,0.3)",MAGENTA:"rgba(194,24,91,0.25)",AMARILLO:"rgba(184,134,11,0.28)"};
+  const tintaProBorder={"NEGRO PRO":"rgba(74,74,106,0.25)","CYAN PRO":"rgba(21,101,192,0.3)","MAGENTA PRO":"rgba(136,14,79,0.28)","AMARILLO PRO":"rgba(109,76,0,0.28)"};
+
+  const SectionLabel=({children,color})=>(
+    <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".1em",color:color||"var(--text-secondary)",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
+      <div style={{width:16,height:1,background:color||"var(--text-tertiary)",opacity:.5}}/>
+      {children}
+      <div style={{flex:1,height:1,background:color||"var(--text-tertiary)",opacity:.15}}/>
+    </div>
+  );
+
+  const PapelCard=({nombre,cant})=>{
+    const conts2=(data.contenedores||[]).filter(c=>(c.articulos||[]).some(a=>a.nombre===nombre));
+    const detalle=conts2.map(c=>{
+      const enCont=(c.articulos||[]).find(a=>a.nombre===nombre);
+      const disp=enCont?Math.max(0,Number(enCont.cantidad)-stockDisp(c.id,nombre,data.ventas)):0;
+      return disp>0?{nombre:c.nombre,disp}:null;
+    }).filter(Boolean);
+    const maxCant=totalPapel>0?cant/totalPapel:0;
+    const pctBar=Math.round(maxCant*100);
+    const alerta=pctBar<15?"danger":pctBar<30?"warning":"ok";
+    const alertaColor=alerta==="danger"?"var(--text-danger)":alerta==="warning"?"var(--text-warning)":"var(--text-success)";
+    const alertaBg=alerta==="danger"?"var(--bg-tint-red)":alerta==="warning"?"var(--bg-tint-amber)":"var(--bg-tint-green)";
+    const alertaBorder=alerta==="danger"?"var(--color-border-danger)":alerta==="warning"?"var(--color-border-warning)":"var(--border-success)";
+    return(
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px 18px",boxShadow:"var(--glass-shadow-sm)",display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",letterSpacing:"-.01em"}}>{nombre}</div>
+            <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:3}}>
+              {detalle.map(d=><span key={d.nombre} style={{marginRight:8}}>{d.nombre} <strong style={{color:"var(--text-primary)"}}>{fmt(d.disp)}</strong></span>)}
+            </div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:28,fontWeight:700,letterSpacing:"-.03em",color:"var(--text-primary)",lineHeight:1}}>{fmt(cant)}</div>
+            <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>rollos</div>
+          </div>
+        </div>
+        <div>
+          <div style={{height:4,background:"rgba(120,120,128,0.12)",borderRadius:4,overflow:"hidden"}}>
+            <div style={{height:"100%",width:pctBar+"%",background:alertaColor,borderRadius:4,transition:"width .5s cubic-bezier(.4,0,.2,1)",opacity:.8}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
+            <div style={{fontSize:9,color:"var(--text-tertiary)",letterSpacing:".02em"}}>{pctBar}% del stock total de papel</div>
+            <div style={{fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:"var(--r-pill)",background:alertaBg,color:alertaColor,border:"0.5px solid "+alertaBorder}}>
+              {alerta==="danger"?"⚠ BAJO":alerta==="warning"?"● Medio":"● OK"}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const TintaCard=({nombre,cant,isPro})=>{
+    const col=isPro?(tintaProColor[nombre]||"var(--text-info)"):(tintaColor[nombre]||"var(--text-info)");
+    const bg=isPro?(tintaProBg[nombre]||"var(--bg-tint-blue)"):(tintaBg[nombre]||"var(--bg-tint-blue)");
+    const brd=isPro?(tintaProBorder[nombre]||"var(--border-info)"):(tintaBorder[nombre]||"var(--border-info)");
+    const conts2=(data.contenedores||[]).filter(c=>(c.articulos||[]).some(a=>a.nombre===nombre));
+    const detalle=conts2.map(c=>{
+      const enCont=(c.articulos||[]).find(a=>a.nombre===nombre);
+      const disp=enCont?Math.max(0,Number(enCont.cantidad)-stockDisp(c.id,nombre,data.ventas)):0;
+      return disp>0?{nombre:c.nombre,disp}:null;
+    }).filter(Boolean);
+    const nombreCorto=nombre.replace(" PRO","");
+    return(
+      <div style={{background:bg,backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid "+brd,borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:col,letterSpacing:".02em",textTransform:"uppercase"}}>{nombreCorto}</div>
+            {detalle.length>0&&<div style={{fontSize:9,color:col,opacity:.7,marginTop:3}}>{detalle.map(d=>d.nombre+" ("+fmt(d.disp)+")").join(" · ")}</div>}
+          </div>
+          <div style={{fontSize:26,fontWeight:700,color:col,letterSpacing:"-.02em",lineHeight:1}}>{fmt(cant)}</div>
+        </div>
+        <div style={{height:3,background:"rgba(120,120,128,0.12)",borderRadius:3,overflow:"hidden"}}>
+          <div style={{height:"100%",width:Math.min(100,cant*4)+"%",background:col,borderRadius:3,opacity:.6}}/>
+        </div>
+      </div>
+    );
+  };
+
   return(
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"1.25rem"}}>
+    <div style={{paddingBottom:8}}>
+
+      {/* ── HEADER ── */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"1.5rem"}}>
         <div>
-          <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-.02em",margin:"0 0 2px",color:"var(--text-primary)"}}>Status Super Coating</h1>
-          <p style={{fontSize:12,color:"var(--text-secondary)",margin:0}}>Datos en tiempo real · Solo lectura</p>
+          <h1 style={{fontSize:24,fontWeight:700,letterSpacing:"-.03em",margin:"0 0 3px",color:"var(--text-primary)"}}>Super Coating</h1>
+          <p style={{fontSize:12,color:"var(--text-secondary)",margin:0,letterSpacing:".01em"}}>Datos en tiempo real · Solo lectura</p>
         </div>
-        {lastUpdate&&<div style={{fontSize:10,color:"var(--text-secondary)",textAlign:"right"}}>Actualizado<br/>{lastUpdate.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</div>}
+        {lastUpdate&&(
+          <div style={{textAlign:"right",background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-md)",padding:"7px 12px",boxShadow:"var(--glass-shadow-sm)"}}>
+            <div style={{fontSize:9,fontWeight:600,color:"var(--text-tertiary)",textTransform:"uppercase",letterSpacing:".06em",marginBottom:2}}>Actualizado</div>
+            <div style={{fontSize:12,fontWeight:600,color:"var(--text-primary)",fontVariantNumeric:"tabular-nums"}}>{lastUpdate.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</div>
+          </div>
+        )}
       </div>
-      <div style={{background:"var(--bg-tint-green)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-lg)",boxShadow:"var(--glass-shadow-sm)",padding:"14px 18px",marginBottom:"1.25rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:11,color:"var(--text-success)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Stock total disponible</div>
-          <div style={{fontSize:28,fontWeight:700,letterSpacing:"-.03em",color:"var(--text-success)"}}>{fmt(stockTotal)} <span style={{fontSize:14}}>unidades</span></div>
+
+      {/* ── RESUMEN STOCK 3 PILLS ── */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:"2rem"}}>
+        <div onClick={()=>setView("stock")} style={{cursor:"pointer",background:"var(--bg-tint-green)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-xl)",padding:"18px 20px",boxShadow:"var(--glass-shadow-sm)",transition:"box-shadow .2s"}}>
+          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:"var(--text-success)",marginBottom:8}}>📄 Papel</div>
+          <div style={{fontSize:34,fontWeight:700,letterSpacing:"-.04em",color:"var(--text-success)",lineHeight:1}}>{fmt(totalPapel)}</div>
+          <div style={{fontSize:10,color:"var(--text-success)",opacity:.7,marginTop:4}}>rollos disponibles</div>
         </div>
-        <button onClick={()=>setView("stock")} style={{fontSize:12,padding:"7px 14px",border:"0.5px solid var(--color-text-success)",borderRadius:"var(--r-md)",background:"none",color:"var(--text-success)",cursor:"pointer"}}>Ver detalle →</button>
+        <div onClick={()=>setView("stock")} style={{cursor:"pointer",background:"var(--bg-tint-blue)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-xl)",padding:"18px 20px",boxShadow:"var(--glass-shadow-sm)"}}>
+          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:"var(--text-info)",marginBottom:8}}>🖨 Tinta CMYK</div>
+          <div style={{fontSize:34,fontWeight:700,letterSpacing:"-.04em",color:"var(--text-info)",lineHeight:1}}>{fmt(totalCMYK)}</div>
+          <div style={{fontSize:10,color:"var(--text-info)",opacity:.7,marginTop:4}}>unidades disponibles</div>
+        </div>
+        <div onClick={()=>setView("stock")} style={{cursor:"pointer",background:"var(--bg-tint-amber)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--color-border-warning)",borderRadius:"var(--r-xl)",padding:"18px 20px",boxShadow:"var(--glass-shadow-sm)"}}>
+          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:"var(--text-warning)",marginBottom:8}}>✦ Tinta PRO</div>
+          <div style={{fontSize:34,fontWeight:700,letterSpacing:"-.04em",color:"var(--text-warning)",lineHeight:1}}>{fmt(totalCMYKPro)}</div>
+          <div style={{fontSize:10,color:"var(--text-warning)",opacity:.7,marginTop:4}}>unidades disponibles</div>
+        </div>
       </div>
-      <div style={{fontSize:10,fontWeight:600,color:"var(--text-secondary)",marginBottom:10,textTransform:"uppercase",letterSpacing:".06em"}}>Estado por contenedor</div>
-      <div style={{display:"grid",gap:8}}>
+
+      {/* ── CONTENEDORES ── */}
+      <SectionLabel>Estado por contenedor</SectionLabel>
+      <div style={{display:"grid",gap:10,marginBottom:"2rem"}}>
         {resumen.map(({c,cobUSD,costo,pct,enG,stockCont})=>(
-          <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",cursor:"pointer"}} onClick={()=>setView("stock")}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-              <span style={{fontWeight:500,fontSize:14,color:"var(--text-primary)"}}>{c.nombre}</span>
-              <div style={{textAlign:"right"}}>
-                <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"flex-end",marginBottom:4}}>
-                  <span style={{fontSize:12,fontWeight:500,color:"var(--text-secondary)"}}>{fmt(stockCont)} u</span>
-                  <span style={{fontSize:11,padding:"2px 9px",borderRadius:20,background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)",fontWeight:500}}>
-                    {costo===0?"Activo":enG?"✓ En ganancia":fmtPct(pct)+" recuperado"}
-                  </span>
+          <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-xl)",padding:"18px 20px",cursor:"pointer",transition:"box-shadow .2s"}} onClick={()=>setView("stock")}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:costo>0?12:0}}>
+              <div>
+                <div style={{fontWeight:600,fontSize:15,color:"var(--text-primary)",letterSpacing:"-.01em"}}>{c.nombre}</div>
+                <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:3}}>
+                  {fmt(stockCont)} unidades en stock
                 </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                <span style={{fontSize:11,fontWeight:600,padding:"4px 12px",borderRadius:"var(--r-pill)",letterSpacing:".01em",background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)",border:enG?"0.5px solid var(--border-success)":costo===0?"0.5px solid rgba(120,120,128,.2)":"0.5px solid var(--color-border-warning)"}}>
+                  {costo===0?"Activo":enG?"✓ En ganancia":fmtPct(pct)+" recuperado"}
+                </span>
                 {costo>0&&(
-                  <div style={{fontSize:13,fontWeight:700,color:enG?"var(--text-success)":"var(--text-warning)"}}>
-                    {enG?"+ "+fmtUSD(cobUSD-costo):"-"+fmtUSD(costo-cobUSD)+" para cubrir"}
+                  <div style={{fontSize:14,fontWeight:700,color:enG?"var(--text-success)":"var(--text-warning)",letterSpacing:"-.01em"}}>
+                    {enG?"+ "+fmtUSD(cobUSD-costo):"−"+fmtUSD(costo-cobUSD)}
                   </div>
                 )}
               </div>
             </div>
-            {costo>0&&<BarraProgreso pct={pct} enGanancia={enG}/>}
             {costo>0&&(
-              <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:11,color:"var(--text-secondary)"}}>
-                <span>Cobrado: <strong style={{color:"var(--text-primary)"}}>{fmtUSD(cobUSD)}</strong></span>
-                <span>Inversión: <strong>{fmtUSD(costo)}</strong></span>
-              </div>
+              <>
+                <div style={{height:5,background:"rgba(120,120,128,0.1)",borderRadius:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:Math.min(100,pct)+"%",background:enG?"var(--text-success)":"var(--sc-blue,#2E86C1)",borderRadius:4,transition:"width .6s cubic-bezier(.4,0,.2,1)"}}/>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:11}}>
+                  <span style={{color:"var(--text-secondary)"}}>Cobrado <strong style={{color:"var(--text-primary)",fontVariantNumeric:"tabular-nums"}}>{fmtUSD(cobUSD)}</strong></span>
+                  <span style={{color:"var(--text-secondary)"}}>Inversión <strong style={{color:"var(--text-primary)"}}>{fmtUSD(costo)}</strong></span>
+                </div>
+              </>
             )}
           </div>
         ))}
-        {resumen.length===0&&<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin contenedores.</div>}
+        {resumen.length===0&&<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",borderRadius:"var(--r-xl)",border:"0.5px solid var(--glass-border)"}}>Sin contenedores.</div>}
       </div>
+
+      {/* ── STOCK PAPEL DETALLADO ── */}
+      {Object.keys(papel).length>0&&(
+        <>
+          <SectionLabel color="var(--text-success)">Stock papel · por gramaje</SectionLabel>
+          <div style={{display:"grid",gap:10,marginBottom:"2rem"}}>
+            {Object.entries(papel).sort((a,b)=>b[1]-a[1]).map(([n,c])=><PapelCard key={n} nombre={n} cant={c}/>)}
+          </div>
+        </>
+      )}
+
+      {/* ── STOCK TINTAS ── */}
+      {(Object.keys(cmyk).length>0||Object.keys(cmykPro).length>0)&&(
+        <>
+          <SectionLabel color="var(--text-info)">Stock tintas</SectionLabel>
+          <div style={{display:"grid",gap:16}}>
+            {Object.keys(cmyk).length>0&&(
+              <div>
+                <div style={{fontSize:10,fontWeight:600,color:"var(--text-secondary)",letterSpacing:".06em",textTransform:"uppercase",marginBottom:8,paddingLeft:2}}>CMYK Estándar</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {TINTA_NAMES.filter(n=>cmyk[n]!==undefined).map(n=><TintaCard key={n} nombre={n} cant={cmyk[n]||0} isPro={false}/>)}
+                </div>
+              </div>
+            )}
+            {Object.keys(cmykPro).length>0&&(
+              <div>
+                <div style={{fontSize:10,fontWeight:600,color:"var(--text-warning)",letterSpacing:".06em",textTransform:"uppercase",marginBottom:8,paddingLeft:2}}>CMYK Pro</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {TINTA_PRO_NAMES.filter(n=>cmykPro[n]!==undefined).map(n=><TintaCard key={n} nombre={n} cant={cmykPro[n]||0} isPro={true}/>)}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
     </div>
   );
 }
 
 function ViewStock({stockUni,data}){
-  const stockPapel={}, stockTinta={};
-  let totalPapel=0, totalTinta=0;
-  Object.entries(stockUni).filter(([,v])=>v>0).forEach(([nombre,cant])=>{
-    if(nombre.includes("TINTA")){stockTinta[nombre]=cant;totalTinta+=cant;}
-    else{stockPapel[nombre]=cant;totalPapel+=cant;}
-  });
-  const Row=([art,cant],esTinta)=>{
-    const conts=(data.contenedores||[]).filter(c=>(c.articulos||[]).some(a=>a.nombre===art));
-    const detalle=conts.map(c=>{
-      const enCont=(c.articulos||[]).find(a=>a.nombre===art);
-      const disp=enCont?Math.max(0,Number(enCont.cantidad)-stockDisp(c.id,art,data.ventas)):0;
-      return disp>0?c.nombre+" ("+fmt(disp)+")":null;
-    }).filter(Boolean).join(" · ");
+  const {papel,cmyk,cmykPro}=clasificarStock(stockUni);
+  const totalPapel=Object.values(papel).reduce((a,v)=>a+v,0);
+  const totalCMYK=Object.values(cmyk).reduce((a,v)=>a+v,0);
+  const totalCMYKPro=Object.values(cmykPro).reduce((a,v)=>a+v,0);
+
+  const tintaColor={NEGRO:"#636366",CYAN:"#2E86C1",MAGENTA:"#C2185B",AMARILLO:"#B8860B"};
+  const tintaProColor={"NEGRO PRO":"#4A4A6A","CYAN PRO":"#1565C0","MAGENTA PRO":"#880E4F","AMARILLO PRO":"#6D4C00"};
+  const tintaBg={NEGRO:"rgba(99,99,102,0.1)",CYAN:"rgba(46,134,193,0.12)",MAGENTA:"rgba(194,24,91,0.1)",AMARILLO:"rgba(184,134,11,0.1)"};
+  const tintaProBg={"NEGRO PRO":"rgba(74,74,106,0.12)","CYAN PRO":"rgba(21,101,192,0.12)","MAGENTA PRO":"rgba(136,14,79,0.1)","AMARILLO PRO":"rgba(109,76,0,0.1)"};
+  const tintaBorder={NEGRO:"rgba(99,99,102,0.22)",CYAN:"rgba(46,134,193,0.3)",MAGENTA:"rgba(194,24,91,0.25)",AMARILLO:"rgba(184,134,11,0.28)"};
+  const tintaProBorder={"NEGRO PRO":"rgba(74,74,106,0.25)","CYAN PRO":"rgba(21,101,192,0.3)","MAGENTA PRO":"rgba(136,14,79,0.28)","AMARILLO PRO":"rgba(109,76,0,0.28)"};
+
+  const SectionLabel=({children,color})=>(
+    <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".1em",color:color||"var(--text-secondary)",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
+      <div style={{width:16,height:1,background:color||"var(--text-tertiary)",opacity:.5}}/>
+      {children}
+      <div style={{flex:1,height:1,background:color||"var(--text-tertiary)",opacity:.15}}/>
+    </div>
+  );
+
+  const getDetalleConts=(art)=>(data.contenedores||[]).map(c=>{
+    const enCont=(c.articulos||[]).find(a=>a.nombre===art);
+    const disp=enCont?Math.max(0,Number(enCont.cantidad)-stockDisp(c.id,art,data.ventas)):0;
+    return disp>0?{nombre:c.nombre,disp}:null;
+  }).filter(Boolean);
+
+  const PapelRow=([art,cant])=>{
+    const detalle=getDetalleConts(art);
+    const pctBar=totalPapel>0?Math.round((cant/totalPapel)*100):0;
+    const alerta=pctBar<15?"danger":pctBar<30?"warning":"ok";
+    const alertaColor=alerta==="danger"?"var(--text-danger)":alerta==="warning"?"var(--text-warning)":"var(--text-success)";
+    const alertaBg=alerta==="danger"?"var(--bg-tint-red)":alerta==="warning"?"var(--bg-tint-amber)":"var(--bg-tint-green)";
+    const alertaBorder=alerta==="danger"?"var(--color-border-danger)":alerta==="warning"?"var(--color-border-warning)":"var(--border-success)";
     return(
-      <div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"var(--glass-shadow-sm)"}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art}</div>
-          <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>{detalle}</div>
+      <div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"18px 20px",boxShadow:"var(--glass-shadow-sm)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:600,fontSize:15,color:"var(--text-primary)",letterSpacing:"-.01em",marginBottom:5}}>{art}</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {detalle.map(d=>(
+                <span key={d.nombre} style={{fontSize:10,padding:"2px 9px",borderRadius:"var(--r-pill)",background:"rgba(120,120,128,0.08)",border:"0.5px solid rgba(120,120,128,0.15)",color:"var(--text-secondary)"}}>
+                  {d.nombre} · <strong style={{color:"var(--text-primary)"}}>{fmt(d.disp)}</strong>
+                </span>
+              ))}
+            </div>
+          </div>
+          <div style={{textAlign:"right",marginLeft:16,flexShrink:0}}>
+            <div style={{fontSize:36,fontWeight:700,letterSpacing:"-.04em",color:"var(--text-primary)",lineHeight:1}}>{fmt(cant)}</div>
+            <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:3}}>rollos</div>
+          </div>
         </div>
-        <div style={{fontSize:22,fontWeight:700,color:esTinta?"var(--text-info)":"var(--text-success)",marginLeft:12}}>{fmt(cant)}</div>
+        <div style={{height:4,background:"rgba(120,120,128,0.1)",borderRadius:4,overflow:"hidden",marginBottom:8}}>
+          <div style={{height:"100%",width:pctBar+"%",background:alertaColor,borderRadius:4,opacity:.75,transition:"width .5s cubic-bezier(.4,0,.2,1)"}}/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:10,color:"var(--text-tertiary)"}}>{pctBar}% del stock total de papel</div>
+          <span style={{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:"var(--r-pill)",background:alertaBg,color:alertaColor,border:"0.5px solid "+alertaBorder}}>
+            {alerta==="danger"?"⚠ STOCK BAJO":alerta==="warning"?"● Nivel medio":"● Nivel OK"}
+          </span>
+        </div>
       </div>
     );
   };
+
+  const TintaRow=([art,cant],isPro)=>{
+    const col=isPro?(tintaProColor[art]||"var(--text-info)"):(tintaColor[art]||"var(--text-info)");
+    const bg=isPro?(tintaProBg[art]||"var(--bg-tint-blue)"):(tintaBg[art]||"var(--bg-tint-blue)");
+    const brd=isPro?(tintaProBorder[art]||"var(--border-info)"):(tintaBorder[art]||"var(--border-info)");
+    const detalle=getDetalleConts(art);
+    const nombreCorto=art.replace(" PRO","");
+    const totalRef=isPro?totalCMYKPro:totalCMYK;
+    const pctBar=totalRef>0?Math.round((cant/totalRef)*100):0;
+    return(
+      <div key={art} style={{background:bg,backdropFilter:"blur(14px)",WebkitBackdropFilter:"blur(14px)",border:"0.5px solid "+brd,borderRadius:"var(--r-xl)",padding:"18px 20px",boxShadow:"var(--glass-shadow-sm)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:11,fontWeight:700,color:col,letterSpacing:".05em",textTransform:"uppercase",marginBottom:6}}>{nombreCorto}</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+              {detalle.map(d=>(
+                <span key={d.nombre} style={{fontSize:10,padding:"2px 9px",borderRadius:"var(--r-pill)",background:"rgba(120,120,128,0.08)",border:"0.5px solid rgba(120,120,128,0.12)",color:"var(--text-secondary)"}}>
+                  {d.nombre} · <strong style={{color:"var(--text-primary)"}}>{fmt(d.disp)}</strong>
+                </span>
+              ))}
+            </div>
+          </div>
+          <div style={{textAlign:"right",marginLeft:16,flexShrink:0}}>
+            <div style={{fontSize:36,fontWeight:700,letterSpacing:"-.04em",color:col,lineHeight:1}}>{fmt(cant)}</div>
+            <div style={{fontSize:10,color:col,opacity:.6,marginTop:3}}>unidades</div>
+          </div>
+        </div>
+        <div style={{height:3,background:"rgba(120,120,128,0.1)",borderRadius:3,overflow:"hidden"}}>
+          <div style={{height:"100%",width:pctBar+"%",background:col,borderRadius:3,opacity:.5,transition:"width .5s cubic-bezier(.4,0,.2,1)"}}/>
+        </div>
+      </div>
+    );
+  };
+
+  const sinStock=totalPapel===0&&totalCMYK===0&&totalCMYKPro===0;
+
   return(
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-        <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:0,color:"var(--text-primary)"}}>Stock disponible</h2>
+      <div style={{marginBottom:"1.5rem"}}>
+        <h2 style={{fontSize:24,fontWeight:700,letterSpacing:"-.03em",margin:"0 0 3px",color:"var(--text-primary)"}}>Stock disponible</h2>
+        <div style={{fontSize:12,color:"var(--text-secondary)"}}>Calculado en tiempo real desde Firebase</div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:"1.5rem"}}>
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:6}}>📄 Total Papel</div>
-          <div style={{fontSize:28,fontWeight:700,color:"var(--text-primary)"}}>{fmt(totalPapel)}</div>
-          <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>rollos disponibles</div>
+
+      {/* Totales */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:"2rem"}}>
+        <div style={{background:"var(--bg-tint-green)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-xl)",padding:"18px 20px",boxShadow:"var(--glass-shadow-sm)"}}>
+          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:"var(--text-success)",marginBottom:8}}>📄 Total Papel</div>
+          <div style={{fontSize:38,fontWeight:700,letterSpacing:"-.04em",color:"var(--text-success)",lineHeight:1}}>{fmt(totalPapel)}</div>
+          <div style={{fontSize:10,color:"var(--text-success)",opacity:.7,marginTop:5}}>rollos disponibles</div>
         </div>
-        <div style={{background:"var(--bg-tint-blue)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:6}}>🖨️ Total Tinta</div>
-          <div style={{fontSize:28,fontWeight:700,color:"var(--text-info)"}}>{fmt(totalTinta)}</div>
-          <div style={{fontSize:11,color:"var(--text-info)",marginTop:2,opacity:.8}}>unidades disponibles</div>
+        <div style={{background:"var(--bg-tint-blue)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-xl)",padding:"18px 20px",boxShadow:"var(--glass-shadow-sm)"}}>
+          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:"var(--text-info)",marginBottom:8}}>🖨 CMYK Estándar</div>
+          <div style={{fontSize:38,fontWeight:700,letterSpacing:"-.04em",color:"var(--text-info)",lineHeight:1}}>{fmt(totalCMYK)}</div>
+          <div style={{fontSize:10,color:"var(--text-info)",opacity:.7,marginTop:5}}>unidades disponibles</div>
+        </div>
+        <div style={{background:"var(--bg-tint-amber)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--color-border-warning)",borderRadius:"var(--r-xl)",padding:"18px 20px",boxShadow:"var(--glass-shadow-sm)"}}>
+          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:"var(--text-warning)",marginBottom:8}}>✦ CMYK Pro</div>
+          <div style={{fontSize:38,fontWeight:700,letterSpacing:"-.04em",color:"var(--text-warning)",lineHeight:1}}>{fmt(totalCMYKPro)}</div>
+          <div style={{fontSize:10,color:"var(--text-warning)",opacity:.7,marginTop:5}}>unidades disponibles</div>
         </div>
       </div>
-      {totalPapel===0&&totalTinta===0
-        ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin stock.</div>
+
+      {sinStock
+        ?<div style={{padding:"4rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",borderRadius:"var(--r-xl)",border:"0.5px solid var(--glass-border)"}}>Sin stock disponible.</div>
         :<>
-          {Object.keys(stockPapel).length>0&&(
-            <div style={{marginBottom:"1.5rem"}}>
-              <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>📄 Papeles</div>
-              <div style={{display:"grid",gap:6}}>{Object.entries(stockPapel).sort((a,b)=>b[1]-a[1]).map(e=>Row(e,false))}</div>
+          {Object.keys(papel).length>0&&(
+            <div style={{marginBottom:"2rem"}}>
+              <SectionLabel color="var(--text-success)">Papel · por gramaje</SectionLabel>
+              <div style={{display:"grid",gap:10}}>
+                {Object.entries(papel).sort((a,b)=>b[1]-a[1]).map(e=>PapelRow(e))}
+              </div>
             </div>
           )}
-          {Object.keys(stockTinta).length>0&&(
-            <div>
-              <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:8}}>🖨️ Tintas</div>
-              <div style={{display:"grid",gap:6}}>{Object.entries(stockTinta).sort((a,b)=>b[1]-a[1]).map(e=>Row(e,true))}</div>
+          {Object.keys(cmyk).length>0&&(
+            <div style={{marginBottom:"2rem"}}>
+              <SectionLabel color="var(--text-info)">Tinta CMYK Estándar</SectionLabel>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                {TINTA_NAMES.filter(n=>cmyk[n]!==undefined).map(n=>TintaRow([n,cmyk[n]],false))}
+              </div>
+            </div>
+          )}
+          {Object.keys(cmykPro).length>0&&(
+            <div style={{marginBottom:"2rem"}}>
+              <SectionLabel color="var(--text-warning)">Tinta CMYK Pro</SectionLabel>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                {TINTA_PRO_NAMES.filter(n=>cmykPro[n]!==undefined).map(n=>TintaRow([n,cmykPro[n]],true))}
+              </div>
             </div>
           )}
         </>
