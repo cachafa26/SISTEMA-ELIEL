@@ -435,13 +435,11 @@ function ReporteIA({data,stockUni}){
 
   const calcularMetricas=async()=>{
     const ventasHist=data.ventasHistoricas||[];
-    // fechas normalizadas
-ventasHist=data.ventasHistoricas||[];
     const todasVentas=[...ventasHist,...(data.ventas||[])];
     const hoy=new Date('2026-06-18');
     const normalFecha=f=>{if(!f)return null;const s=String(f);if(s.length>=10&&s[4]==='-')return s.substring(0,10);return null;};
     const porMes={};
-    todasVentas.forEach(v=>{if(!v.fecha)return;const mes=v.fecha.substring(0,7);porMes[mes]=(porMes[mes]||0)+Number(v.total||0);});
+    todasVentas.forEach(v=>{const ff=normalFecha(v.fecha);if(!ff)return;const mes=ff.substring(0,7);porMes[mes]=(porMes[mes]||0)+Number(v.total||0);});
     const mesesOrdenados=Object.entries(porMes).sort((a,b)=>a[0].localeCompare(b[0]));
     const porCliente={};
     todasVentas.forEach(v=>{if(!v.cliente)return;const cl=String(v.cliente).trim().toUpperCase();if(!porCliente[cl])porCliente[cl]={total:0,ultimaCompra:"",fechas:[]};porCliente[cl].total+=Number(v.total||0);const ff2=normalFecha(v.fecha);if(ff2&&ff2>porCliente[cl].ultimaCompra)porCliente[cl].ultimaCompra=ff2;if(ff2)porCliente[cl].fechas.push(ff2);});
