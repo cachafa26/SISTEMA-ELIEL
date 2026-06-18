@@ -7300,19 +7300,21 @@ body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f1117;color:#e
   <button class="btn btn-p" onclick="window.print()">⬇ Descargar PDF</button>
 </div>
 
-</div>
-<script>
-const chartData=${chartDataStr};
-const max=Math.max(...chartData.map(d=>d.v));
-const chart=document.getElementById('chart');
-chartData.forEach(d=>{
-  const pct=(d.v/max)*100;
-  const g=document.createElement('div');g.className='bg';
-  g.innerHTML='<div class="bv">$'+d.v+'M</div><div class="b '+(d.cur?'cur':'old')+'" style="height:'+pct+'%" title="'+d.l+': $'+d.v+'M"></div><div class="bl">'+d.l+'</div>';
-  chart.appendChild(g);
-});
-</script>
-</body></html>`;
+    +"</div>\n"
+    +"<"+"script>\n"
+    +"const chartData="+chartDataStr+";\n"
+    +"const max=Math.max.apply(null,chartData.map(function(d){return d.v;}));\n"
+    +"const chart=document.getElementById('chart');\n"
+    +"chartData.forEach(function(d){\n"
+    +"  var pct=(d.v/max)*100;\n"
+    +"  var g=document.createElement('div');g.className='bg';\n"
+    +"  var lbl=d.l||'?';var val=d.v||0;\n"
+    +"  g.innerHTML='<div class=\\"bv\\">\$'+val+'M</div><div class=\\"b '+(d.cur?'cur':'old')+'\\" style=\\"height:'+pct+'%\\"></div><div class=\\"bl\\">'+lbl+'</div>';\n"
+    +"  chart.appendChild(g);\n"
+    +"});\n"
+    +"<"+"/script>\n"
+    +"</body></html>";
+  };
   };
 
   const generarReporte=async()=>{
