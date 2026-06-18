@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.4.0 · 2026-06-18 -->
+  <!-- v3.5.0 · 2026-06-18 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -614,7 +614,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.4.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.5.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1060,7 +1060,7 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.4.0";
+const APP_VERSION = "v3.5.0";
 const APP_BUILD   = "2026-06-18";
 
 // ── SC Reporte PDF ─────────────────────────────────────────────────
@@ -1090,7 +1090,7 @@ window.sc_construirPDF=function(textos,m){
     if(f>compProd[art][cl].ultima)compProd[art][cl].ultima=f;
   });
   var dormidosPotencial=fmtM(Math.round((m.dormidos||[]).slice(0,3).reduce(function(a,x){return a+x.total*0.15;},0)));
-  var hoyDate=new Date("2026-06-18");
+  var hoyDate=new Date();
   var stockCruceRows=sPapel.slice(0,4).map(function(pe){
     var prod=pe[0];var cant=pe[1];
     var al=cant<15?"low":cant<40?"mid":"ok";
@@ -1617,6 +1617,7 @@ function App(){
   const [toastMsg,setToastMsg]=useState(null);
   const [blue,setBlue]=useState(null);
   const [showPedido,setShowPedido]=useState(false);
+  const [scNavOpen,setScNavOpen]=useState(false);
   const [showSearch,setShowSearch]=useState(false);
   const [chatState,setChatState]=useState("closed"); // "closed"|"open"|"minimized"
   const [chatMsgs,setChatMsgs]=useState([{role:"assistant",content:"¡Hola! Soy tu asistente. Puedo responder preguntas, cargar pedidos, generar presupuestos DJ y más. ¿Qué necesitás?"}]);
@@ -1968,51 +1969,68 @@ function App(){
             position:"sticky",top:"var(--subnav-top,52px)",zIndex:49,
             background:"var(--bg-nav)",backdropFilter:"blur(20px) saturate(1.8)",WebkitBackdropFilter:"blur(20px) saturate(1.8)",
             borderBottom:"0.5px solid var(--glass-border)",
-            padding:"10px 12px",
           }}>
-            {/* + Pedido button — full width, prominent */}
-            <button onClick={()=>setShowPedido(true)} style={{
-              width:"100%",fontSize:15,padding:"13px",
-              background:"linear-gradient(135deg,#F47920,#5BAD41)",color:"#fff",border:"none",
-              borderRadius:"var(--r-lg)",fontWeight:700,cursor:"pointer",
-              boxShadow:"0 4px 16px rgba(244,121,32,0.4)",letterSpacing:".01em",
-              marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-            }}>
-              <span style={{fontSize:18,lineHeight:1}}>+</span> Nuevo Pedido
-            </button>
-            {/* Grid 3x3 de secciones */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-              {[
-                {id:"dashboard",icon:"🏠",label:"Resumen"},
-                {id:"contenedores",icon:"🗃️",label:"Contenedores"},
-                {id:"stock",icon:"📦",label:"Stock"},
-                {id:"ventas",icon:"💰",label:"Ventas"},
-                {id:"cuentas",icon:"👤",label:"Cuentas"},
-                {id:"extracto",icon:"📋",label:"Extracto"},
-                {id:"mi30",icon:"✦",label:"Mi 30%"},
-                {id:"despachos",icon:"🚚",label:"Despachos"},
-                {id:"reportes",icon:"📊",label:"Reportes"},
-              ].map(n=>(
-                <button key={n.id} onClick={()=>{setView(n.id);setContSel(null);}}
-                  style={{
-                    background:view===n.id?"var(--bg-tint-orange)":"var(--bg-card)",
-                    backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
-                    border:view===n.id?"0.5px solid rgba(244,121,32,0.4)":"0.5px solid var(--glass-border)",
-                    borderRadius:"var(--r-md)",
-                    padding:"10px 6px",cursor:"pointer",
-                    display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-                    boxShadow:view===n.id?"0 2px 12px rgba(244,121,32,0.2)":"var(--glass-shadow-sm)",
-                    transition:"all .15s",
-                  }}>
-                  <span style={{fontSize:20,lineHeight:1}}>{n.icon}</span>
-                  <span style={{
-                    fontSize:10,fontWeight:view===n.id?700:500,
-                    color:view===n.id?"var(--sc-orange)":"var(--text-secondary)",
-                    letterSpacing:".01em",lineHeight:1.2,
-                  }}>{n.label}</span>
-                </button>
-              ))}
+            {/* Barra compacta: sección activa + toggle + botón pedido */}
+            <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px"}}>
+              {/* Toggle menú */}
+              <button onClick={()=>setScNavOpen(o=>!o)} style={{
+                display:"flex",alignItems:"center",gap:6,flex:1,
+                background:"none",border:"0.5px solid var(--glass-border)",
+                borderRadius:"var(--r-md)",padding:"7px 10px",cursor:"pointer",
+                color:"var(--text-primary)",
+              }}>
+                <span style={{fontSize:16,lineHeight:1}}>
+                  {[{id:"dashboard",icon:"🏠"},{id:"contenedores",icon:"🗃️"},{id:"stock",icon:"📦"},{id:"ventas",icon:"💰"},{id:"cuentas",icon:"👤"},{id:"extracto",icon:"📋"},{id:"mi30",icon:"✦"},{id:"despachos",icon:"🚚"},{id:"reportes",icon:"📊"}].find(n=>n.id===view)?.icon||"☰"}
+                </span>
+                <span style={{fontSize:12,fontWeight:600,flex:1,textAlign:"left",color:"var(--sc-orange)"}}>
+                  {[{id:"dashboard",label:"Resumen"},{id:"contenedores",label:"Contenedores"},{id:"stock",label:"Stock"},{id:"ventas",label:"Ventas"},{id:"cuentas",label:"Cuentas"},{id:"extracto",label:"Extracto"},{id:"mi30",label:"Mi 30%"},{id:"despachos",label:"Despachos"},{id:"reportes",label:"Reportes"}].find(n=>n.id===view)?.label||"Menú"}
+                </span>
+                <span style={{fontSize:10,color:"var(--text-secondary)",transition:"transform .2s",display:"inline-block",transform:scNavOpen?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
+              </button>
+              {/* Botón + Pedido discreto */}
+              <button onClick={()=>setShowPedido(true)} style={{
+                flexShrink:0,width:36,height:36,
+                background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#fff",border:"none",
+                borderRadius:"var(--r-md)",fontWeight:700,cursor:"pointer",fontSize:20,lineHeight:1,
+                boxShadow:"0 2px 10px rgba(244,121,32,0.4)",
+                display:"flex",alignItems:"center",justifyContent:"center",
+              }}>+</button>
             </div>
+            {/* Grilla desplegable */}
+            {scNavOpen&&(
+              <div style={{padding:"0 12px 12px"}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                  {[
+                    {id:"dashboard",icon:"🏠",label:"Resumen"},
+                    {id:"contenedores",icon:"🗃️",label:"Contenedores"},
+                    {id:"stock",icon:"📦",label:"Stock"},
+                    {id:"ventas",icon:"💰",label:"Ventas"},
+                    {id:"cuentas",icon:"👤",label:"Cuentas"},
+                    {id:"extracto",icon:"📋",label:"Extracto"},
+                    {id:"mi30",icon:"✦",label:"Mi 30%"},
+                    {id:"despachos",icon:"🚚",label:"Despachos"},
+                    {id:"reportes",icon:"📊",label:"Reportes"},
+                  ].map(n=>(
+                    <button key={n.id} onClick={()=>{setView(n.id);setContSel(null);setScNavOpen(false);}}
+                      style={{
+                        background:view===n.id?"var(--bg-tint-orange)":"var(--bg-card)",
+                        backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+                        border:view===n.id?"0.5px solid rgba(244,121,32,0.4)":"0.5px solid var(--glass-border)",
+                        borderRadius:"var(--r-md)",padding:"9px 4px",cursor:"pointer",
+                        display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+                        boxShadow:view===n.id?"0 2px 8px rgba(244,121,32,0.2)":"none",
+                        transition:"all .15s",
+                      }}>
+                      <span style={{fontSize:18,lineHeight:1}}>{n.icon}</span>
+                      <span style={{
+                        fontSize:9,fontWeight:view===n.id?700:500,
+                        color:view===n.id?"var(--sc-orange)":"var(--text-secondary)",
+                      }}>{n.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -2061,6 +2079,7 @@ function App(){
           <FinanzasView
             data={data} save={save} showToast={showToast} blue={blue}
             totalIngresos={totalIngresos} totalGastos={totalGastos}
+            totalGastosUSD={totalGastosUSD} totalCobUSD={totalCobUSD} djCobradoUSD={djCobradoUSD}
             bhTotalAnio={bhTotalAnio} bhCobradoTotal={bhCobradoTotal} djCobrado={djCobrado} totalRetSCPesos={totalRetSCPesos}
             bhSueldo={bhSueldo} pendienteRetiro={pendienteRetiro}
           />
@@ -4638,7 +4657,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 // ══════════════════════════════════════════════════════════════════════════
 // FINANZAS PERSONALES
 // ══════════════════════════════════════════════════════════════════════════
-function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTotalAnio,bhCobradoTotal,djCobrado,totalRetSCPesos,bhSueldo,pendienteRetiro}){
+function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalGastosUSD,totalCobUSD,djCobradoUSD,bhTotalAnio,bhCobradoTotal,djCobrado,totalRetSCPesos,bhSueldo,pendienteRetiro}){
   const tcBlue=blue||1450;
   const initForm={desc:"",moneda:"ARS",monto:"",cotiz:String(Math.round(tcBlue)),cat:"Alimentación",fecha:hoy(),fuente:"Otros"};
   const [form,setForm]=useState(initForm);
@@ -4758,19 +4777,33 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,bhTota
       </div>
 
       {/* Métricas */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.5rem"}}>
-        {[
-          {l:"Ingresos totales",v:"$"+fmt(totalIngresos)},
-          {l:"Total gastado",v:"$"+fmt(totalGastos),danger:totalGastos>0},
-          {l:"Balance",v:"$"+fmt(balance),green:balance>=0,danger:balance<0},
-          {l:"N° de gastos",v:gastos.length},
-        ].map(x=>(
-          <div key={x.l} style={{background:x.green?"var(--color-background-success)":x.danger&&typeof x.v==="string"?"var(--color-background-danger)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
-            <div style={{fontSize:11,color:x.green?"var(--color-text-success)":x.danger&&typeof x.v==="string"?"var(--color-text-danger)":"var(--color-text-secondary)",marginBottom:4}}>{x.l}</div>
-            <div style={{fontSize:18,fontWeight:500,color:x.green?"var(--color-text-success)":x.danger&&typeof x.v==="string"?"var(--color-text-danger)":"var(--color-text-primary)"}}>{x.v}</div>
+      {(()=>{
+        const totalIngresosUSD=(totalCobUSD||0)+(djCobradoUSD||0);
+        const balanceUSD=totalIngresosUSD-(totalGastosUSD||0);
+        const MetCard=({label,value,green,danger,sub})=>(
+          <div style={{background:green?"var(--color-background-success)":danger?"var(--color-background-danger)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
+            <div style={{fontSize:10,fontWeight:600,letterSpacing:".04em",textTransform:"uppercase",color:green?"var(--color-text-success)":danger?"var(--color-text-danger)":"var(--color-text-secondary)",marginBottom:4}}>{label}</div>
+            <div style={{fontSize:18,fontWeight:600,color:green?"var(--color-text-success)":danger?"var(--color-text-danger)":"var(--color-text-primary)"}}>{value}</div>
+            {sub&&<div style={{fontSize:10,color:green?"var(--color-text-success)":danger?"var(--color-text-danger)":"var(--color-text-secondary)",marginTop:2,opacity:.75}}>{sub}</div>}
           </div>
-        ))}
-      </div>
+        );
+        return(
+          <>
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--color-text-secondary)",marginBottom:8}}>En pesos</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:"1.25rem"}}>
+              <MetCard label="Balance" value={"$"+fmt(balance)} green={balance>=0} danger={balance<0}/>
+              <MetCard label="Ingresos" value={"$"+fmt(totalIngresos)}/>
+              <MetCard label="Gastado" value={"$"+fmt(totalGastos)} danger={totalGastos>0}/>
+            </div>
+            <div style={{fontSize:10,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--color-text-secondary)",marginBottom:8}}>En dólares</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:"1.5rem"}}>
+              <MetCard label="Balance" value={fmtUSD(balanceUSD)} green={balanceUSD>=0} danger={balanceUSD<0}/>
+              <MetCard label="Ingresos" value={fmtUSD(totalIngresosUSD)} sub="SC + DJ cobrado"/>
+              <MetCard label="Gastado" value={fmtUSD(totalGastosUSD||0)} danger={(totalGastosUSD||0)>0}/>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Formulario */}
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"16px 18px",marginBottom:"1.5rem"}}>
@@ -7117,10 +7150,15 @@ function ReportesView({data,save,showToast}){
   // ── Calcular métricas (recibe ventasHist como param para evitar stale closure) ──
   const calcularMetricas=(vh)=>{
     const todasVentas=[...vh,...(data.ventas||[])];
-    const hoy=new Date("2026-06-18"); // fecha actual del sistema
+    const hoy=new Date();
 
     const normalFecha=f=>{
-      if(!f)return null;
+      if(!f&&f!==0)return null;
+      if(typeof f==="number"&&f>40000){
+        const d=new Date(Math.round((f-25569)*86400*1000));
+        if(!isNaN(d.getTime()))return d.toISOString().split("T")[0];
+        return null;
+      }
       const s=String(f);
       if(s.match(/^\d{4}-\d{2}-\d{2}/))return s.substring(0,10);
       return null;
@@ -7231,6 +7269,8 @@ function ReportesView({data,save,showToast}){
     try{
       // Pasar ventasHist directamente, no desde estado
       const m=calcularMetricas(vh);
+      console.log("[Reporte] vh.length:",vh.length,"ventas:",( data.ventas||[]).length);
+      console.log("[Reporte] totalHist:",m.totalHist,"topClientes:",m.topClientes.slice(0,3).map(c=>c.nombre+":"+c.diasSin+"d"));
       setLoadingMsg("Enviando a Claude...");
 
       // Claude solo escribe los textos — los números ya los tenemos
