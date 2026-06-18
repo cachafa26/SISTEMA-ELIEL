@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.1.3 · 2026-06-17 -->
+  <!-- v3.2.0 · 2026-06-18 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.1.3</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.2.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1041,9 +1041,7 @@ window.generarPresupuestoHTML = generarPresupuestoHTML;
 window.generarReciboHTML = generarReciboHTML;
 window.obtenerServiciosPaquete = obtenerServiciosPaquete;
 window.abrirPDF = abrirPDF;
-</script>
 
-<script>
 function sc_construirPDF(textos,m){
     const fmt2=n=>Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
     const fmtM=n=>{const v=Number(n||0);return v>=1000000?"$"+(v/1000000).toFixed(1)+"M":"$"+fmt2(v);};
@@ -1535,17 +1533,17 @@ body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f1117;color:#e
 
 `
     +"</div>\n"
-    +"<"+"script>\n"
-    +"const chartData="+chartDataStr+";\n"
-    +"const max=Math.max.apply(null,chartData.map(function(d){return d.v;}));\n"
-    +"const chart=document.getElementById('chart');\n"
-    +"chartData.forEach(function(d){\n"
-    +"  var pct=(d.v/max)*100;\n"
-    +"  var g=document.createElement('div');g.className='bg';\n"
-    +"  var lbl=d.l||'?';var val=d.v||0;\n"
-    +"  g.innerHTML='<div class=\\"bv\\">\$'+val+'M</div><div class=\\"b '+(d.cur?'cur':'old')+'\\" style=\\"height:'+pct+'%\\"></div><div class=\\"bl\\">'+lbl+'</div>';\n"
-    +"  chart.appendChild(g);\n"
-    +"});\n"
+    +"<"+"script>" 
+    +"var cd="+chartDataStr+"; var mx=0;"
+    +"for(var i=0;i<cd.length;i++){if(cd[i].v>mx)mx=cd[i].v;}"
+    +"var ch=document.getElementById(" +JSON.stringify("chart")+");"
+    +"for(var j=0;j<cd.length;j++){"
+    +"var d=cd[j];var pct=mx>0?(d.v/mx)*100:0;"
+    +"var g=document.createElement(" +JSON.stringify("div")+");g.className=" +JSON.stringify("bg")+";"
+    +"var bv=document.createElement(" +JSON.stringify("div")+");bv.className=" +JSON.stringify("bv")+";bv.textContent=" +JSON.stringify("$")+"+d.v+" +JSON.stringify("M")+";"
+    +"var bar=document.createElement(" +JSON.stringify("div")+");bar.className=" +JSON.stringify("b ")+"+(d.cur?" +JSON.stringify("cur")+":" +JSON.stringify("old")+");bar.style.height=pct+" +JSON.stringify("%")+";"
+    +"var bl=document.createElement(" +JSON.stringify("div")+");bl.className=" +JSON.stringify("bl")+";bl.textContent=d.l;"
+    +"g.appendChild(bv);g.appendChild(bar);g.appendChild(bl);ch.appendChild(g);}"
     +"<"+"/script>\n"
     +"</body></html>";
 }
@@ -1554,8 +1552,8 @@ window.sc_construirPDF=sc_construirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.1.3";
-const APP_BUILD   = "2026-06-16";
+const APP_VERSION = "v3.2.0";
+const APP_BUILD   = "2026-06-18";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
 const ESTADOS = ["A despachar","Despachado","A retirar Ezeiza","A retirar Once","Retirado"];
@@ -7320,7 +7318,7 @@ function ReportesView({data,save,showToast}){
   };
 
   // ── Construir PDF fiel al mockup aprobado ─────────────────────
-  const construirPDF=(textos,m)=>window.sc_construirPDF(textos,m);
+  const construirPDF=(textos,m)=>{if(typeof window.sc_construirPDF!=="function"){throw new Error("sc_construirPDF not loaded. Type: "+typeof window.sc_construirPDF);}return window.sc_construirPDF(textos,m);};
 
 
   const generarReporte=async()=>{
