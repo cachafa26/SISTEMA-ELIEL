@@ -7376,7 +7376,7 @@ body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f1117;color:#e
       if(!raw)throw new Error("Respuesta vacía de Claude");
       setLoadingMsg("Construyendo reporte...");
       let textos;
-      var cleanRaw=raw.replace(new RegExp("```json|```","g"),"").trim();try{textos=JSON.parse(cleanRaw);}
+      var bt="`";var cleanRaw=raw.split(bt+bt+bt+"json").join("").split(bt+bt+bt).join("").trim();try{textos=JSON.parse(cleanRaw);}
       catch(e){throw new Error("Error parseando JSON: "+raw.slice(0,200));}
 
       const mConRaw={...m,ventasHistRaw:vh,ventasRaw:data.ventas||[]};
