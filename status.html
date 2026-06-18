@@ -524,26 +524,27 @@ ventasHist=data.ventasHistoricas||[];
       React.createElement("button",{
         onClick:generar,
         style:{
-          width:"100%%",
+          width:"100%",
           padding:"16px 24px",
-          background:"linear-gradient(135deg,#F47920 0%%,#e8640a 60%%,#d4550a 100%%)",
-          color:"#fff",
+          background:"linear-gradient(135deg,#F47920 0%,#e8640a 60%,#d4550a 100%)",
+          color:"#ffffff",
           border:"none",
           borderRadius:"var(--r-xl)",
           fontSize:15,
           fontWeight:700,
           cursor:"pointer",
-          boxShadow:"0 6px 28px rgba(244,121,32,.40), 0 1px 0 rgba(255,255,255,0.15) inset",
+          boxShadow:"0 6px 28px rgba(244,121,32,.45), 0 1px 0 rgba(255,255,255,0.2) inset",
           display:"flex",
           alignItems:"center",
           justifyContent:"center",
           gap:10,
           letterSpacing:"-.01em",
-          transition:"all .2s"
+          fontFamily:"inherit",
+          WebkitTextFillColor:"#ffffff"
         }
       },
-        React.createElement("span",{style:{fontSize:20,lineHeight:1}},"✦"),
-        React.createElement("span",null,"Generar reporte con IA")
+        React.createElement("span",{style:{fontSize:20,lineHeight:1,color:"#fff"}},"✦"),
+        React.createElement("span",{style:{color:"#fff"}},"Generar reporte con IA")
       )
     ),
     estado==="loading"&&React.createElement("div",{style:{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"20px",display:"flex",alignItems:"center",gap:14,boxShadow:"var(--glass-shadow-sm)",marginBottom:"1.25rem"}},
@@ -557,16 +558,16 @@ ventasHist=data.ventasHistoricas||[];
       React.createElement("div",{style:{fontSize:12,color:"var(--text-danger)",fontWeight:600,marginBottom:8}},msg),
       React.createElement("button",{onClick:()=>{setEstado("idle");setMsg("");},style:{fontSize:11,padding:"6px 14px",background:"none",border:"0.5px solid var(--border-danger)",borderRadius:"var(--r-pill)",color:"var(--text-danger)",cursor:"pointer"}},"Reintentar")
     ),
-    estado==="done"&&reporteHTML&&React.createElement("div",null,
-      React.createElement("div",{style:{display:"flex",gap:8,marginBottom:12,justifyContent:"space-between",alignItems:"center"}},
-        React.createElement("div",{style:{fontSize:12,color:"var(--text-success)",fontWeight:600}},"✓ Reporte generado"),
-        React.createElement("div",{style:{display:"flex",gap:8}},
-          React.createElement("button",{onClick:()=>{setEstado("idle");setReporteHTML(null);},style:{fontSize:11,padding:"7px 14px",background:"none",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-pill)",color:"var(--text-secondary)",cursor:"pointer"}},"↺ Nuevo"),
-          React.createElement("button",{onClick:imprimir,style:{fontSize:11,padding:"7px 14px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#fff",border:"none",borderRadius:"var(--r-pill)",fontWeight:600,cursor:"pointer"}},"⬇ Descargar PDF")
+    estado==="done"&&reporteHTML&&React.createElement("div",{style:{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"20px 24px",boxShadow:"var(--glass-shadow-sm)",marginBottom:"1.25rem"}},
+      React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}},
+        React.createElement("div",null,
+          React.createElement("div",{style:{fontSize:13,fontWeight:700,color:"var(--text-success)",marginBottom:3}},"✓ Reporte generado"),
+          React.createElement("div",{style:{fontSize:11,color:"var(--text-secondary)"}},new Date().toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}))
+        ),
+        React.createElement("div",{style:{display:"flex",gap:8,flexShrink:0}},
+          React.createElement("button",{onClick:()=>{setEstado("idle");setReporteHTML(null);},style:{fontSize:12,padding:"9px 16px",background:"none",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-pill)",color:"var(--text-secondary)",cursor:"pointer",fontFamily:"inherit"}},"↺ Nuevo"),
+          React.createElement("button",{onClick:imprimir,style:{fontSize:12,padding:"9px 18px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#ffffff",border:"none",borderRadius:"var(--r-pill)",fontWeight:700,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 3px 12px rgba(244,121,32,.4)",WebkitTextFillColor:"#fff"}},"⬇ Abrir / Descargar PDF")
         )
-      ),
-      React.createElement("div",{style:{border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",overflow:"hidden",boxShadow:"var(--glass-shadow-sm)"}},
-        React.createElement("iframe",{srcDoc:reporteHTML,style:{width:"100%%",height:"min(80vh, 600px)",border:"none",display:"block"},title:"Reporte"})
       )
     )
   );
