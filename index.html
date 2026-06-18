@@ -6887,16 +6887,17 @@ function ReportesView({data,save,showToast}){
     };
 
     // ── Clientes dormidos table rows ─────────────────────────────
-    const dormidosRows=m.dormidos.map(c=>{
-      const prodKey=Object.keys(compradoresPorProd).filter(p=>compradoresPorProd[p][c.nombre]).sort((a,b)=>(compradoresPorProd[b][c.nombre]||{total:0}).total-(compradoresPorProd[a][c.nombre]||{total:0}).total)[0]||"—";
+    const dormidosRows=m.dormidos.map(function(cl){
+      const prodKey=Object.keys(compradoresPorProd).filter(function(p){return compradoresPorProd[p][cl.nombre];}).sort(function(a,b){return ((compradoresPorProd[b][cl.nombre]||{total:0}).total-(compradoresPorProd[a][cl.nombre]||{total:0}).total);})[0]||"—";
       return "<div class='cli-row dormido-row'>"
-        +"<span class='cr-name'>"+c.nombre+"</span>"
-        +"<span class='cr-val'>"+c.ultima+"</span>"
-        +"<span class='cr-days hot'>"+c.diasSin+" días</span>"
-        +"<span class='cr-ticket'>"+fmtM(c.total)+"</span>"
+        +"<span class='cr-name'>"+cl.nombre+"</span>"
+        +"<span class='cr-val'>"+cl.ultima+"</span>"
+        +"<span class='cr-days hot'>"+cl.diasSin+" días</span>"
+        +"<span class='cr-ticket'>"+fmtM(cl.total)+"</span>"
         +"<span class='cr-val'>"+prodKey+"</span>"
         +"</div>";
     }).join("");
+    const dormidosPotencial=fmtM(Math.round(m.dormidos.slice(0,3).reduce(function(a,x){return a+x.total*.15;},0)));
 
     // ── Proyecciones ─────────────────────────────────────────────
     // Calcular junio estimado = ventas hasta hoy * (30/días del mes transcurridos)
@@ -7250,7 +7251,7 @@ body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f1117;color:#e
                 <div class="cli-row cr-head dh"><span class="cr-label">Cliente</span><span class="cr-label">Última compra</span><span class="cr-label">Días</span><span class="cr-label">Historial</span><span class="cr-label">Producto</span></div>
                 ${dormidosRows}
               </div>
-              <div class="ac-detail" style="margin-top:8px">Si recuperás solo 3 de estos ${m.dormidos.length} → <strong>+${fmtM(Math.round(m.dormidos.slice(0,3).reduce((a,c)=>a+c.total*.15,0))} adicionales este mes</strong>. Vale una llamada de 5 minutos a cada uno.</div>
+              <div class="ac-detail" style="margin-top:8px">Si recuperás solo 3 de estos ${m.dormidos.length} → <strong>+${dormidosPotencial} adicionales este mes</strong>. Vale una llamada de 5 minutos a cada uno.</div>
             </div>
           </div>
         </div>`:""}
