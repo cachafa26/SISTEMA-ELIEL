@@ -434,16 +434,17 @@ function ReporteIA({data,stockUni}){
   const fmt2=n=>Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
 
   const calcularMetricas=async()=>{
-    let ventasHist=[];
-    // ventasHistoricas vive dentro del payload de eliel/datos
+    const ventasHist=data.ventasHistoricas||[];
+    // fechas normalizadas
 ventasHist=data.ventasHistoricas||[];
     const todasVentas=[...ventasHist,...(data.ventas||[])];
-    const hoy=new Date();
+    const hoy=new Date('2026-06-18');
+    const normalFecha=f=>{if(!f)return null;const s=String(f);if(s.length>=10&&s[4]==='-')return s.substring(0,10);return null;};
     const porMes={};
     todasVentas.forEach(v=>{if(!v.fecha)return;const mes=v.fecha.substring(0,7);porMes[mes]=(porMes[mes]||0)+Number(v.total||0);});
     const mesesOrdenados=Object.entries(porMes).sort((a,b)=>a[0].localeCompare(b[0]));
     const porCliente={};
-    todasVentas.forEach(v=>{if(!v.cliente)return;const cl=String(v.cliente).trim().toUpperCase();if(!porCliente[cl])porCliente[cl]={total:0,ultimaCompra:"",fechas:[]};porCliente[cl].total+=Number(v.total||0);if(v.fecha&&v.fecha>porCliente[cl].ultimaCompra)porCliente[cl].ultimaCompra=v.fecha;if(v.fecha)porCliente[cl].fechas.push(v.fecha);});
+    todasVentas.forEach(v=>{if(!v.cliente)return;const cl=String(v.cliente).trim().toUpperCase();if(!porCliente[cl])porCliente[cl]={total:0,ultimaCompra:"",fechas:[]};porCliente[cl].total+=Number(v.total||0);const ff2=normalFecha(v.fecha);if(ff2&&ff2>porCliente[cl].ultimaCompra)porCliente[cl].ultimaCompra=ff2;if(ff2)porCliente[cl].fechas.push(ff2);});
     const topClientes=Object.entries(porCliente).sort((a,b)=>b[1].total-a[1].total).slice(0,15).map(([nombre,d])=>{const fs=[...new Set(d.fechas)].sort();const diffs=fs.slice(1).map((f,i)=>Math.round((new Date(f)-new Date(fs[i]))/86400000));const frecProm=diffs.length?Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length):null;const diasSin=d.ultimaCompra?Math.round((hoy-new Date(d.ultimaCompra))/86400000):null;return{nombre,total:d.total,ultimaCompra:d.ultimaCompra,frecProm,diasSin};});
     const porProd={};
     todasVentas.forEach(v=>{if(!v.articulo)return;if(!porProd[v.articulo])porProd[v.articulo]={total:0,cantidad:0};porProd[v.articulo].total+=Number(v.total||0);porProd[v.articulo].cantidad+=Number(v.cantidad||0);});
