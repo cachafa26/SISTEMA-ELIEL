@@ -435,7 +435,8 @@ function ReporteIA({data,stockUni}){
 
   const calcularMetricas=async()=>{
     let ventasHist=[];
-    try{const db=window._fbDB;if(db){const histDoc=await db.doc("eliel/historial").get();ventasHist=histDoc.exists?(histDoc.data().ventas||[]):[];}}catch(e){console.warn("hist:",e);}
+    // ventasHistoricas vive dentro del payload de eliel/datos
+ventasHist=data.ventasHistoricas||[];
     const todasVentas=[...ventasHist,...(data.ventas||[])];
     const hoy=new Date();
     const porMes={};
