@@ -6647,14 +6647,11 @@ function ReportesView({data,save,showToast,blue}){
       try{
         const db=window._fbDB;
         if(!db)return;
-        // Lee ventasHistoricas desde eliel/historial (mismo doc root, sin colecciones separadas)
-        const histDoc=await db.doc("eliel/historial").get();
-        const rows=histDoc.exists?(histDoc.data().ventas||[]):[];
+        // Lee ventasHistoricas y reportes desde data (payload de eliel/datos)
+        const rows=data.ventasHistoricas||[];
         setVentasHist(rows);
         setHistLoaded(true);
-        // cargar reportes guardados
-        const repDoc=await db.doc("eliel/reportes").get();
-        const reps=repDoc.exists?(repDoc.data().lista||[]):[];
+        const reps=data.reportesSC||[];
         setReportes(reps.slice().reverse().slice(0,10).map((r,i)=>({id:i,...r})));
       }catch(e){console.warn("historial:",e);setHistLoaded(true);}
     })();
@@ -6689,9 +6686,9 @@ function ReportesView({data,save,showToast,blue}){
       setImportMsg(`${clean.length} registros encontrados. Subiendo a Firebase...`);
       const db=window._fbDB;
       if(!db)throw new Error("Firebase no disponible");
-      // Guardar en eliel/historial (documento único, sin colecciones separadas)
+      // Guardar dentro de data vía save() — mismo doc eliel/datos, sin permisos extra
       setImportMsg("Guardando en Firebase...");
-      await db.doc("eliel/historial").set({ventas:clean,importadoEn:new Date().toISOString(),total:clean.length});
+      await save({...data, ventasHistoricas:clean});
       setVentasHist(clean);
       setImportMsg("✓ "+clean.length+" registros importados correctamente. El historial quedó guardado en Firebase — no necesitás volver a subir el archivo.");
       showToast("✓ Histórico importado");
@@ -6906,16 +6903,13 @@ IMPORTANTE:
       const html=construirReportePDF(analisis,m);
       setReporteHTML(html);
 
-      // Guardar en Firebase (eliel/reportes doc)
+      // Guardar reporte dentro de data vía save() — mismo doc eliel/datos
       try{
-        const db=window._fbDB;
-        if(db){
-          const repDoc=await db.doc("eliel/reportes").get();
-          const lista=repDoc.exists?(repDoc.data().lista||[]):[];
-          lista.push({fecha:new Date().toISOString(),semana:analisis.semana||"",html,diagnostico:analisis.diagnostico||""});
-          await db.doc("eliel/reportes").set({lista:lista.slice(-10)});
-          setReportes(lista.slice().reverse().slice(0,10).map((r,i)=>({id:i,...r})));
-        }
+        const lista=[...(data.reportesSC||[])];
+        lista.push({fecha:new Date().toISOString(),semana:analisis.semana||"",html,diagnostico:analisis.diagnostico||""});
+        const listaFinal=lista.slice(-10);
+        await save({...data, reportesSC:listaFinal});
+        setReportes(listaFinal.slice().reverse().map((r,i)=>({id:i,...r})));
       }catch(e){console.warn("No se pudo guardar reporte",e);}
       setTab("ver");
     }catch(err){
