@@ -6636,6 +6636,7 @@ function ReportesView({data,save,showToast,blue}){
   const [histLoaded,setHistLoaded]=useState(false);
   const [importando,setImportando]=useState(false);
   const [importMsg,setImportMsg]=useState("");
+  const [historialImportado,setHistorialImportado]=useState(false);
   const [reporteHTML,setReporteHTML]=useState(null);
   const [reportes,setReportes]=useState([]);
   const fileRef=useRef();
@@ -6646,14 +6647,16 @@ function ReportesView({data,save,showToast,blue}){
       try{
         const db=window._fbDB;
         if(!db)return;
-        const snap=await db.collection("ventasHistoricas").limit(2000).get();
-        const rows=snap.docs.map(d=>d.data());
+        // Lee ventasHistoricas desde eliel/historial (mismo doc root, sin colecciones separadas)
+        const histDoc=await db.doc("eliel/historial").get();
+        const rows=histDoc.exists?(histDoc.data().ventas||[]):[];
         setVentasHist(rows);
         setHistLoaded(true);
         // cargar reportes guardados
-        const rSnap=await db.collection("reportesSC").orderBy("fecha","desc").limit(10).get();
-        setReportes(rSnap.docs.map(d=>({id:d.id,...d.data()})));
-      }catch(e){console.warn("ventasHistoricas:",e);setHistLoaded(true);}
+        const repDoc=await db.doc("eliel/reportes").get();
+        const reps=repDoc.exists?(repDoc.data().lista||[]):[];
+        setReportes(reps.slice().reverse().slice(0,10).map((r,i)=>({id:i,...r})));
+      }catch(e){console.warn("historial:",e);setHistLoaded(true);}
     })();
   },[]);
 
@@ -6686,25 +6689,13 @@ function ReportesView({data,save,showToast,blue}){
       setImportMsg(`${clean.length} registros encontrados. Subiendo a Firebase...`);
       const db=window._fbDB;
       if(!db)throw new Error("Firebase no disponible");
-      // Borrar colección anterior y re-subir en batches de 400
-      const existing=await db.collection("ventasHistoricas").limit(500).get();
-      let batch=db.batch();
-      existing.docs.forEach(d=>batch.delete(d.ref));
-      await batch.commit();
-      const BATCH=400;
-      for(let i=0;i<clean.length;i+=BATCH){
-        const b=db.batch();
-        clean.slice(i,i+BATCH).forEach((row,j)=>{
-          const ref=db.collection("ventasHistoricas").doc("h"+(i+j));
-          b.set(ref,row);
-        });
-        await b.commit();
-        setImportMsg(`Subiendo... ${Math.min(i+BATCH,clean.length)}/${clean.length}`);
-      }
+      // Guardar en eliel/historial (documento único, sin colecciones separadas)
+      setImportMsg("Guardando en Firebase...");
+      await db.doc("eliel/historial").set({ventas:clean,importadoEn:new Date().toISOString(),total:clean.length});
       setVentasHist(clean);
-      setImportMsg(`✓ ${clean.length} registros importados correctamente`);
+      setImportMsg("✓ "+clean.length+" registros importados correctamente. El historial quedó guardado en Firebase — no necesitás volver a subir el archivo.");
       showToast("✓ Histórico importado");
-      setTimeout(()=>setImportMsg(""),4000);
+      setHistorialImportado(true);
     }catch(err){
       setImportMsg("⚠ Error: "+err.message);
     }finally{
@@ -6915,18 +6906,15 @@ IMPORTANTE:
       const html=construirReportePDF(analisis,m);
       setReporteHTML(html);
 
-      // Guardar en Firebase
+      // Guardar en Firebase (eliel/reportes doc)
       try{
         const db=window._fbDB;
         if(db){
-          await db.collection("reportesSC").add({
-            fecha:new Date().toISOString(),
-            semana:analisis.semana||"",
-            html,
-            diagnostico:analisis.diagnostico||""
-          });
-          const rSnap=await db.collection("reportesSC").orderBy("fecha","desc").limit(10).get();
-          setReportes(rSnap.docs.map(d=>({id:d.id,...d.data()})));
+          const repDoc=await db.doc("eliel/reportes").get();
+          const lista=repDoc.exists?(repDoc.data().lista||[]):[];
+          lista.push({fecha:new Date().toISOString(),semana:analisis.semana||"",html,diagnostico:analisis.diagnostico||""});
+          await db.doc("eliel/reportes").set({lista:lista.slice(-10)});
+          setReportes(lista.slice().reverse().slice(0,10).map((r,i)=>({id:i,...r})));
         }
       }catch(e){console.warn("No se pudo guardar reporte",e);}
       setTab("ver");
@@ -7206,7 +7194,7 @@ tr:hover td{background:#f8f9fa}
         <TabBtn2 id="generar" label="Generar reporte"/>
         <TabBtn2 id="ver" label="Último reporte"/>
         <TabBtn2 id="historial" label="Historial"/>
-        <TabBtn2 id="importar" label="⬆ Importar Excel"/>
+        {!historialImportado&&ventasHist.length===0&&<TabBtn2 id="importar" label="⬆ Importar Excel"/>}
       </div>
 
       {/* Tab: Generar */}
