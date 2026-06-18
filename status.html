@@ -8,8 +8,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="SC Status"/>
   <title>Status Super Coating</title>
-  <link rel="manifest" href="manifest.json"/>
-  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -591,28 +589,66 @@ function ViewVentas({data}){
       </div>
       {ventas.length===0
         ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)"}}>Sin ventas para los filtros seleccionados.</div>
-        :<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",overflow:"hidden",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{overflowX:"auto"}}>
-            <table>
-              <thead><tr>{["Fecha","Contenedor","Artículo","Cant.","Cliente","USD","Estado"].map(h=><th key={h}>{h}</th>)}</tr></thead>
-              <tbody>
-                {ventas.map(v=>{
-                  const cont=(data.contenedores||[]).find(c=>c.id===v.contId);
-                  const est=v.estado||"Retirado";
-                  return(<tr key={v.id}>
-                    <td style={{fontSize:11,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{v.fecha}</td>
-                    <td style={{fontSize:11,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{cont?.nombre?.split(" ")[0]||"—"}</td>
-                    <td style={{fontWeight:500,whiteSpace:"nowrap"}}>{v.articulo}</td>
-                    <td style={{color:"var(--text-secondary)"}}>{fmt(v.cantidad)}</td>
-                    <td style={{whiteSpace:"nowrap"}}>{v.cliente}</td>
-                    <td style={{fontWeight:500,color:"var(--text-info)",whiteSpace:"nowrap"}}>{fmtUSD(v.usd||0)}</td>
-                    <td><span style={{fontSize:10,fontWeight:500,padding:"2px 8px",borderRadius:"var(--r-pill)",background:stBg[est]||"rgba(120,120,128,0.1)",color:stCol[est]||"var(--text-secondary)"}}>{est}</span></td>
-                  </tr>);
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        :(()=>{
+          // Group by pedidoId
+          const pedMap=new Map();
+          for(const v of ventas){
+            const pid=v.pedidoId||v.id;
+            if(!pedMap.has(pid))pedMap.set(pid,{pid,fecha:v.fecha,cliente:v.cliente,contId:v.contId,estado:v.estado,lineas:[],totalARS:0,totalUSD:0});
+            const p=pedMap.get(pid);
+            p.lineas.push(v);
+            p.totalARS+=Number(v.total||0);
+            p.totalUSD+=Number(v.usd||0);
+            if(v.fecha>p.fecha)p.fecha=v.fecha;
+          }
+          const pedidos=[...pedMap.values()];
+          return(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {pedidos.map(p=>{
+                const cont=(data.contenedores||[]).find(c=>c.id===p.contId);
+                const est=p.estado||"Retirado";
+                return(
+                  <div key={p.pid} style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",overflow:"hidden",boxShadow:"var(--glass-shadow-sm)"}}>
+                    {/* Header del pedido */}
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",borderBottom:"0.5px solid var(--glass-border)"}}>
+                      <div>
+                        <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{p.cliente}</div>
+                        <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:1}}>
+                          {p.fecha}
+                          {cont&&<span style={{marginLeft:6}}>· {cont.nombre.split(" ")[0]}</span>}
+                        </div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>${fmt(p.totalARS)}</div>
+                          <div style={{fontSize:11,color:"var(--text-info)",fontWeight:500}}>{fmtUSD(p.totalUSD)}</div>
+                        </div>
+                        <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:"var(--r-pill)",background:stBg[est]||"rgba(120,120,128,0.1)",color:stCol[est]||"var(--text-secondary)",whiteSpace:"nowrap"}}>{est}</span>
+                      </div>
+                    </div>
+                    {/* Líneas del pedido */}
+                    {p.lineas.map((v,i)=>(
+                      <div key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 14px",borderBottom:i<p.lineas.length-1?"0.5px solid rgba(120,120,128,0.08)":"none",fontSize:12}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <span style={{color:"var(--text-primary)",fontWeight:500}}>{v.articulo}</span>
+                          <span style={{color:"var(--text-secondary)",marginLeft:6}}>×{fmt(v.cantidad)}</span>
+                        </div>
+                        <div style={{display:"flex",gap:12,alignItems:"center",flexShrink:0}}>
+                          {v.precioVenta>0&&(
+                            <span style={{color:"var(--text-secondary)",fontSize:11}}>${fmt(v.precioVenta)}/u</span>
+                          )}
+                          {v.total>0&&(
+                            <span style={{fontWeight:600,color:"var(--text-primary)"}}>${fmt(v.total)}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()
       }
     </div>
   );
@@ -639,11 +675,6 @@ function ViewVentas({data}){
     }
     if(document.readyState==="complete"){runApp();}
     else{window.addEventListener("load",runApp);}
-  </script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js');
-    }
   </script>
 </body>
 </html>
