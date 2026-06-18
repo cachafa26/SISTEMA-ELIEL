@@ -176,7 +176,6 @@
     (function(){var t=localStorage.getItem("sc_status_theme")||"light";document.documentElement.setAttribute("data-theme",t);})();
   </script>
 
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" onerror="showErr('No se pudo cargar Firebase.')"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js" onerror="showErr('No se pudo cargar Firestore.')"></script>
   <script>
@@ -200,7 +199,6 @@
 
   <script id="src" type="text/raw">
 const {useState,useEffect,useRef}=React;
-const ANTHROPIC_KEY = String.fromCharCode(115,107,45,97,110,116,45,97,112,105,48,51,45,73,97,57,108,50,81,110,106,95,115,50,48,114,79,79,119,107,117,56,104,88,65,95,55,86,53,119,109,110,113,87,65,115,113,90,86,78,56,88,76,70,116,74,89,122,77,122,101,97,97,55,95,80,88,101,66,101,105,118,55,97,72,73,49,102,95,97,72,73,51,104,113,52,49,110,50,122,120,49,65,112,120,70,88,78,119,45,83,90,53,52,74,81,65,65);
 
 
 const fmt = n => Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
@@ -383,7 +381,6 @@ function ViewDashboard({data,stockUni,lastUpdate,setView}){
         {lastUpdate&&<div style={{fontSize:10,color:"var(--text-secondary)",textAlign:"right"}}>Actualizado<br/>{lastUpdate.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</div>}
       </div>
       {/* Botón reporte IA — arriba, ancho completo */}
-      <ReporteIA data={data} stockUni={stockUni}/>
       <div style={{background:"var(--bg-tint-green)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-lg)",boxShadow:"var(--glass-shadow-sm)",padding:"14px 18px",marginBottom:"1.25rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
           <div style={{fontSize:11,color:"var(--text-success)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Stock total disponible</div>
@@ -427,150 +424,6 @@ function ViewDashboard({data,stockUni,lastUpdate,setView}){
   );
 }
 
-function ReporteIA({data,stockUni}){
-  const [estado,setEstado]=React.useState("idle");
-  const [msg,setMsg]=React.useState("");
-  const [reporteHTML,setReporteHTML]=React.useState(null);
-  const fmt2=n=>Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
-
-  const calcularMetricas=async()=>{
-    const ventasHist=data.ventasHistoricas||[];
-    const todasVentas=[...ventasHist,...(data.ventas||[])];
-    const hoy=new Date('2026-06-18');
-    const normalFecha=f=>{if(!f)return null;const s=String(f);if(s.length>=10&&s[4]==='-')return s.substring(0,10);return null;};
-    const porMes={};
-    todasVentas.forEach(v=>{const ff=normalFecha(v.fecha);if(!ff)return;const mes=ff.substring(0,7);porMes[mes]=(porMes[mes]||0)+Number(v.total||0);});
-    const mesesOrdenados=Object.entries(porMes).sort((a,b)=>a[0].localeCompare(b[0]));
-    const porCliente={};
-    todasVentas.forEach(v=>{if(!v.cliente)return;const cl=String(v.cliente).trim().toUpperCase();if(!porCliente[cl])porCliente[cl]={total:0,ultimaCompra:"",fechas:[]};porCliente[cl].total+=Number(v.total||0);const ff2=normalFecha(v.fecha);if(ff2&&ff2>porCliente[cl].ultimaCompra)porCliente[cl].ultimaCompra=ff2;if(ff2)porCliente[cl].fechas.push(ff2);});
-    const topClientes=Object.entries(porCliente).sort((a,b)=>b[1].total-a[1].total).slice(0,15).map(([nombre,d])=>{const fs=[...new Set(d.fechas)].sort();const diffs=fs.slice(1).map((f,i)=>Math.round((new Date(f)-new Date(fs[i]))/86400000));const frecProm=diffs.length?Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length):null;const diasSin=d.ultimaCompra?Math.round((hoy-new Date(d.ultimaCompra))/86400000):null;return{nombre,total:d.total,ultimaCompra:d.ultimaCompra,frecProm,diasSin};});
-    const porProd={};
-    todasVentas.forEach(v=>{if(!v.articulo)return;if(!porProd[v.articulo])porProd[v.articulo]={total:0,cantidad:0};porProd[v.articulo].total+=Number(v.total||0);porProd[v.articulo].cantidad+=Number(v.cantidad||0);});
-    const topProd=Object.entries(porProd).sort((a,b)=>b[1].total-a[1].total).slice(0,8).map(([n,d])=>({nombre:n,...d}));
-    const stockActual={};Object.entries(stockUni).forEach(([n,c])=>{if(c>0)stockActual[n]=c;});
-    const estadoConts=(data.contenedores||[]).map(c=>{const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>{const tot=Number(v.total||0);if(tot===0)return a;const pag=Number(v.pago||0)+(data.pagos||[]).filter(p=>p.ventaId===v.id).reduce((x,p)=>x+Number(p.monto||0),0);return a+Number(v.usd||0)*Math.min(1,pag/tot);},0);const costo=c.costoTotal||0;const pct=costo>0?Math.round((cobUSD/costo)*100):null;return{nombre:c.nombre,cobUSD:Math.round(cobUSD),costo,pct,enGanancia:costo>0&&cobUSD>=costo};});
-    const ultimos30=new Date(hoy);ultimos30.setDate(ultimos30.getDate()-30);const u30str=ultimos30.toISOString().split("T")[0];
-    const ventasU30=todasVentas.filter(v=>v.fecha&&v.fecha>=u30str).reduce((a,v)=>a+Number(v.total||0),0);
-    const totalHistorico=todasVentas.reduce((a,v)=>a+Number(v.total||0),0);
-    return{mesesOrdenados,topClientes,topProd,stockActual,estadoConts,totalHistorico,ventasU30,totalRegistros:todasVentas.length,ventasHistLen:ventasHist.length};
-  };
-
-  const construirPDF=(a,m)=>{
-    const hoy=new Date().toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric"});
-    const PAPEL=["30GR 1,60 X 600","35GR 1,60 X 500","42GR 1,60 X 300","61GR 1,60 X 300","52GR 1,10 X 100","80GR 1,60 X 300","80GR 1,10 X 100"];
-    const CMYK_=["NEGRO","CYAN","MAGENTA","AMARILLO"];
-    const PRO_=["NEGRO PRO","CYAN PRO","MAGENTA PRO","AMARILLO PRO"];
-    const tCol={NEGRO:"#636366",CYAN:"#2E86C1",MAGENTA:"#C2185B",AMARILLO:"#B8860B","NEGRO PRO":"#4A4A6A","CYAN PRO":"#1565C0","MAGENTA PRO":"#880E4F","AMARILLO PRO":"#6D4C00"};
-    const spapel=Object.entries(m.stockActual).filter(([n])=>PAPEL.includes(n));
-    const scmyk=Object.entries(m.stockActual).filter(([n])=>CMYK_.includes(n));
-    const spro=Object.entries(m.stockActual).filter(([n])=>PRO_.includes(n));
-    const totalPapelStock=spapel.reduce((s,[,v])=>s+v,0)||1;
-    const accCard=(ac,tagStyle,tagLabel)=>"<div style='display:flex;gap:12px;align-items:flex-start;background:#f8f9fa;border:1px solid #e9ecef;border-radius:10px;padding:13px 15px;margin-bottom:8px'><div style='font-size:20px;flex-shrink:0;line-height:1.2'>"+(ac.icono||"")+"</div><div style='flex:1'><div style='display:flex;justify-content:space-between;gap:8px;margin-bottom:5px'><div style='font-size:12px;font-weight:700;color:#1a1a2e'>"+(ac.titulo||"")+"</div><span style='flex-shrink:0;font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;"+tagStyle+"'>"+tagLabel+"</span></div><div style='font-size:11px;color:#495057;line-height:1.6'>"+(ac.detalle||"")+"</div></div></div>";
-    const papelCards=spapel.map(([n,c])=>{const pct=Math.round(c/totalPapelStock*100);const al=c<15?"low":c<40?"mid":"ok";const col=al==="low"?"#c0392b":al==="mid"?"#b25000":"#1a7f3c";const bg=al==="low"?"#fdf2f2":al==="mid"?"#fff8f0":"#f0faf0";return"<div style='background:"+bg+";border:1px solid "+col+"22;border-radius:10px;padding:14px 16px'><div style='font-size:10px;font-weight:600;color:#6b7280;margin-bottom:4px'>"+n+"</div><div style='font-size:26px;font-weight:700;color:"+col+";line-height:1'>"+fmt2(c)+"<span style='font-size:11px;color:#6b7280;margin-left:2px'>u.</span></div><div style='height:3px;background:#e5e7eb;border-radius:2px;margin-top:8px;overflow:hidden'><div style='width:"+Math.min(100,pct)+"%%;height:100%%;background:"+col+";opacity:.7;border-radius:2px'></div></div><div style='font-size:9px;font-weight:600;color:"+col+";margin-top:5px'>"+(al==="low"?"⚠ BAJO":al==="mid"?"● Medio":"● OK")+"</div></div>";}).join("");
-    const tCard=([n,c])=>{const col=tCol[n]||"#333";const nm=n.replace(" PRO","");return"<div style='background:"+col+"0d;border:1px solid "+col+"28;border-radius:10px;padding:12px 14px'><div style='font-size:10px;font-weight:700;color:"+col+";text-transform:uppercase;margin-bottom:6px'>"+nm+"</div><div style='font-size:24px;font-weight:700;color:"+col+";line-height:1'>"+fmt2(c)+"<span style='font-size:10px;opacity:.6;margin-left:2px'>u.</span></div><div style='height:3px;background:#e5e7eb;border-radius:2px;margin-top:8px;overflow:hidden'><div style='width:"+Math.min(100,c*3)+"%%;height:100%%;background:"+col+";opacity:.5;border-radius:2px'></div></div></div>";};
-    const dormidos=(a.clientesDormidos||[]).map(c=>"<tr><td style='padding:9px 10px;font-weight:600;color:#1a1a2e;font-size:11px'>"+(c.nombre||"")+"</td><td style='padding:9px 10px;font-size:11px;color:#c0392b;font-weight:700'>"+(c.diasInactivo||"?")+" días</td><td style='padding:9px 10px;font-size:11px;color:#495057'>"+(c.ultimaCompra||"")+"</td><td style='padding:9px 10px;font-size:11px;font-weight:600;color:#1a7f3c'>$"+fmt2(c.historialTotal||0)+"</td><td style='padding:9px 10px;font-size:11px;color:#495057'>"+(c.producto||"")+"</td><td style='padding:9px 10px;font-size:11px;color:#1a5fa5'>"+(c.accion||"")+"</td></tr>").join("");
-    const maxMes=Math.max(...m.mesesOrdenados.slice(-12).map(x=>x[1]));
-    const meses=m.mesesOrdenados.slice(-12).reverse().map(([mes,total])=>{const pct=maxMes>0?Math.round(total/maxMes*100):0;return"<tr><td style='padding:7px 10px;font-size:11px;color:#495057;font-weight:500'>"+mes+"</td><td style='padding:7px 10px;font-size:12px;font-weight:700;color:#1a1a2e'>$"+fmt2(total)+"</td><td style='padding:7px 10px;width:45%%'><div style='height:7px;background:#e9ecef;border-radius:4px;overflow:hidden'><div style='width:"+pct+"%%;height:100%%;background:#F47920;border-radius:4px;opacity:.8'></div></div></td></tr>";}).join("");
-    const tPct=(a.kpis&&a.kpis.tendenciaPct)||0;
-    return"<!DOCTYPE html><html><head><meta charset='UTF-8'><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,sans-serif;background:#f0f2f5;color:#1a1a2e;-webkit-print-color-adjust:exact;print-color-adjust:exact}@media print{body{background:#fff}@page{margin:12mm}}.page{max-width:900px;margin:0 auto;background:#fff;box-shadow:0 8px 40px rgba(0,0,0,.12)}.sec{font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#9ca3af;display:flex;align-items:center;gap:8px;margin-bottom:14px}.sec::after{content:'';flex:1;height:1px;background:#e9ecef}table{width:100%;border-collapse:collapse}th{font-size:9px;font-weight:700;color:#9ca3af;letter-spacing:.08em;text-transform:uppercase;padding:7px 10px;border-bottom:1px solid #e9ecef;text-align:left}tr:hover td{background:#f8f9fa}</style></head><body><div class='page'>"
-    +"<div style='background:linear-gradient(135deg,#1a1a2e,#16213e);padding:30px 40px 26px;display:flex;justify-content:space-between;align-items:center'><div><div style='font-size:10px;font-weight:700;letter-spacing:.2em;color:#F47920;text-transform:uppercase;margin-bottom:5px'>Super Coating · Sistema Eliel</div><div style='font-size:26px;font-weight:800;color:#fff;letter-spacing:-.5px'>Reporte <span style=\"color:#F47920\">Semanal</span></div><div style='font-size:11px;color:#9ca3af;margin-top:3px'>"+(a.semana||"")+" · "+fmt2(m.totalRegistros)+" registros ("+fmt2(m.ventasHistLen)+" históricos + "+fmt2(m.totalRegistros-m.ventasHistLen)+" sistema)</div></div><div style='background:rgba(244,121,32,.15);border:1px solid rgba(244,121,32,.3);border-radius:10px;padding:10px 16px;text-align:right'><div style='font-size:10px;color:#F47920;font-weight:700'>GENERADO</div><div style='font-size:12px;color:#fff;margin-top:2px;font-weight:600'>"+hoy+"</div></div></div>"
-    +"<div style='display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e9ecef;border-bottom:1px solid #e9ecef'>"
-    +"<div style='background:#fff;padding:18px 20px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#F47920,#fbbf24)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.1em;color:#9ca3af;text-transform:uppercase;margin-bottom:6px'>Ventas últimos 30 días</div><div style='font-size:17px;font-weight:800;color:#1a1a2e'>$"+fmt2(m.ventasU30)+"</div><div style='font-size:10px;color:"+(tPct>=0?"#1a7f3c":"#c0392b")+";margin-top:3px;font-weight:600'>"+(tPct>=0?"▲":"▼")+" "+Math.abs(tPct)+"% vs período ant.</div></div>"
-    +"<div style='background:#fff;padding:18px 20px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#10b981,#34d399)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.1em;color:#9ca3af;text-transform:uppercase;margin-bottom:6px'>Facturación histórica</div><div style='font-size:17px;font-weight:800;color:#1a1a2e'>$"+fmt2(m.totalHistorico)+"</div><div style='font-size:10px;color:#6b7280;margin-top:3px'>"+fmt2(m.totalRegistros)+" operaciones</div></div>"
-    +"<div style='background:#fff;padding:18px 20px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#8b5cf6,#a78bfa)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.1em;color:#9ca3af;text-transform:uppercase;margin-bottom:6px'>Cliente #1</div><div style='font-size:13px;font-weight:800;color:#1a1a2e'>"+(m.topClientes[0]&&m.topClientes[0].nombre||"—")+"</div><div style='font-size:10px;color:#6b7280;margin-top:3px'>$"+fmt2(m.topClientes[0]&&m.topClientes[0].total||0)+" histórico</div></div>"
-    +"<div style='background:#fff;padding:18px 20px;position:relative;overflow:hidden'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2E86C1,#5b9bd5)'></div><div style='font-size:9px;font-weight:700;letter-spacing:.1em;color:#9ca3af;text-transform:uppercase;margin-bottom:6px'>Contenedores activos</div><div style='font-size:17px;font-weight:800;color:#1a1a2e'>"+m.estadoConts.length+"</div><div style='font-size:10px;color:#1a7f3c;margin-top:3px'>"+m.estadoConts.filter(c=>c.enGanancia).length+" en ganancia</div></div>"
-    +"</div>"
-    +"<div style='padding:28px 40px'>"
-    +"<div style='margin-bottom:28px'><div class='sec'>Stock disponible · Snapshot</div>"
-    +(spapel.length>0?"<div style='font-size:10px;font-weight:600;color:#6b7280;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px'>📄 Papel</div><div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:14px'>"+papelCards+"</div>":"")
-    +((scmyk.length>0||spro.length>0)?"<div style='display:grid;grid-template-columns:1fr 1fr;gap:14px'>"+(scmyk.length>0?"<div><div style='font-size:10px;font-weight:600;color:#2E86C1;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px'>🖨 Tinta CMYK</div><div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>"+scmyk.map(tCard).join("")+"</div></div>":"")+(spro.length>0?"<div><div style='font-size:10px;font-weight:600;color:#b25000;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px'>✦ Tinta CMYK PRO</div><div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>"+spro.map(tCard).join("")+"</div></div>":"")+"</div>":"")
-    +"</div>"
-    +"<div style='margin-bottom:28px'><div class='sec'>Diagnóstico de la semana</div><div style='background:#f8f9fa;border:1px solid #e9ecef;border-left:4px solid #F47920;border-radius:0 10px 10px 0;padding:15px 18px;font-size:12px;color:#374151;line-height:1.8'>"+(a.diagnostico||"")+"</div></div>"
-    +"<div style='margin-bottom:24px'><div class='sec' style='color:#c0392b'>Acciones inmediatas · HOY</div>"+(a.accionesInmediatas||[]).map(ac=>accCard(ac,"background:#fdf2f2;color:#c0392b;border:1px solid rgba(192,57,43,.25)","HOY")).join("")+"</div>"
-    +"<div style='margin-bottom:24px'><div class='sec' style='color:#b25000'>Esta semana</div>"+(a.accionesSemana||[]).map(ac=>accCard(ac,"background:#fff8f0;color:#b25000;border:1px solid rgba(178,80,0,.25)","ESTA SEMANA")).join("")+"</div>"
-    +((a.accionesMes||[]).length>0?"<div style='margin-bottom:24px'><div class='sec' style='color:#1a5fa5'>Este mes</div>"+(a.accionesMes||[]).map(ac=>accCard(ac,"background:#eff6ff;color:#1a5fa5;border:1px solid rgba(26,95,165,.25)","ESTE MES")).join("")+"</div>":"")
-    +(dormidos?"<div style='margin-bottom:28px'><div class='sec'>Clientes dormidos · Oportunidad de reactivación</div><div style='border:1px solid #e9ecef;border-radius:12px;overflow:hidden'><table><thead><tr style='background:#f8f9fa'><th>Cliente</th><th>Sin comprar</th><th>Última compra</th><th>Historial</th><th>Producto</th><th>Acción</th></tr></thead><tbody>"+dormidos+"</tbody></table></div></div>":"")
-    +"<div style='margin-bottom:28px'><div class='sec'>Evolución mensual · Últimos 12 meses</div><div style='border:1px solid #e9ecef;border-radius:12px;overflow:hidden'><table><thead><tr style='background:#f8f9fa'><th>Mes</th><th>Ventas</th><th>Proporción</th></tr></thead><tbody>"+meses+"</tbody></table></div></div>"
-    +"<div style='margin-bottom:28px'><div class='sec'>Proyecciones</div><div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px'><div style='background:#f0faf0;border:1px solid rgba(26,127,60,.2);border-radius:12px;padding:16px;text-align:center'><div style='font-size:9px;font-weight:700;letter-spacing:.1em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Mes actual</div><div style='font-size:15px;font-weight:800;color:#1a7f3c'>"+(a.proyecciones&&a.proyecciones.mesActual||"—")+"</div></div><div style='background:#eff6ff;border:1px solid rgba(26,95,165,.2);border-radius:12px;padding:16px;text-align:center'><div style='font-size:9px;font-weight:700;letter-spacing:.1em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Mes siguiente</div><div style='font-size:15px;font-weight:800;color:#1a5fa5'>"+(a.proyecciones&&a.proyecciones.mesSiguiente||"—")+"</div></div><div style='background:#fff8f0;border:1px solid rgba(178,80,0,.2);border-radius:12px;padding:16px;text-align:center'><div style='font-size:9px;font-weight:700;letter-spacing:.1em;color:#9ca3af;text-transform:uppercase;margin-bottom:7px'>Riesgo principal</div><div style='font-size:11px;font-weight:600;color:#b25000;line-height:1.4'>"+(a.proyecciones&&a.proyecciones.riesgo||"—")+"</div></div></div></div>"
-    +"<div style='margin-bottom:12px'><div class='sec' style='color:#8b5cf6'>Insight estratégico</div><div style='background:linear-gradient(135deg,rgba(139,92,246,.06),rgba(244,121,32,.04));border:1px solid rgba(139,92,246,.2);border-radius:12px;padding:16px 18px;font-size:12px;color:#374151;line-height:1.8'>"+(a.insightEstrategico||"")+"</div></div>"
-    +"</div>"
-    +"<div style='border-top:1px solid #e9ecef;padding:14px 40px;display:flex;justify-content:space-between;background:#f8f9fa'><div style='font-size:10px;color:#9ca3af'><strong style=\"color:#6b7280\">Sistema Eliel</strong> · Super Coating · Análisis IA por Claude Sonnet</div><div style='font-size:10px;color:#9ca3af'>"+hoy+"</div></div>"
-    +"</div></body></html>";
-  };
-
-  const generar=async()=>{
-    setEstado("loading");setMsg("Cargando datos históricos...");
-    try{
-      const m=await calcularMetricas();
-      setMsg("Enviando datos a Claude...");
-      const prompt="Sos el asesor comercial experto de Super Coating, negocio de insumos para sublimación. Tu análisis debe ser ESPECÍFICO y ACCIONABLE con NOMBRES REALES. Nunca generes consejos genéricos.\n\nDATOS ("+new Date().toLocaleDateString("es-AR")+"):\n- Registros totales: "+m.totalRegistros+" ("+m.ventasHistLen+" históricos)\n- Facturación histórica: $"+Math.round(m.totalHistorico).toLocaleString("es-AR")+"\n- Ventas últimos 30 días: $"+Math.round(m.ventasU30).toLocaleString("es-AR")+"\n\nEVOLUCIÓN MENSUAL (últimos 12):\n"+m.mesesOrdenados.slice(-12).map(([mes,total])=>"  "+mes+": $"+Math.round(total).toLocaleString("es-AR")).join("\n")+"\n\nTOP 15 CLIENTES:\n"+m.topClientes.map((c,i)=>"  "+(i+1)+". "+c.nombre+": $"+Math.round(c.total).toLocaleString("es-AR")+" | Última: "+c.ultimaCompra+" (hace "+c.diasSin+" días)"+(c.frecProm?" | Frec: cada "+c.frecProm+" días":"")).join("\n")+"\n\nTOP PRODUCTOS:\n"+m.topProd.map((p,i)=>"  "+(i+1)+". "+p.nombre+": $"+Math.round(p.total).toLocaleString("es-AR")+" | "+Math.round(p.cantidad)+" u.").join("\n")+"\n\nSTOCK ACTUAL:\n"+Object.entries(m.stockActual).map(([n,c])=>"  "+n+": "+c+" u.").join("\n")+"\n\nCONTENEDORES:\n"+m.estadoConts.map(c=>"  "+c.nombre+": USD "+c.cobUSD.toLocaleString()+" cobrado / USD "+c.costo.toLocaleString()+(c.pct!==null?" ("+c.pct+"%)":"")+" - "+(c.enGanancia?"EN GANANCIA":"Pendiente")).join("\n")+"\n\nRespondé SOLO el JSON sin markdown:\n{\"semana\":\"Semana del [lunes] al [domingo]\",\"diagnostico\":\"4-6 oraciones con diagnóstico real y números\",\"kpis\":{\"tendenciaPct\":0},\"accionesInmediatas\":[{\"icono\":\"📞\",\"titulo\":\"título con nombre real\",\"detalle\":\"detalle accionable\"}],\"accionesSemana\":[{\"icono\":\"📦\",\"titulo\":\"...\",\"detalle\":\"...\"}],\"accionesMes\":[{\"icono\":\"📈\",\"titulo\":\"...\",\"detalle\":\"...\"}],\"clientesDormidos\":[{\"nombre\":\"NOMBRE\",\"diasInactivo\":0,\"ultimaCompra\":\"fecha\",\"historialTotal\":0,\"producto\":\"producto\",\"accion\":\"qué decirle\"}],\"proyecciones\":{\"mesActual\":\"estimación\",\"mesSiguiente\":\"estimación\",\"riesgo\":\"riesgo específico\"},\"insightEstrategico\":\"3-4 oraciones con insight clave\"}\nReglas: accionesInmediatas max 3, accionesSemana max 3, accionesMes max 2, clientesDormidos solo >45 días Y historial >1000000 max 6 por historial desc.";
-      const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:4000,messages:[{role:"user",content:prompt}]})});
-      if(!resp.ok)throw new Error("API error "+resp.status);
-      const apiData=await resp.json();
-      const raw=(apiData.content&&apiData.content[0]&&apiData.content[0].text)||"{}";
-      setMsg("Construyendo reporte...");
-      let analisis;
-      try{analisis=JSON.parse(raw.replace(/```json|```/g,"").trim());}catch(e){throw new Error("Error parseando IA");}
-      setReporteHTML(construirPDF(analisis,m));
-      setEstado("done");
-    }catch(err){console.error(err);setEstado("error");setMsg("⚠ "+err.message);}
-  };
-
-  const imprimir=()=>{const win=window.open("","_blank");win.document.write(reporteHTML);win.document.close();setTimeout(()=>{win.print();},600);};
-
-  return React.createElement("div",{style:{marginBottom:0}},
-    estado==="idle"&&React.createElement("div",{style:{marginBottom:"1.25rem"}},
-      React.createElement("button",{
-        onClick:generar,
-        style:{
-          width:"100%",
-          padding:"16px 24px",
-          background:"linear-gradient(135deg,#F47920 0%,#e8640a 60%,#d4550a 100%)",
-          color:"#ffffff",
-          border:"none",
-          borderRadius:"var(--r-xl)",
-          fontSize:15,
-          fontWeight:700,
-          cursor:"pointer",
-          boxShadow:"0 6px 28px rgba(244,121,32,.45), 0 1px 0 rgba(255,255,255,0.2) inset",
-          display:"flex",
-          alignItems:"center",
-          justifyContent:"center",
-          gap:10,
-          letterSpacing:"-.01em",
-          fontFamily:"inherit",
-          WebkitTextFillColor:"#ffffff"
-        }
-      },
-        React.createElement("span",{style:{fontSize:20,lineHeight:1,color:"#fff"}},"✦"),
-        React.createElement("span",{style:{color:"#fff"}},"Generar reporte con IA")
-      )
-    ),
-    estado==="loading"&&React.createElement("div",{style:{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"20px",display:"flex",alignItems:"center",gap:14,boxShadow:"var(--glass-shadow-sm)",marginBottom:"1.25rem"}},
-      React.createElement("div",{style:{width:22,height:22,borderRadius:"50%%",border:"2.5px solid rgba(244,121,32,.2)",borderTopColor:"var(--sc-orange)",animation:"sp .8s linear infinite",flexShrink:0}}),
-      React.createElement("div",null,
-        React.createElement("div",{style:{fontSize:13,fontWeight:600,color:"var(--text-primary)"}},msg),
-        React.createElement("div",{style:{fontSize:11,color:"var(--text-secondary)",marginTop:2}},"Analizando con Claude Sonnet...")
-      )
-    ),
-    estado==="error"&&React.createElement("div",{style:{background:"var(--bg-tint-red)",border:"0.5px solid var(--border-danger)",borderRadius:"var(--r-xl)",marginBottom:"1.25rem",padding:"14px 16px"}},
-      React.createElement("div",{style:{fontSize:12,color:"var(--text-danger)",fontWeight:600,marginBottom:8}},msg),
-      React.createElement("button",{onClick:()=>{setEstado("idle");setMsg("");},style:{fontSize:11,padding:"6px 14px",background:"none",border:"0.5px solid var(--border-danger)",borderRadius:"var(--r-pill)",color:"var(--text-danger)",cursor:"pointer"}},"Reintentar")
-    ),
-    estado==="done"&&reporteHTML&&React.createElement("div",{style:{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"20px 24px",boxShadow:"var(--glass-shadow-sm)",marginBottom:"1.25rem"}},
-      React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}},
-        React.createElement("div",null,
-          React.createElement("div",{style:{fontSize:13,fontWeight:700,color:"var(--text-success)",marginBottom:3}},"✓ Reporte generado"),
-          React.createElement("div",{style:{fontSize:11,color:"var(--text-secondary)"}},new Date().toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}))
-        ),
-        React.createElement("div",{style:{display:"flex",gap:8,flexShrink:0}},
-          React.createElement("button",{onClick:()=>{setEstado("idle");setReporteHTML(null);},style:{fontSize:12,padding:"9px 16px",background:"none",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-pill)",color:"var(--text-secondary)",cursor:"pointer",fontFamily:"inherit"}},"↺ Nuevo"),
-          React.createElement("button",{onClick:imprimir,style:{fontSize:12,padding:"9px 18px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#ffffff",border:"none",borderRadius:"var(--r-pill)",fontWeight:700,cursor:"pointer",fontFamily:"inherit",boxShadow:"0 3px 12px rgba(244,121,32,.4)",WebkitTextFillColor:"#fff"}},"⬇ Abrir / Descargar PDF")
-        )
-      )
-    )
-  );
-}
 
 function ViewStock({stockUni,data}){
   const stockPapel={}, stockTinta={};
