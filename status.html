@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.1.3 · 2026-06-17 -->
+  <!-- v3.2.0 · 2026-06-18 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -599,7 +599,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.1.3</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.2.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1041,9 +1041,7 @@ window.generarPresupuestoHTML = generarPresupuestoHTML;
 window.generarReciboHTML = generarReciboHTML;
 window.obtenerServiciosPaquete = obtenerServiciosPaquete;
 window.abrirPDF = abrirPDF;
-</script>
 
-<script>
 function sc_construirPDF(textos,m){
     const fmt2=n=>Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
     const fmtM=n=>{const v=Number(n||0);return v>=1000000?"$"+(v/1000000).toFixed(1)+"M":"$"+fmt2(v);};
@@ -1554,8 +1552,8 @@ window.sc_construirPDF=sc_construirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.1.3";
-const APP_BUILD   = "2026-06-16";
+const APP_VERSION = "v3.2.0";
+const APP_BUILD   = "2026-06-18";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
 const ESTADOS = ["A despachar","Despachado","A retirar Ezeiza","A retirar Once","Retirado"];
@@ -7320,7 +7318,7 @@ function ReportesView({data,save,showToast}){
   };
 
   // ── Construir PDF fiel al mockup aprobado ─────────────────────
-  const construirPDF=(textos,m)=>window.sc_construirPDF(textos,m);
+  const construirPDF=(textos,m)=>{if(typeof window.sc_construirPDF!=="function"){throw new Error("sc_construirPDF not loaded. Type: "+typeof window.sc_construirPDF);}return window.sc_construirPDF(textos,m);};
 
 
   const generarReporte=async()=>{
