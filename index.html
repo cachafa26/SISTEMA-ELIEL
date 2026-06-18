@@ -1043,6 +1043,515 @@ window.obtenerServiciosPaquete = obtenerServiciosPaquete;
 window.abrirPDF = abrirPDF;
 </script>
 
+<script>
+function sc_construirPDF(textos,m){
+    const fmt2=n=>Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
+    const fmtM=n=>{const v=Number(n||0);return v>=1000000?"$"+(v/1000000).toFixed(1)+"M":"$"+fmt2(v);};
+    const hoyStr=new Date().toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric"});
+    const hoyTime=new Date().toLocaleString("es-AR",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    const PAPEL=["30GR 1,60 X 600","35GR 1,60 X 500","42GR 1,60 X 300","61GR 1,60 X 300","52GR 1,10 X 100","80GR 1,60 X 300","80GR 1,10 X 100"];
+    const CMYK_=["NEGRO","CYAN","MAGENTA","AMARILLO"];
+    const PRO_=["NEGRO PRO","CYAN PRO","MAGENTA PRO","AMARILLO PRO"];
+    const tintaTopColor={NEGRO:"#374151",CYAN:"#06b6d4",MAGENTA:"#ec4899",AMARILLO:"#eab308"};
+    const tintaProTopColor={"NEGRO PRO":"#8b5cf6","CYAN PRO":"#8b5cf6","MAGENTA PRO":"#8b5cf6","AMARILLO PRO":"#8b5cf6"};
+
+    const sPapel=Object.entries(m.stockActual).filter(([n])=>PAPEL.includes(n));
+    const sCMYK=Object.entries(m.stockActual).filter(([n])=>CMYK_.includes(n));
+    const sPRO=Object.entries(m.stockActual).filter(([n])=>PRO_.includes(n));
+
+    // ── Cruce stock × clientes (calculado del sistema) ──────────
+    // Por cada producto con stock, quiénes son los top compradores
+    const compradoresPorProd={};
+    [...(m.ventasHistRaw||[]),...(m.ventasRaw||[])].forEach(v=>{
+      if(!v.articulo||!v.cliente||!v.total)return;
+      const art=String(v.articulo).trim();
+      const cl=String(v.cliente).trim().toUpperCase();
+      if(!compradoresPorProd[art])compradoresPorProd[art]={};
+      if(!compradoresPorProd[art][cl])compradoresPorProd[art][cl]={total:0,ultima:""};
+      compradoresPorProd[art][cl].total+=Number(v.total||0);
+      const f=String(v.fecha||"").substring(0,10);
+      if(f>compradoresPorProd[art][cl].ultima)compradoresPorProd[art][cl].ultima=f;
+    });
+
+    const stockCruceRows=sPapel.slice(0,4).flatMap(([prod,cant])=>{
+      const compradores=Object.entries(compradoresPorProd[prod]||{})
+        .sort((a,b)=>b[1].total-a[1].total).slice(0,2);
+      const al=cant<15?"low":cant<40?"mid":"ok";
+      const prodColor=al==="low"?"#ef4444":al==="mid"?"#f59e0b":"#4a9eff";
+      return compradores.map(([ cl,d],ci)=>{
+        const dias=d.ultima?Math.round((new Date("2026-06-18")-new Date(d.ultima))/86400000):null;
+        const urgencia=dias===null?"?":dias>90?"🔴 DORMIDO":dias>45?"🔴 DORMIDO":dias>20?"🟡 LLAMAR":"🟢 ACTIVO";
+        const urgClass=dias===null||dias>45?"hot":dias>20?"warm":"ok-d";
+        return "<div class='cli-row prod-row' style='border-left:3px solid "+(ci===0?prodColor:prodColor+"44")+"'>"
+          +(ci===0?"<span class='cr-name'>"+prod+" <span class='pc'>~"+fmt2(cant)+" u.</span></span>":"<span></span>")
+          +"<span class='cr-val'>"+cl+"</span>"
+          +"<span class='cr-ticket'>"+fmtM(d.total)+"</span>"
+          +"<span class='cr-val'>"+(d.ultima?d.ultima.split("-").reverse().join("/").substring(0,5)+" · "+dias+"d":"—")+"</span>"
+          +"<span class='cr-days "+urgClass+"'>"+urgencia+"</span>"
+          +"</div>";
+      });
+    }).join("");
+
+    // ── Stock cards ──────────────────────────────────────────────
+    const papelCards=sPapel.map(([n,c])=>{
+      const al=c<15?"low":c<40?"mid":"ok";
+      const col=al==="low"?"#ef4444":al==="mid"?"#f59e0b":"#4a9eff";
+      const brd=al==="low"?"#ef444430":"#2a2f42";
+      const label=al==="low"?"⚠ BAJO":al==="mid"?"● Medio":"● OK";
+      const pct=Math.min(100,Math.round(c/Math.max(1,...sPapel.map(x=>x[1]))*100));
+      return "<div style='background:#1a1f2e;border:1px solid "+brd+";border-radius:10px;padding:11px 15px;flex:1;min-width:90px;position:relative;overflow:hidden'>"
+        +"<div style='position:absolute;top:0;left:0;right:0;height:2px;background:"+col+"'></div>"
+        +"<div style='font-size:9px;font-weight:700;color:#6b7280;letter-spacing:1px;margin-bottom:5px'>"+n.replace(" 1,60","").replace(" 1,10","")+"</div>"
+        +"<div style='font-size:20px;font-weight:800;color:"+(al==="low"?col:"#fff")+";line-height:1'>"+fmt2(c)+"<span style='font-size:10px;font-weight:400;color:#6b7280;margin-left:2px'>u.</span></div>"
+        +"<div style='height:3px;background:#2a2f42;border-radius:2px;margin-top:7px;overflow:hidden'><div style='width:"+pct+"%;height:100%;background:"+col+";border-radius:2px'></div></div>"
+        +"<div style='font-size:9px;color:"+col+";font-weight:600;margin-top:4px'>"+label+"</div>"
+        +"</div>";
+    }).join("");
+
+    const cmykCard=([n,c],colTop)=>{
+      const col=colTop||"#9ca3af";
+      const nm=n.replace(" PRO","");
+      return "<div style='background:#1a1f2e;border:1px solid "+col+"20;border-radius:8px;padding:9px 12px;position:relative;overflow:hidden'>"
+        +"<div style='position:absolute;top:0;left:0;right:0;height:2px;background:"+col+"'></div>"
+        +"<div style='font-size:9px;font-weight:700;color:#6b7280;margin-bottom:4px'>"+nm+"</div>"
+        +"<div style='font-size:19px;font-weight:800;color:#fff;line-height:1'>"+fmt2(c)+"<span style='font-size:10px;font-weight:400;color:#6b7280;margin-left:2px'>u.</span></div>"
+        +"<div style='height:3px;background:#2a2f42;border-radius:2px;margin-top:6px;overflow:hidden'><div style='width:"+Math.min(100,c*3)+"%;height:100%;background:"+col+";border-radius:2px'></div></div>"
+        +"</div>";
+    };
+
+    // ── Clientes dormidos table rows ─────────────────────────────
+    const dormidosRows=m.dormidos.map(function(cl){
+      const prodKey=Object.keys(compradoresPorProd).filter(function(p){return compradoresPorProd[p][cl.nombre];}).sort(function(a,b){return ((compradoresPorProd[b][cl.nombre]||{total:0}).total-(compradoresPorProd[a][cl.nombre]||{total:0}).total);})[0]||"—";
+      return "<div class='cli-row dormido-row'>"
+        +"<span class='cr-name'>"+cl.nombre+"</span>"
+        +"<span class='cr-val'>"+cl.ultima+"</span>"
+        +"<span class='cr-days hot'>"+cl.diasSin+" días</span>"
+        +"<span class='cr-ticket'>"+fmtM(cl.total)+"</span>"
+        +"<span class='cr-val'>"+prodKey+"</span>"
+        +"</div>";
+    }).join("");
+    const dormidosPotencial=fmtM(Math.round(m.dormidos.slice(0,3).reduce(function(a,x){return a+x.total*.15;},0)));
+
+    // ── Proyecciones ─────────────────────────────────────────────
+    // Calcular junio estimado = ventas hasta hoy * (30/días del mes transcurridos)
+    const mesActualData=m.mesesOrdenados.find(([mes])=>mes===m.hoyStr.substring(0,7));
+    const diasTranscurridos=parseInt(m.hoyStr.split("-")[2]);
+    const proyMesAct=mesActualData?Math.round(mesActualData[1]/diasTranscurridos*30):0;
+    // Mismo mes año anterior
+    const mesAnterior=m.mesesOrdenados.find(([mes])=>mes===m.hoyStr.substring(0,4)-1+"-"+m.hoyStr.substring(5,7));
+    const proyMesSig=textos.proyMesSig||"—";
+    const proyMesActStr=textos.proyMesActual||("~"+fmtM(proyMesAct));
+
+    // ── Bar chart data para JS ───────────────────────────────────
+    const chartData=m.mesesOrdenados.slice(-16).map(([mes,total])=>{
+      const year=mes.substring(0,4);
+      const monthNames=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+      const monthIdx=parseInt(mes.substring(5,7))-1;
+      const isCurrent=year==="2026";
+      const isLastMonth=mes===m.hoyStr.substring(0,7);
+      return {l:monthNames[monthIdx]+(isLastMonth?"*":""),v:Math.round(total/1000000*10)/10,cur:isCurrent};
+    });
+    const chartDataStr=JSON.stringify(chartData);
+
+    // ── Semana actual ────────────────────────────────────────────
+    const semana=textos.semana||"Semana actual";
+
+    // ── Top productos con precio unitario promedio ───────────────
+    const prodConPrecio=m.topProd.slice(0,5).map(p=>{
+      const precProm=p.cantidad>0?Math.round(p.total/p.cantidad):0;
+      const maxT=m.topProd[0].total;
+      const pct=Math.round(p.total/maxT*100);
+      const ranks=["g","s","b","",""];
+      const rankClass=ranks[m.topProd.indexOf(p)]||"";
+      return {nombre:p.nombre,total:p.total,cantidad:p.cantidad,precProm,pct,rankClass,rank:m.topProd.indexOf(p)+1};
+    });
+
+    // ── Top clientes con pct del total ──────────────────────────
+    const topCliPct=m.topClientes.slice(0,5).map(c=>({
+      ...c,
+      pct:m.totalHist>0?Math.round(c.total/m.totalHist*100*10)/10:0,
+      initial:c.nombre[0].toUpperCase()
+    }));
+    const cliMaxT=topCliPct[0]?topCliPct[0].total:1;
+    const cliColors=["linear-gradient(90deg,#4a9eff,#7bb8ff)","linear-gradient(90deg,#4a9eff,#7bb8ff)","linear-gradient(90deg,#8b5cf6,#a78bfa)","linear-gradient(90deg,#f59e0b,#fbbf24)","linear-gradient(90deg,#10b981,#34d399)"];
+
+    // ── promedio semanal ─────────────────────────────────────────
+    const totalSemanas=m.mesesOrdenados.length*4.33;
+    const promSemanal=totalSemanas>0?Math.round(m.totalHist/totalSemanas):0;
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f1117;color:#e8eaf0;padding:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media print{body{background:#0f1117;padding:0}@page{margin:8mm size:A4}.container{border-radius:0;box-shadow:none}}
+.container{max-width:920px;margin:0 auto;background:#161922;border-radius:16px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.header{background:linear-gradient(135deg,#1a1f2e,#0f1420);border-bottom:1px solid #2a2f42;padding:28px 40px;display:flex;align-items:center;justify-content:space-between}
+.brand{font-size:10px;font-weight:700;letter-spacing:3px;color:#4a9eff;text-transform:uppercase;margin-bottom:5px}
+.h-title{font-size:24px;font-weight:800;color:#fff}.h-title span{color:#4a9eff}
+.h-period{font-size:12px;color:#6b7280;margin-top:3px}
+.badge{background:#4a9eff12;border:1px solid #4a9eff44;border-radius:10px;padding:10px 18px;text-align:center}
+.badge-n{font-size:26px;font-weight:800;color:#fff;display:block}
+.badge-l{font-size:10px;color:#4a9eff;font-weight:700;letter-spacing:1px}
+.gen{font-size:10px;color:#4b5563;margin-top:7px;text-align:right}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#2a2f42;border-bottom:1px solid #2a2f42}
+.kpi{background:#1a1f2e;padding:20px 22px;position:relative}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.k1::before{background:linear-gradient(90deg,#4a9eff,#7bb8ff)}
+.kpi.k2::before{background:linear-gradient(90deg,#10b981,#34d399)}
+.kpi.k3::before{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+.kpi.k4::before{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
+.kpi-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;color:#6b7280;text-transform:uppercase;margin-bottom:7px}
+.kpi-val{font-size:17px;font-weight:800;color:#fff;line-height:1.2}
+.kpi-sub{font-size:10px;color:#6b7280;margin-top:4px}
+.pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:5px}
+.pup{background:#10b98122;color:#10b981}.pdown{background:#ef444422;color:#ef4444}.pwarn{background:#f59e0b22;color:#f59e0b}
+.body{padding:30px 40px}
+.section{margin-bottom:32px}
+.divider{height:1px;background:#2a2f42;margin-bottom:32px}
+.sh{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.si{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.si-b{background:#4a9eff1a}.si-g{background:#10b9811a}.si-o{background:#f59e0b1a}.si-p{background:#8b5cf61a}.si-r{background:#ef44441a}
+.st{font-size:14px;font-weight:700;color:#e8eaf0}.ss{font-size:11px;color:#6b7280;margin-top:1px}
+.chart-wrap{background:#1a1f2e;border:1px solid #2a2f42;border-radius:12px;padding:20px}
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:100px}
+.bg{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end}
+.b{width:100%;border-radius:3px 3px 0 0}.b.cur{background:linear-gradient(180deg,#4a9eff,#1d4ed8)}.b.old{background:#2a2f42}
+.bl{font-size:7px;color:#4b5563;font-weight:600}.bv{font-size:6px;color:#6b7280}
+.leg{display:flex;gap:14px;margin-top:10px}.li{display:flex;align-items:center;gap:5px;font-size:10px;color:#6b7280}
+.ld{width:10px;height:10px;border-radius:2px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.prod-list{display:flex;flex-direction:column;gap:7px}
+.pi{background:#1a1f2e;border:1px solid #2a2f42;border-radius:9px;padding:11px 13px;display:flex;align-items:center;gap:9px}
+.rk{width:20px;height:20px;border-radius:5px;background:#2a2f42;font-size:9px;font-weight:700;color:#6b7280;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rk.g{background:#f59e0b1a;color:#f59e0b}.rk.s{background:#9ca3af1a;color:#9ca3af}.rk.b{background:#cd7c321a;color:#cd7c32}
+.pn{font-size:11px;font-weight:600;color:#e8eaf0}
+.pc{font-size:9px;color:#6b7280;background:#2a2f42;border-radius:3px;padding:1px 5px;margin-top:2px;display:inline-block}
+.mb{width:60px;height:4px;background:#2a2f42;border-radius:2px;overflow:hidden}
+.mf{height:100%;border-radius:2px;background:linear-gradient(90deg,#4a9eff,#7bb8ff)}
+.pt{font-size:11px;font-weight:700;color:#fff;min-width:56px;text-align:right}
+.cl{display:flex;flex-direction:column;gap:7px}
+.ci{background:#1a1f2e;border:1px solid #2a2f42;border-radius:9px;padding:11px 13px;display:flex;align-items:center;gap:9px}
+.av{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#4a9eff22,#8b5cf622);border:1px solid #4a9eff33;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4a9eff;flex-shrink:0}
+.cn{font-size:11px;font-weight:600;color:#e8eaf0;flex:1}
+.ct{font-size:11px;font-weight:700;color:#fff}.cp{font-size:9px;color:#6b7280;text-align:right}
+.cb{height:3px;background:#2a2f42;border-radius:2px;margin-top:4px;overflow:hidden}
+.cf{height:100%;border-radius:2px}
+.ai-box{background:#1a1f2e;border:1px solid #4a9eff33;border-radius:12px;overflow:hidden}
+.ai-hd{background:linear-gradient(90deg,#4a9eff0d,transparent);border-bottom:1px solid #4a9eff1a;padding:13px 18px;display:flex;align-items:center;gap:9px}
+.ai-badge{background:#4a9eff1a;border:1px solid #4a9eff44;border-radius:5px;padding:2px 7px;font-size:9px;font-weight:800;color:#4a9eff;letter-spacing:1.5px}
+.ai-t{font-size:13px;font-weight:600;color:#e8eaf0}
+.ai-body{padding:18px;display:flex;flex-direction:column;gap:18px}
+.ai-blk-title{font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.diag{font-size:12px;color:#9ca3af;line-height:1.75;background:#0d1117;border:1px solid #2a2f42;border-radius:8px;padding:14px 16px}
+.diag strong{color:#e8eaf0}.hi{color:#4a9eff;font-weight:600}.warn{color:#f59e0b;font-weight:600}.ok{color:#10b981;font-weight:600}
+.ac{background:#0d1117;border:1px solid #2a2f42;border-radius:9px;padding:13px 15px;display:flex;gap:12px;align-items:flex-start}
+.ac-ico{font-size:18px;flex-shrink:0;line-height:1}
+.ac-body{flex:1}.ac-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px}
+.ac-title{font-size:12px;font-weight:700;color:#fff}
+.ac-tag{flex-shrink:0;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.5px}
+.t-now{background:#ef444415;color:#ef4444;border:1px solid #ef444430}
+.t-week{background:#f59e0b15;color:#f59e0b;border:1px solid #f59e0b30}
+.t-month{background:#4a9eff15;color:#4a9eff;border:1px solid #4a9eff30}
+.t-long{background:#8b5cf615;color:#8b5cf6;border:1px solid #8b5cf630}
+.ac-detail{font-size:11px;color:#9ca3af;line-height:1.6}
+.ac-detail strong{color:#d1d5db}
+.cli-table{margin-top:8px;display:flex;flex-direction:column;gap:5px}
+.cli-row{display:grid;align-items:center;background:#161922;border:1px solid #2a2f42;border-radius:6px;padding:7px 11px;font-size:11px;gap:8px}
+.prod-row{grid-template-columns:1.5fr 1fr 0.9fr 0.9fr 0.7fr}
+.dormido-row{grid-template-columns:1.3fr 0.9fr 0.7fr 0.9fr 0.8fr}
+.cr-head{background:transparent;border-color:transparent;padding:2px 11px}
+.cr-label{font-size:9px;color:#6b7280;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.cr-name{font-weight:700;color:#e8eaf0}
+.cr-val{color:#9ca3af}
+.cr-ticket{color:#10b981;font-weight:600}
+.cr-days{font-weight:600}
+.cr-days.hot{color:#ef4444}.cr-days.warm{color:#f59e0b}.cr-days.ok-d{color:#10b981}
+.proj{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pc-card{background:#0d1117;border:1px solid #2a2f42;border-radius:9px;padding:15px;text-align:center}
+.pc-lbl{font-size:9px;color:#6b7280;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:7px}
+.pc-val{font-size:19px;font-weight:800}
+.pc-sub{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.4}
+.footer{border-top:1px solid #2a2f42;padding:18px 40px;display:flex;align-items:center;justify-content:space-between;background:#1a1f2e}
+.ft{font-size:10px;color:#4b5563}.ft strong{color:#6b7280}
+.btn{padding:8px 15px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:none;font-family:inherit}
+.btn-p{background:linear-gradient(135deg,#4a9eff,#2563eb);color:#fff}
+</style></head><body>
+<div class="container">
+
+<div class="header">
+  <div>
+    <div class="brand">Super Coating · Sistema Eliel</div>
+    <div class="h-title">Reporte <span>Semanal</span></div>
+    <div class="h-period">${semana} · Histórico: registros analizados · ${fmt2(m.totalRegistros)} ops</div>
+  </div>
+  <div>
+    <div class="badge">
+      <span class="badge-n">S·${new Date().toLocaleDateString("es-AR",{month:"numeric",year:"2-digit"}).replace("/","·")}</span>
+      <span class="badge-l">${new Date().toLocaleDateString("es-AR",{month:"long",year:"numeric"}).toUpperCase()}</span>
+    </div>
+    <div class="gen">Generado: ${hoyTime} hs</div>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kpi k1">
+    <div class="kpi-lbl">Ventas últimos 30 días</div>
+    <div class="kpi-val">${fmtM(m.u30)}</div>
+    <div class="kpi-sub">Papel + tinta combinados</div>
+    <span class="pill ${m.tendPct>=0?"pup":"pdown"}">${m.tendPct>=0?"▲":"▼"} ${Math.abs(m.tendPct)}% vs mes ant.</span>
+  </div>
+  <div class="kpi k2">
+    <div class="kpi-lbl">Total histórico</div>
+    <div class="kpi-val">${fmtM(m.totalHist)}</div>
+    <div class="kpi-sub">Feb 2025 → hoy · ${m.topClientes.length} clientes</div>
+    <span class="pill pup">${fmt2(m.totalRegistros)} operaciones</span>
+  </div>
+  <div class="kpi k3">
+    <div class="kpi-lbl">Promedio semanal</div>
+    <div class="kpi-val">${fmtM(promSemanal)}</div>
+    <div class="kpi-sub">Sobre todo el histórico</div>
+    <span class="pill pwarn">Referencia de mercado</span>
+  </div>
+  <div class="kpi k4">
+    <div class="kpi-lbl">Tu 30% est.</div>
+    <div class="kpi-val">${fmtM(Math.round(m.u30*0.3))}</div>
+    <div class="kpi-sub">Estimado sobre 30 días</div>
+    <span class="pill pup">↗ Ver módulo SC</span>
+  </div>
+</div>
+
+<div class="body">
+
+  <div class="section">
+    <div class="sh"><div class="si si-b">📊</div><div><div class="st">Evolución mensual de ventas</div><div class="ss">Histórico completo · En pesos · Excel + Firebase</div></div></div>
+    <div class="chart-wrap">
+      <div class="bar-chart" id="chart"></div>
+      <div class="leg">
+        <div class="li"><div class="ld" style="background:linear-gradient(#4a9eff,#1d4ed8)"></div>2026</div>
+        <div class="li"><div class="ld" style="background:#2a2f42"></div>2025</div>
+        <div class="li" style="margin-left:auto;font-size:9px;color:#4b5563">* mes en curso</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <div class="two-col">
+      <div>
+        <div class="sh"><div class="si si-o">📦</div><div><div class="st">Top productos</div><div class="ss">Facturación histórica acumulada</div></div></div>
+        <div class="prod-list">
+          ${prodConPrecio.map(p=>`
+          <div class="pi">
+            <div class="rk ${p.rankClass}">${p.rank}</div>
+            <div style="flex:1">
+              <div class="pn">${p.nombre.replace(" 1,60","").replace(" 1,10","")}</div>
+              <div class="pc">${p.cantidad>0?"·"+fmt2(p.cantidad)+" u.":""} · $${fmt2(Math.round(p.total/Math.max(1,p.cantidad)))}/u</div>
+            </div>
+            <div class="mb"><div class="mf" style="width:${p.pct}%"></div></div>
+            <div class="pt">${fmtM(p.total)}</div>
+          </div>`).join("")}
+        </div>
+      </div>
+      <div>
+        <div class="sh"><div class="si si-p">🏆</div><div><div class="st">Top clientes</div><div class="ss">Facturación histórica · % del total</div></div></div>
+        <div class="cl">
+          ${topCliPct.map((c,i)=>`
+          <div class="ci">
+            <div class="av">${c.initial}</div>
+            <div style="flex:1">
+              <div class="cn">${c.nombre}</div>
+              <div class="cb"><div class="cf" style="width:${Math.round(c.total/cliMaxT*100)}%;background:${cliColors[i]}"></div></div>
+            </div>
+            <div style="text-align:right">
+              <div class="ct">${fmtM(c.total)}</div>
+              <div class="cp">${c.pct}% del total</div>
+            </div>
+          </div>`).join("")}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <div class="sh"><div class="si si-g">🗄️</div><div><div class="st">Stock disponible · Snapshot</div><div class="ss">Desde Firebase · Tiempo real</div></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch">
+      ${papelCards}
+      <div style="width:1px;background:#2a2f42;align-self:stretch;margin:0 4px;flex:none"></div>
+      <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px">
+        <div style="font-size:9px;font-weight:700;color:#6b7280;letter-spacing:1.5px;text-transform:uppercase;padding:0 2px">Tinta CMYK</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          ${sCMYK.map(e=>cmykCard(e,tintaTopColor[e[0]]||"#9ca3af")).join("")}
+          ${sCMYK.length===0?"<div style='color:#4b5563;font-size:11px;padding:8px'>Sin stock</div>":""}
+        </div>
+      </div>
+      ${sPRO.length>0?`
+      <div style="width:1px;background:#2a2f42;align-self:stretch;margin:0 4px;flex:none"></div>
+      <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px">
+        <div style="font-size:9px;font-weight:700;color:#8b5cf6;letter-spacing:1.5px;text-transform:uppercase;padding:0 2px">Tinta CMYK PRO</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          ${sPRO.map(e=>cmykCard(e,"#8b5cf6")).join("")}
+        </div>
+      </div>`:""}
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <div class="sh"><div class="si si-p">🤖</div><div><div class="st">Análisis IA · Asesor de negocio Super Coating</div><div class="ss">Basado en ${fmt2(m.totalRegistros)} registros · Histórico real + stock Firebase</div></div></div>
+    <div class="ai-box">
+      <div class="ai-hd">
+        <div class="ai-badge">CLAUDE AI</div>
+        <div class="ai-t">Diagnóstico, acciones específicas y proyecciones — ${hoyStr}</div>
+      </div>
+      <div class="ai-body">
+
+        <div class="ai-blk">
+          <div class="ai-blk-title" style="color:#9ca3af"><span class="dot" style="background:#4a9eff"></span> Diagnóstico de la semana</div>
+          <div class="diag">${textos.diagnostico||"—"}</div>
+        </div>
+
+        <div class="ai-blk">
+          <div class="ai-blk-title" style="color:#ef4444"><span class="dot" style="background:#ef4444"></span> Acción inmediata · Clientes que deberían haber comprado esta semana</div>
+          ${(textos.accionesInmediatas||[]).map(ac=>`
+          <div class="ac">
+            <div class="ac-ico">${ac.icono||"📞"}</div>
+            <div class="ac-body">
+              <div class="ac-head"><div class="ac-title">${ac.titulo||""}</div><div class="ac-tag t-now">HOY</div></div>
+              <div class="ac-detail">${ac.detalle||""}</div>
+              ${ac.tabla?`<div class="cli-table">
+                <div class="cli-row cr-head dh">
+                  <span class="cr-label">Cliente</span><span class="cr-label">Última compra</span>
+                  <span class="cr-label">Ciclo prom.</span><span class="cr-label">Compra típica</span>
+                  <span class="cr-label">Estado</span>
+                </div>
+                ${ac.tabla.map(r=>`<div class="cli-row dormido-row">
+                  <span class="cr-name">${r.cliente}</span>
+                  <span class="cr-val">${r.ultima}</span>
+                  <span class="cr-val">${r.ciclo||"—"}</span>
+                  <span class="cr-ticket">${r.producto||""}</span>
+                  <span class="cr-days ${r.urgencia==="hot"?"hot":r.urgencia==="warm"?"warm":"ok-d"}">${r.estado}</span>
+                </div>`).join("")}
+              </div>`:""}
+            </div>
+          </div>`).join("")}
+        </div>
+
+        <div class="ai-blk">
+          <div class="ai-blk-title" style="color:#10b981"><span class="dot" style="background:#10b981"></span> Acción esta semana · Cruce stock disponible × clientes potenciales</div>
+          <div class="ac">
+            <div class="ac-ico">📦</div>
+            <div class="ac-body">
+              <div class="ac-head"><div class="ac-title">Tenés stock — ¿a quién llamar por cada producto?</div><div class="ac-tag t-week">ESTA SEMANA</div></div>
+              <div class="ac-detail">Top compradores históricos por producto, con su último pedido y días sin comprar.</div>
+              <div class="cli-table">
+                <div class="cli-row cr-head prod-row">
+                  <span class="cr-label">Producto (stock)</span><span class="cr-label">Cliente</span>
+                  <span class="cr-label">Historial</span><span class="cr-label">Última compra</span>
+                  <span class="cr-label">Prioridad</span>
+                </div>
+                ${stockCruceRows||"<div style='color:#4b5563;font-size:11px;padding:8px 11px'>Sin stock disponible actualmente</div>"}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        ${(textos.accionesSemana||[]).map(ac=>`
+        <div class="ai-blk">
+          <div class="ai-blk-title" style="color:#f59e0b"><span class="dot" style="background:#f59e0b"></span> ${ac.seccion||"Esta semana"}</div>
+          <div class="ac">
+            <div class="ac-ico">${ac.icono||"📦"}</div>
+            <div class="ac-body">
+              <div class="ac-head"><div class="ac-title">${ac.titulo||""}</div><div class="ac-tag t-week">ESTA SEMANA</div></div>
+              <div class="ac-detail">${ac.detalle||""}</div>
+            </div>
+          </div>
+        </div>`).join("")}
+
+        ${m.dormidos.length>0?`
+        <div class="ai-blk">
+          <div class="ai-blk-title" style="color:#8b5cf6"><span class="dot" style="background:#8b5cf6"></span> Investigar · Clientes con alto historial que desaparecieron</div>
+          <div class="ac">
+            <div class="ac-ico">🔍</div>
+            <div class="ac-body">
+              <div class="ac-head"><div class="ac-title">Estos clientes tenían volumen y dejaron de comprar — ¿qué pasó?</div><div class="ac-tag t-month">MES QUE VIENE</div></div>
+              <div class="ac-detail">No es una baja estacional — llevan demasiado tiempo inactivos para explicarlo por temporada.</div>
+              <div class="cli-table">
+                <div class="cli-row cr-head dh"><span class="cr-label">Cliente</span><span class="cr-label">Última compra</span><span class="cr-label">Días</span><span class="cr-label">Historial</span><span class="cr-label">Producto</span></div>
+                ${dormidosRows}
+              </div>
+              <div class="ac-detail" style="margin-top:8px">Si recuperás solo 3 de estos ${m.dormidos.length} → <strong>+${dormidosPotencial} adicionales este mes</strong>. Vale una llamada de 5 minutos a cada uno.</div>
+            </div>
+          </div>
+        </div>`:""}
+
+        ${(textos.accionesMes||[]).map(ac=>`
+        <div class="ai-blk">
+          <div class="ai-blk-title" style="color:#4a9eff"><span class="dot" style="background:#4a9eff"></span> Largo plazo</div>
+          <div class="ac">
+            <div class="ac-ico">${ac.icono||"📈"}</div>
+            <div class="ac-body">
+              <div class="ac-head"><div class="ac-title">${ac.titulo||""}</div><div class="ac-tag t-long">LARGO PLAZO</div></div>
+              <div class="ac-detail">${ac.detalle||""}</div>
+            </div>
+          </div>
+        </div>`).join("")}
+
+        <div class="ai-blk">
+          <div class="ai-blk-title" style="color:#4a9eff"><span class="dot" style="background:#4a9eff"></span> Proyecciones · Basadas en histórico real</div>
+          <div class="proj">
+            <div class="pc-card">
+              <div class="pc-lbl">${new Date().toLocaleDateString("es-AR",{month:"long",year:"numeric"})}</div>
+              <div class="pc-val" style="color:#f59e0b">${proyMesActStr}</div>
+              <div class="pc-sub">${textos.proyContext||""}</div>
+            </div>
+            <div class="pc-card">
+              <div class="pc-lbl">Mes siguiente</div>
+              <div class="pc-val" style="color:#10b981">${proyMesSig}</div>
+              <div class="pc-sub">${textos.proySigContext||""}</div>
+            </div>
+            <div class="pc-card">
+              <div class="pc-lbl">Riesgo de concentración</div>
+              <div class="pc-val" style="color:#ef4444">${topCliPct[0]?topCliPct[0].pct+"%":"—"}</div>
+              <div class="pc-sub">${topCliPct[0]?topCliPct[0].nombre+" = "+topCliPct[0].pct+"% del total histórico. "+textos.riesgo:""}</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <div class="ft"><strong>Sistema Eliel</strong> · Super Coating · Datos: Excel histórico + Firebase realtime</div>
+  <button class="btn btn-p" onclick="window.print()">⬇ Descargar PDF</button>
+</div>
+
+    +"</div>\n"
+    +"<"+"script>\n"
+    +"const chartData="+chartDataStr+";\n"
+    +"const max=Math.max.apply(null,chartData.map(function(d){return d.v;}));\n"
+    +"const chart=document.getElementById('chart');\n"
+    +"chartData.forEach(function(d){\n"
+    +"  var pct=(d.v/max)*100;\n"
+    +"  var g=document.createElement('div');g.className='bg';\n"
+    +"  var lbl=d.l||'?';var val=d.v||0;\n"
+    +"  g.innerHTML='<div class=\\"bv\\">\$'+val+'M</div><div class=\\"b '+(d.cur?'cur':'old')+'\\" style=\\"height:'+pct+'%\\"></div><div class=\\"bl\\">'+lbl+'</div>';\n"
+    +"  chart.appendChild(g);\n"
+    +"});\n"
+    +"<"+"/script>\n"
+    +"</body></html>";
+  };
+}
+window.sc_construirPDF=sc_construirPDF;
+</script>
+
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
 const APP_VERSION = "v3.1.3";
@@ -6811,511 +7320,8 @@ function ReportesView({data,save,showToast}){
   };
 
   // ── Construir PDF fiel al mockup aprobado ─────────────────────
-  const construirPDF=(textos,m)=>{
-    const fmt2=n=>Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});
-    const fmtM=n=>{const v=Number(n||0);return v>=1000000?"$"+(v/1000000).toFixed(1)+"M":"$"+fmt2(v);};
-    const hoyStr=new Date().toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric"});
-    const hoyTime=new Date().toLocaleString("es-AR",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
-    const PAPEL=["30GR 1,60 X 600","35GR 1,60 X 500","42GR 1,60 X 300","61GR 1,60 X 300","52GR 1,10 X 100","80GR 1,60 X 300","80GR 1,10 X 100"];
-    const CMYK_=["NEGRO","CYAN","MAGENTA","AMARILLO"];
-    const PRO_=["NEGRO PRO","CYAN PRO","MAGENTA PRO","AMARILLO PRO"];
-    const tintaTopColor={NEGRO:"#374151",CYAN:"#06b6d4",MAGENTA:"#ec4899",AMARILLO:"#eab308"};
-    const tintaProTopColor={"NEGRO PRO":"#8b5cf6","CYAN PRO":"#8b5cf6","MAGENTA PRO":"#8b5cf6","AMARILLO PRO":"#8b5cf6"};
+  const construirPDF=(textos,m)=>window.sc_construirPDF(textos,m);
 
-    const sPapel=Object.entries(m.stockActual).filter(([n])=>PAPEL.includes(n));
-    const sCMYK=Object.entries(m.stockActual).filter(([n])=>CMYK_.includes(n));
-    const sPRO=Object.entries(m.stockActual).filter(([n])=>PRO_.includes(n));
-
-    // ── Cruce stock × clientes (calculado del sistema) ──────────
-    // Por cada producto con stock, quiénes son los top compradores
-    const compradoresPorProd={};
-    [...(m.ventasHistRaw||[]),...(m.ventasRaw||[])].forEach(v=>{
-      if(!v.articulo||!v.cliente||!v.total)return;
-      const art=String(v.articulo).trim();
-      const cl=String(v.cliente).trim().toUpperCase();
-      if(!compradoresPorProd[art])compradoresPorProd[art]={};
-      if(!compradoresPorProd[art][cl])compradoresPorProd[art][cl]={total:0,ultima:""};
-      compradoresPorProd[art][cl].total+=Number(v.total||0);
-      const f=String(v.fecha||"").substring(0,10);
-      if(f>compradoresPorProd[art][cl].ultima)compradoresPorProd[art][cl].ultima=f;
-    });
-
-    const stockCruceRows=sPapel.slice(0,4).flatMap(([prod,cant])=>{
-      const compradores=Object.entries(compradoresPorProd[prod]||{})
-        .sort((a,b)=>b[1].total-a[1].total).slice(0,2);
-      const al=cant<15?"low":cant<40?"mid":"ok";
-      const prodColor=al==="low"?"#ef4444":al==="mid"?"#f59e0b":"#4a9eff";
-      return compradores.map(([ cl,d],ci)=>{
-        const dias=d.ultima?Math.round((new Date("2026-06-18")-new Date(d.ultima))/86400000):null;
-        const urgencia=dias===null?"?":dias>90?"🔴 DORMIDO":dias>45?"🔴 DORMIDO":dias>20?"🟡 LLAMAR":"🟢 ACTIVO";
-        const urgClass=dias===null||dias>45?"hot":dias>20?"warm":"ok-d";
-        return "<div class='cli-row prod-row' style='border-left:3px solid "+(ci===0?prodColor:prodColor+"44")+"'>"
-          +(ci===0?"<span class='cr-name'>"+prod+" <span class='pc'>~"+fmt2(cant)+" u.</span></span>":"<span></span>")
-          +"<span class='cr-val'>"+cl+"</span>"
-          +"<span class='cr-ticket'>"+fmtM(d.total)+"</span>"
-          +"<span class='cr-val'>"+(d.ultima?d.ultima.split("-").reverse().join("/").substring(0,5)+" · "+dias+"d":"—")+"</span>"
-          +"<span class='cr-days "+urgClass+"'>"+urgencia+"</span>"
-          +"</div>";
-      });
-    }).join("");
-
-    // ── Stock cards ──────────────────────────────────────────────
-    const papelCards=sPapel.map(([n,c])=>{
-      const al=c<15?"low":c<40?"mid":"ok";
-      const col=al==="low"?"#ef4444":al==="mid"?"#f59e0b":"#4a9eff";
-      const brd=al==="low"?"#ef444430":"#2a2f42";
-      const label=al==="low"?"⚠ BAJO":al==="mid"?"● Medio":"● OK";
-      const pct=Math.min(100,Math.round(c/Math.max(1,...sPapel.map(x=>x[1]))*100));
-      return "<div style='background:#1a1f2e;border:1px solid "+brd+";border-radius:10px;padding:11px 15px;flex:1;min-width:90px;position:relative;overflow:hidden'>"
-        +"<div style='position:absolute;top:0;left:0;right:0;height:2px;background:"+col+"'></div>"
-        +"<div style='font-size:9px;font-weight:700;color:#6b7280;letter-spacing:1px;margin-bottom:5px'>"+n.replace(" 1,60","").replace(" 1,10","")+"</div>"
-        +"<div style='font-size:20px;font-weight:800;color:"+(al==="low"?col:"#fff")+";line-height:1'>"+fmt2(c)+"<span style='font-size:10px;font-weight:400;color:#6b7280;margin-left:2px'>u.</span></div>"
-        +"<div style='height:3px;background:#2a2f42;border-radius:2px;margin-top:7px;overflow:hidden'><div style='width:"+pct+"%;height:100%;background:"+col+";border-radius:2px'></div></div>"
-        +"<div style='font-size:9px;color:"+col+";font-weight:600;margin-top:4px'>"+label+"</div>"
-        +"</div>";
-    }).join("");
-
-    const cmykCard=([n,c],colTop)=>{
-      const col=colTop||"#9ca3af";
-      const nm=n.replace(" PRO","");
-      return "<div style='background:#1a1f2e;border:1px solid "+col+"20;border-radius:8px;padding:9px 12px;position:relative;overflow:hidden'>"
-        +"<div style='position:absolute;top:0;left:0;right:0;height:2px;background:"+col+"'></div>"
-        +"<div style='font-size:9px;font-weight:700;color:#6b7280;margin-bottom:4px'>"+nm+"</div>"
-        +"<div style='font-size:19px;font-weight:800;color:#fff;line-height:1'>"+fmt2(c)+"<span style='font-size:10px;font-weight:400;color:#6b7280;margin-left:2px'>u.</span></div>"
-        +"<div style='height:3px;background:#2a2f42;border-radius:2px;margin-top:6px;overflow:hidden'><div style='width:"+Math.min(100,c*3)+"%;height:100%;background:"+col+";border-radius:2px'></div></div>"
-        +"</div>";
-    };
-
-    // ── Clientes dormidos table rows ─────────────────────────────
-    const dormidosRows=m.dormidos.map(function(cl){
-      const prodKey=Object.keys(compradoresPorProd).filter(function(p){return compradoresPorProd[p][cl.nombre];}).sort(function(a,b){return ((compradoresPorProd[b][cl.nombre]||{total:0}).total-(compradoresPorProd[a][cl.nombre]||{total:0}).total);})[0]||"—";
-      return "<div class='cli-row dormido-row'>"
-        +"<span class='cr-name'>"+cl.nombre+"</span>"
-        +"<span class='cr-val'>"+cl.ultima+"</span>"
-        +"<span class='cr-days hot'>"+cl.diasSin+" días</span>"
-        +"<span class='cr-ticket'>"+fmtM(cl.total)+"</span>"
-        +"<span class='cr-val'>"+prodKey+"</span>"
-        +"</div>";
-    }).join("");
-    const dormidosPotencial=fmtM(Math.round(m.dormidos.slice(0,3).reduce(function(a,x){return a+x.total*.15;},0)));
-
-    // ── Proyecciones ─────────────────────────────────────────────
-    // Calcular junio estimado = ventas hasta hoy * (30/días del mes transcurridos)
-    const mesActualData=m.mesesOrdenados.find(([mes])=>mes===m.hoyStr.substring(0,7));
-    const diasTranscurridos=parseInt(m.hoyStr.split("-")[2]);
-    const proyMesAct=mesActualData?Math.round(mesActualData[1]/diasTranscurridos*30):0;
-    // Mismo mes año anterior
-    const mesAnterior=m.mesesOrdenados.find(([mes])=>mes===m.hoyStr.substring(0,4)-1+"-"+m.hoyStr.substring(5,7));
-    const proyMesSig=textos.proyMesSig||"—";
-    const proyMesActStr=textos.proyMesActual||("~"+fmtM(proyMesAct));
-
-    // ── Bar chart data para JS ───────────────────────────────────
-    const chartData=m.mesesOrdenados.slice(-16).map(([mes,total])=>{
-      const year=mes.substring(0,4);
-      const monthNames=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-      const monthIdx=parseInt(mes.substring(5,7))-1;
-      const isCurrent=year==="2026";
-      const isLastMonth=mes===m.hoyStr.substring(0,7);
-      return {l:monthNames[monthIdx]+(isLastMonth?"*":""),v:Math.round(total/1000000*10)/10,cur:isCurrent};
-    });
-    const chartDataStr=JSON.stringify(chartData);
-
-    // ── Semana actual ────────────────────────────────────────────
-    const semana=textos.semana||"Semana actual";
-
-    // ── Top productos con precio unitario promedio ───────────────
-    const prodConPrecio=m.topProd.slice(0,5).map(p=>{
-      const precProm=p.cantidad>0?Math.round(p.total/p.cantidad):0;
-      const maxT=m.topProd[0].total;
-      const pct=Math.round(p.total/maxT*100);
-      const ranks=["g","s","b","",""];
-      const rankClass=ranks[m.topProd.indexOf(p)]||"";
-      return {nombre:p.nombre,total:p.total,cantidad:p.cantidad,precProm,pct,rankClass,rank:m.topProd.indexOf(p)+1};
-    });
-
-    // ── Top clientes con pct del total ──────────────────────────
-    const topCliPct=m.topClientes.slice(0,5).map(c=>({
-      ...c,
-      pct:m.totalHist>0?Math.round(c.total/m.totalHist*100*10)/10:0,
-      initial:c.nombre[0].toUpperCase()
-    }));
-    const cliMaxT=topCliPct[0]?topCliPct[0].total:1;
-    const cliColors=["linear-gradient(90deg,#4a9eff,#7bb8ff)","linear-gradient(90deg,#4a9eff,#7bb8ff)","linear-gradient(90deg,#8b5cf6,#a78bfa)","linear-gradient(90deg,#f59e0b,#fbbf24)","linear-gradient(90deg,#10b981,#34d399)"];
-
-    // ── promedio semanal ─────────────────────────────────────────
-    const totalSemanas=m.mesesOrdenados.length*4.33;
-    const promSemanal=totalSemanas>0?Math.round(m.totalHist/totalSemanas):0;
-
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f1117;color:#e8eaf0;padding:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-@media print{body{background:#0f1117;padding:0}@page{margin:8mm size:A4}.container{border-radius:0;box-shadow:none}}
-.container{max-width:920px;margin:0 auto;background:#161922;border-radius:16px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5)}
-.header{background:linear-gradient(135deg,#1a1f2e,#0f1420);border-bottom:1px solid #2a2f42;padding:28px 40px;display:flex;align-items:center;justify-content:space-between}
-.brand{font-size:10px;font-weight:700;letter-spacing:3px;color:#4a9eff;text-transform:uppercase;margin-bottom:5px}
-.h-title{font-size:24px;font-weight:800;color:#fff}.h-title span{color:#4a9eff}
-.h-period{font-size:12px;color:#6b7280;margin-top:3px}
-.badge{background:#4a9eff12;border:1px solid #4a9eff44;border-radius:10px;padding:10px 18px;text-align:center}
-.badge-n{font-size:26px;font-weight:800;color:#fff;display:block}
-.badge-l{font-size:10px;color:#4a9eff;font-weight:700;letter-spacing:1px}
-.gen{font-size:10px;color:#4b5563;margin-top:7px;text-align:right}
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#2a2f42;border-bottom:1px solid #2a2f42}
-.kpi{background:#1a1f2e;padding:20px 22px;position:relative}
-.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
-.kpi.k1::before{background:linear-gradient(90deg,#4a9eff,#7bb8ff)}
-.kpi.k2::before{background:linear-gradient(90deg,#10b981,#34d399)}
-.kpi.k3::before{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
-.kpi.k4::before{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
-.kpi-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;color:#6b7280;text-transform:uppercase;margin-bottom:7px}
-.kpi-val{font-size:17px;font-weight:800;color:#fff;line-height:1.2}
-.kpi-sub{font-size:10px;color:#6b7280;margin-top:4px}
-.pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:5px}
-.pup{background:#10b98122;color:#10b981}.pdown{background:#ef444422;color:#ef4444}.pwarn{background:#f59e0b22;color:#f59e0b}
-.body{padding:30px 40px}
-.section{margin-bottom:32px}
-.divider{height:1px;background:#2a2f42;margin-bottom:32px}
-.sh{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.si{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
-.si-b{background:#4a9eff1a}.si-g{background:#10b9811a}.si-o{background:#f59e0b1a}.si-p{background:#8b5cf61a}.si-r{background:#ef44441a}
-.st{font-size:14px;font-weight:700;color:#e8eaf0}.ss{font-size:11px;color:#6b7280;margin-top:1px}
-.chart-wrap{background:#1a1f2e;border:1px solid #2a2f42;border-radius:12px;padding:20px}
-.bar-chart{display:flex;align-items:flex-end;gap:4px;height:100px}
-.bg{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end}
-.b{width:100%;border-radius:3px 3px 0 0}.b.cur{background:linear-gradient(180deg,#4a9eff,#1d4ed8)}.b.old{background:#2a2f42}
-.bl{font-size:7px;color:#4b5563;font-weight:600}.bv{font-size:6px;color:#6b7280}
-.leg{display:flex;gap:14px;margin-top:10px}.li{display:flex;align-items:center;gap:5px;font-size:10px;color:#6b7280}
-.ld{width:10px;height:10px;border-radius:2px}
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.prod-list{display:flex;flex-direction:column;gap:7px}
-.pi{background:#1a1f2e;border:1px solid #2a2f42;border-radius:9px;padding:11px 13px;display:flex;align-items:center;gap:9px}
-.rk{width:20px;height:20px;border-radius:5px;background:#2a2f42;font-size:9px;font-weight:700;color:#6b7280;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.rk.g{background:#f59e0b1a;color:#f59e0b}.rk.s{background:#9ca3af1a;color:#9ca3af}.rk.b{background:#cd7c321a;color:#cd7c32}
-.pn{font-size:11px;font-weight:600;color:#e8eaf0}
-.pc{font-size:9px;color:#6b7280;background:#2a2f42;border-radius:3px;padding:1px 5px;margin-top:2px;display:inline-block}
-.mb{width:60px;height:4px;background:#2a2f42;border-radius:2px;overflow:hidden}
-.mf{height:100%;border-radius:2px;background:linear-gradient(90deg,#4a9eff,#7bb8ff)}
-.pt{font-size:11px;font-weight:700;color:#fff;min-width:56px;text-align:right}
-.cl{display:flex;flex-direction:column;gap:7px}
-.ci{background:#1a1f2e;border:1px solid #2a2f42;border-radius:9px;padding:11px 13px;display:flex;align-items:center;gap:9px}
-.av{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#4a9eff22,#8b5cf622);border:1px solid #4a9eff33;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4a9eff;flex-shrink:0}
-.cn{font-size:11px;font-weight:600;color:#e8eaf0;flex:1}
-.ct{font-size:11px;font-weight:700;color:#fff}.cp{font-size:9px;color:#6b7280;text-align:right}
-.cb{height:3px;background:#2a2f42;border-radius:2px;margin-top:4px;overflow:hidden}
-.cf{height:100%;border-radius:2px}
-.ai-box{background:#1a1f2e;border:1px solid #4a9eff33;border-radius:12px;overflow:hidden}
-.ai-hd{background:linear-gradient(90deg,#4a9eff0d,transparent);border-bottom:1px solid #4a9eff1a;padding:13px 18px;display:flex;align-items:center;gap:9px}
-.ai-badge{background:#4a9eff1a;border:1px solid #4a9eff44;border-radius:5px;padding:2px 7px;font-size:9px;font-weight:800;color:#4a9eff;letter-spacing:1.5px}
-.ai-t{font-size:13px;font-weight:600;color:#e8eaf0}
-.ai-body{padding:18px;display:flex;flex-direction:column;gap:18px}
-.ai-blk-title{font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
-.diag{font-size:12px;color:#9ca3af;line-height:1.75;background:#0d1117;border:1px solid #2a2f42;border-radius:8px;padding:14px 16px}
-.diag strong{color:#e8eaf0}.hi{color:#4a9eff;font-weight:600}.warn{color:#f59e0b;font-weight:600}.ok{color:#10b981;font-weight:600}
-.ac{background:#0d1117;border:1px solid #2a2f42;border-radius:9px;padding:13px 15px;display:flex;gap:12px;align-items:flex-start}
-.ac-ico{font-size:18px;flex-shrink:0;line-height:1}
-.ac-body{flex:1}.ac-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px}
-.ac-title{font-size:12px;font-weight:700;color:#fff}
-.ac-tag{flex-shrink:0;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.5px}
-.t-now{background:#ef444415;color:#ef4444;border:1px solid #ef444430}
-.t-week{background:#f59e0b15;color:#f59e0b;border:1px solid #f59e0b30}
-.t-month{background:#4a9eff15;color:#4a9eff;border:1px solid #4a9eff30}
-.t-long{background:#8b5cf615;color:#8b5cf6;border:1px solid #8b5cf630}
-.ac-detail{font-size:11px;color:#9ca3af;line-height:1.6}
-.ac-detail strong{color:#d1d5db}
-.cli-table{margin-top:8px;display:flex;flex-direction:column;gap:5px}
-.cli-row{display:grid;align-items:center;background:#161922;border:1px solid #2a2f42;border-radius:6px;padding:7px 11px;font-size:11px;gap:8px}
-.prod-row{grid-template-columns:1.5fr 1fr 0.9fr 0.9fr 0.7fr}
-.dormido-row{grid-template-columns:1.3fr 0.9fr 0.7fr 0.9fr 0.8fr}
-.cr-head{background:transparent;border-color:transparent;padding:2px 11px}
-.cr-label{font-size:9px;color:#6b7280;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
-.cr-name{font-weight:700;color:#e8eaf0}
-.cr-val{color:#9ca3af}
-.cr-ticket{color:#10b981;font-weight:600}
-.cr-days{font-weight:600}
-.cr-days.hot{color:#ef4444}.cr-days.warm{color:#f59e0b}.cr-days.ok-d{color:#10b981}
-.proj{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.pc-card{background:#0d1117;border:1px solid #2a2f42;border-radius:9px;padding:15px;text-align:center}
-.pc-lbl{font-size:9px;color:#6b7280;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:7px}
-.pc-val{font-size:19px;font-weight:800}
-.pc-sub{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.4}
-.footer{border-top:1px solid #2a2f42;padding:18px 40px;display:flex;align-items:center;justify-content:space-between;background:#1a1f2e}
-.ft{font-size:10px;color:#4b5563}.ft strong{color:#6b7280}
-.btn{padding:8px 15px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:none;font-family:inherit}
-.btn-p{background:linear-gradient(135deg,#4a9eff,#2563eb);color:#fff}
-</style></head><body>
-<div class="container">
-
-<div class="header">
-  <div>
-    <div class="brand">Super Coating · Sistema Eliel</div>
-    <div class="h-title">Reporte <span>Semanal</span></div>
-    <div class="h-period">${semana} · Histórico: registros analizados · ${fmt2(m.totalRegistros)} ops</div>
-  </div>
-  <div>
-    <div class="badge">
-      <span class="badge-n">S·${new Date().toLocaleDateString("es-AR",{month:"numeric",year:"2-digit"}).replace("/","·")}</span>
-      <span class="badge-l">${new Date().toLocaleDateString("es-AR",{month:"long",year:"numeric"}).toUpperCase()}</span>
-    </div>
-    <div class="gen">Generado: ${hoyTime} hs</div>
-  </div>
-</div>
-
-<div class="kpis">
-  <div class="kpi k1">
-    <div class="kpi-lbl">Ventas últimos 30 días</div>
-    <div class="kpi-val">${fmtM(m.u30)}</div>
-    <div class="kpi-sub">Papel + tinta combinados</div>
-    <span class="pill ${m.tendPct>=0?"pup":"pdown"}">${m.tendPct>=0?"▲":"▼"} ${Math.abs(m.tendPct)}% vs mes ant.</span>
-  </div>
-  <div class="kpi k2">
-    <div class="kpi-lbl">Total histórico</div>
-    <div class="kpi-val">${fmtM(m.totalHist)}</div>
-    <div class="kpi-sub">Feb 2025 → hoy · ${m.topClientes.length} clientes</div>
-    <span class="pill pup">${fmt2(m.totalRegistros)} operaciones</span>
-  </div>
-  <div class="kpi k3">
-    <div class="kpi-lbl">Promedio semanal</div>
-    <div class="kpi-val">${fmtM(promSemanal)}</div>
-    <div class="kpi-sub">Sobre todo el histórico</div>
-    <span class="pill pwarn">Referencia de mercado</span>
-  </div>
-  <div class="kpi k4">
-    <div class="kpi-lbl">Tu 30% est.</div>
-    <div class="kpi-val">${fmtM(Math.round(m.u30*0.3))}</div>
-    <div class="kpi-sub">Estimado sobre 30 días</div>
-    <span class="pill pup">↗ Ver módulo SC</span>
-  </div>
-</div>
-
-<div class="body">
-
-  <div class="section">
-    <div class="sh"><div class="si si-b">📊</div><div><div class="st">Evolución mensual de ventas</div><div class="ss">Histórico completo · En pesos · Excel + Firebase</div></div></div>
-    <div class="chart-wrap">
-      <div class="bar-chart" id="chart"></div>
-      <div class="leg">
-        <div class="li"><div class="ld" style="background:linear-gradient(#4a9eff,#1d4ed8)"></div>2026</div>
-        <div class="li"><div class="ld" style="background:#2a2f42"></div>2025</div>
-        <div class="li" style="margin-left:auto;font-size:9px;color:#4b5563">* mes en curso</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="section">
-    <div class="two-col">
-      <div>
-        <div class="sh"><div class="si si-o">📦</div><div><div class="st">Top productos</div><div class="ss">Facturación histórica acumulada</div></div></div>
-        <div class="prod-list">
-          ${prodConPrecio.map(p=>`
-          <div class="pi">
-            <div class="rk ${p.rankClass}">${p.rank}</div>
-            <div style="flex:1">
-              <div class="pn">${p.nombre.replace(" 1,60","").replace(" 1,10","")}</div>
-              <div class="pc">${p.cantidad>0?"·"+fmt2(p.cantidad)+" u.":""} · $${fmt2(Math.round(p.total/Math.max(1,p.cantidad)))}/u</div>
-            </div>
-            <div class="mb"><div class="mf" style="width:${p.pct}%"></div></div>
-            <div class="pt">${fmtM(p.total)}</div>
-          </div>`).join("")}
-        </div>
-      </div>
-      <div>
-        <div class="sh"><div class="si si-p">🏆</div><div><div class="st">Top clientes</div><div class="ss">Facturación histórica · % del total</div></div></div>
-        <div class="cl">
-          ${topCliPct.map((c,i)=>`
-          <div class="ci">
-            <div class="av">${c.initial}</div>
-            <div style="flex:1">
-              <div class="cn">${c.nombre}</div>
-              <div class="cb"><div class="cf" style="width:${Math.round(c.total/cliMaxT*100)}%;background:${cliColors[i]}"></div></div>
-            </div>
-            <div style="text-align:right">
-              <div class="ct">${fmtM(c.total)}</div>
-              <div class="cp">${c.pct}% del total</div>
-            </div>
-          </div>`).join("")}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="section">
-    <div class="sh"><div class="si si-g">🗄️</div><div><div class="st">Stock disponible · Snapshot</div><div class="ss">Desde Firebase · Tiempo real</div></div></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch">
-      ${papelCards}
-      <div style="width:1px;background:#2a2f42;align-self:stretch;margin:0 4px;flex:none"></div>
-      <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px">
-        <div style="font-size:9px;font-weight:700;color:#6b7280;letter-spacing:1.5px;text-transform:uppercase;padding:0 2px">Tinta CMYK</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          ${sCMYK.map(e=>cmykCard(e,tintaTopColor[e[0]]||"#9ca3af")).join("")}
-          ${sCMYK.length===0?"<div style='color:#4b5563;font-size:11px;padding:8px'>Sin stock</div>":""}
-        </div>
-      </div>
-      ${sPRO.length>0?`
-      <div style="width:1px;background:#2a2f42;align-self:stretch;margin:0 4px;flex:none"></div>
-      <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px">
-        <div style="font-size:9px;font-weight:700;color:#8b5cf6;letter-spacing:1.5px;text-transform:uppercase;padding:0 2px">Tinta CMYK PRO</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          ${sPRO.map(e=>cmykCard(e,"#8b5cf6")).join("")}
-        </div>
-      </div>`:""}
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="section">
-    <div class="sh"><div class="si si-p">🤖</div><div><div class="st">Análisis IA · Asesor de negocio Super Coating</div><div class="ss">Basado en ${fmt2(m.totalRegistros)} registros · Histórico real + stock Firebase</div></div></div>
-    <div class="ai-box">
-      <div class="ai-hd">
-        <div class="ai-badge">CLAUDE AI</div>
-        <div class="ai-t">Diagnóstico, acciones específicas y proyecciones — ${hoyStr}</div>
-      </div>
-      <div class="ai-body">
-
-        <div class="ai-blk">
-          <div class="ai-blk-title" style="color:#9ca3af"><span class="dot" style="background:#4a9eff"></span> Diagnóstico de la semana</div>
-          <div class="diag">${textos.diagnostico||"—"}</div>
-        </div>
-
-        <div class="ai-blk">
-          <div class="ai-blk-title" style="color:#ef4444"><span class="dot" style="background:#ef4444"></span> Acción inmediata · Clientes que deberían haber comprado esta semana</div>
-          ${(textos.accionesInmediatas||[]).map(ac=>`
-          <div class="ac">
-            <div class="ac-ico">${ac.icono||"📞"}</div>
-            <div class="ac-body">
-              <div class="ac-head"><div class="ac-title">${ac.titulo||""}</div><div class="ac-tag t-now">HOY</div></div>
-              <div class="ac-detail">${ac.detalle||""}</div>
-              ${ac.tabla?`<div class="cli-table">
-                <div class="cli-row cr-head dh">
-                  <span class="cr-label">Cliente</span><span class="cr-label">Última compra</span>
-                  <span class="cr-label">Ciclo prom.</span><span class="cr-label">Compra típica</span>
-                  <span class="cr-label">Estado</span>
-                </div>
-                ${ac.tabla.map(r=>`<div class="cli-row dormido-row">
-                  <span class="cr-name">${r.cliente}</span>
-                  <span class="cr-val">${r.ultima}</span>
-                  <span class="cr-val">${r.ciclo||"—"}</span>
-                  <span class="cr-ticket">${r.producto||""}</span>
-                  <span class="cr-days ${r.urgencia==="hot"?"hot":r.urgencia==="warm"?"warm":"ok-d"}">${r.estado}</span>
-                </div>`).join("")}
-              </div>`:""}
-            </div>
-          </div>`).join("")}
-        </div>
-
-        <div class="ai-blk">
-          <div class="ai-blk-title" style="color:#10b981"><span class="dot" style="background:#10b981"></span> Acción esta semana · Cruce stock disponible × clientes potenciales</div>
-          <div class="ac">
-            <div class="ac-ico">📦</div>
-            <div class="ac-body">
-              <div class="ac-head"><div class="ac-title">Tenés stock — ¿a quién llamar por cada producto?</div><div class="ac-tag t-week">ESTA SEMANA</div></div>
-              <div class="ac-detail">Top compradores históricos por producto, con su último pedido y días sin comprar.</div>
-              <div class="cli-table">
-                <div class="cli-row cr-head prod-row">
-                  <span class="cr-label">Producto (stock)</span><span class="cr-label">Cliente</span>
-                  <span class="cr-label">Historial</span><span class="cr-label">Última compra</span>
-                  <span class="cr-label">Prioridad</span>
-                </div>
-                ${stockCruceRows||"<div style='color:#4b5563;font-size:11px;padding:8px 11px'>Sin stock disponible actualmente</div>"}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        ${(textos.accionesSemana||[]).map(ac=>`
-        <div class="ai-blk">
-          <div class="ai-blk-title" style="color:#f59e0b"><span class="dot" style="background:#f59e0b"></span> ${ac.seccion||"Esta semana"}</div>
-          <div class="ac">
-            <div class="ac-ico">${ac.icono||"📦"}</div>
-            <div class="ac-body">
-              <div class="ac-head"><div class="ac-title">${ac.titulo||""}</div><div class="ac-tag t-week">ESTA SEMANA</div></div>
-              <div class="ac-detail">${ac.detalle||""}</div>
-            </div>
-          </div>
-        </div>`).join("")}
-
-        ${m.dormidos.length>0?`
-        <div class="ai-blk">
-          <div class="ai-blk-title" style="color:#8b5cf6"><span class="dot" style="background:#8b5cf6"></span> Investigar · Clientes con alto historial que desaparecieron</div>
-          <div class="ac">
-            <div class="ac-ico">🔍</div>
-            <div class="ac-body">
-              <div class="ac-head"><div class="ac-title">Estos clientes tenían volumen y dejaron de comprar — ¿qué pasó?</div><div class="ac-tag t-month">MES QUE VIENE</div></div>
-              <div class="ac-detail">No es una baja estacional — llevan demasiado tiempo inactivos para explicarlo por temporada.</div>
-              <div class="cli-table">
-                <div class="cli-row cr-head dh"><span class="cr-label">Cliente</span><span class="cr-label">Última compra</span><span class="cr-label">Días</span><span class="cr-label">Historial</span><span class="cr-label">Producto</span></div>
-                ${dormidosRows}
-              </div>
-              <div class="ac-detail" style="margin-top:8px">Si recuperás solo 3 de estos ${m.dormidos.length} → <strong>+${dormidosPotencial} adicionales este mes</strong>. Vale una llamada de 5 minutos a cada uno.</div>
-            </div>
-          </div>
-        </div>`:""}
-
-        ${(textos.accionesMes||[]).map(ac=>`
-        <div class="ai-blk">
-          <div class="ai-blk-title" style="color:#4a9eff"><span class="dot" style="background:#4a9eff"></span> Largo plazo</div>
-          <div class="ac">
-            <div class="ac-ico">${ac.icono||"📈"}</div>
-            <div class="ac-body">
-              <div class="ac-head"><div class="ac-title">${ac.titulo||""}</div><div class="ac-tag t-long">LARGO PLAZO</div></div>
-              <div class="ac-detail">${ac.detalle||""}</div>
-            </div>
-          </div>
-        </div>`).join("")}
-
-        <div class="ai-blk">
-          <div class="ai-blk-title" style="color:#4a9eff"><span class="dot" style="background:#4a9eff"></span> Proyecciones · Basadas en histórico real</div>
-          <div class="proj">
-            <div class="pc-card">
-              <div class="pc-lbl">${new Date().toLocaleDateString("es-AR",{month:"long",year:"numeric"})}</div>
-              <div class="pc-val" style="color:#f59e0b">${proyMesActStr}</div>
-              <div class="pc-sub">${textos.proyContext||""}</div>
-            </div>
-            <div class="pc-card">
-              <div class="pc-lbl">Mes siguiente</div>
-              <div class="pc-val" style="color:#10b981">${proyMesSig}</div>
-              <div class="pc-sub">${textos.proySigContext||""}</div>
-            </div>
-            <div class="pc-card">
-              <div class="pc-lbl">Riesgo de concentración</div>
-              <div class="pc-val" style="color:#ef4444">${topCliPct[0]?topCliPct[0].pct+"%":"—"}</div>
-              <div class="pc-sub">${topCliPct[0]?topCliPct[0].nombre+" = "+topCliPct[0].pct+"% del total histórico. "+textos.riesgo:""}</div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<div class="footer">
-  <div class="ft"><strong>Sistema Eliel</strong> · Super Coating · Datos: Excel histórico + Firebase realtime</div>
-  <button class="btn btn-p" onclick="window.print()">⬇ Descargar PDF</button>
-</div>
-
-    +"</div>\n"
-    +"<"+"script>\n"
-    +"const chartData="+chartDataStr+";\n"
-    +"const max=Math.max.apply(null,chartData.map(function(d){return d.v;}));\n"
-    +"const chart=document.getElementById('chart');\n"
-    +"chartData.forEach(function(d){\n"
-    +"  var pct=(d.v/max)*100;\n"
-    +"  var g=document.createElement('div');g.className='bg';\n"
-    +"  var lbl=d.l||'?';var val=d.v||0;\n"
-    +"  g.innerHTML='<div class=\\"bv\\">\$'+val+'M</div><div class=\\"b '+(d.cur?'cur':'old')+'\\" style=\\"height:'+pct+'%\\"></div><div class=\\"bl\\">'+lbl+'</div>';\n"
-    +"  chart.appendChild(g);\n"
-    +"});\n"
-    +"<"+"/script>\n"
-    +"</body></html>";
-  };
-  };
 
   const generarReporte=async()=>{
     const vh=data.ventasHistoricas||[];
@@ -7376,7 +7382,7 @@ body{font-family:-apple-system,'Segoe UI',sans-serif;background:#0f1117;color:#e
       if(!raw)throw new Error("Respuesta vacía de Claude");
       setLoadingMsg("Construyendo reporte...");
       let textos;
-      var bt="`";var cleanRaw=raw.split(bt+bt+bt+"json").join("").split(bt+bt+bt).join("").trim();try{textos=JSON.parse(cleanRaw);}
+      var cleanRaw=raw.trim();if(cleanRaw.indexOf(String.fromCharCode(123))>-1){cleanRaw=cleanRaw.substring(cleanRaw.indexOf(String.fromCharCode(123)),cleanRaw.lastIndexOf(String.fromCharCode(125))+1);}try{textos=JSON.parse(cleanRaw);}
       catch(e){throw new Error("Error parseando JSON: "+raw.slice(0,200));}
 
       const mConRaw={...m,ventasHistRaw:vh,ventasRaw:data.ventas||[]};
