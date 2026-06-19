@@ -7157,6 +7157,11 @@ function ReportesView({data,save,showToast}){
   const generarReporte=async()=>{
     setLoading(true);setLoadingMsg("Preparando datos...");
     try{
+      // Verificar que SC_SYSTEM_PROMPT esté cargado
+      if(!window.SC_SYSTEM_PROMPT){
+        throw new Error("Sistema no inicializado correctamente. Recargá la página.");
+      }
+      console.log("[Reporte] SC_SYSTEM_PROMPT length:",window.SC_SYSTEM_PROMPT.length);
       // Payload: solo datos dinámicos de Firebase — sin ventasHistoricas (ya en la skill)
       const payload={
         fecha_hoy:new Date().toISOString().split("T")[0],
@@ -7183,6 +7188,7 @@ function ReportesView({data,save,showToast}){
       };
 
       setLoadingMsg("Generando reporte con IA...");
+      console.log("[Reporte] Enviando payload, ventas:",payload.ventas.length,"contenedores:",payload.contenedores.length);
 
       const resp=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
@@ -7200,10 +7206,17 @@ function ReportesView({data,save,showToast}){
         })
       });
 
-      if(!resp.ok){const t=await resp.text();throw new Error("API "+resp.status+": "+t.slice(0,200));}
+      console.log("[Reporte] API status:",resp.status);
+      if(!resp.ok){const t=await resp.text();console.error("[Reporte] API error body:",t);throw new Error("API "+resp.status+": "+t.slice(0,300));}
       const apiData=await resp.json();
+      console.log("[Reporte] API response:",apiData.stop_reason,"tokens:",apiData.usage);
       const html=(apiData.content&&apiData.content[0]&&apiData.content[0].text)||"";
-      if(!html||!html.includes("<!DOCTYPE"))throw new Error("Respuesta inválida — no es HTML");
+      console.log("[Reporte] HTML length:",html.length,"starts with DOCTYPE:",html.startsWith("<!DOCTYPE")||html.startsWith("<!doctype"));
+      if(!html){throw new Error("Respuesta vacía de la API");}
+      if(!html.includes("<!DOCTYPE")&&!html.includes("<!doctype")){
+        console.error("[Reporte] Bad response:",html.slice(0,500));
+        throw new Error("Claude no devolvió HTML válido. Revisá la consola.");
+      }
 
       setLoadingMsg("Guardando...");
       const semana="Semana del "+new Date().toLocaleDateString("es-AR",{day:"numeric",month:"long"});
@@ -7213,8 +7226,9 @@ function ReportesView({data,save,showToast}){
       setUltimoReporte({html,semana,fecha:new Date().toISOString()});
       showToast("✓ Reporte generado");
     }catch(err){
-      showToast("⚠ "+err.message);
-      console.error("[Reporte]",err);
+      const msg=err.message||"Error desconocido";
+      console.error("[Reporte] ERROR:",err);
+      showToast("⚠ "+msg.slice(0,120));
     }finally{
       setLoading(false);setLoadingMsg("");
     }
