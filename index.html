@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v3.6.0 · 2026-06-18 -->
+  <!-- v4.0.0 · 2026-06-18 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -632,7 +632,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v3.6.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v4.0.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1078,345 +1078,8 @@ window.abrirPDF = abrirPDF;
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v3.6.0";
-const APP_BUILD   = "2026-06-18";
-
-// ── SC Reporte PDF ─────────────────────────────────────────────────
-window.sc_construirPDF=function(textos,m){
-  var fmt2=function(n){return Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0});};
-  var fmtM=function(n){var v=Number(n||0);return v>=1000000?"$"+(v/1000000).toFixed(1)+"M":"$"+fmt2(v);};
-  var hoyStr=new Date().toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric"});
-  var hoyTime=new Date().toLocaleString("es-AR",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
-  var PAPEL=["30GR 1,60 X 600","35GR 1,60 X 500","42GR 1,60 X 300","61GR 1,60 X 300","52GR 1,10 X 100","80GR 1,60 X 300","80GR 1,10 X 100"];
-  var CMYK_=["NEGRO","CYAN","MAGENTA","AMARILLO"];
-  var PRO_=["NEGRO PRO","CYAN PRO","MAGENTA PRO","AMARILLO PRO"];
-  var tintaTopColor={NEGRO:"#374151",CYAN:"#06b6d4",MAGENTA:"#ec4899",AMARILLO:"#eab308"};
-  var tintaProTopColor={"NEGRO PRO":"#8b5cf6","CYAN PRO":"#8b5cf6","MAGENTA PRO":"#8b5cf6","AMARILLO PRO":"#8b5cf6"};
-  var sPapel=Object.entries(m.stockActual).filter(function(e){return PAPEL.indexOf(e[0])>=0;});
-  var sCMYK=Object.entries(m.stockActual).filter(function(e){return CMYK_.indexOf(e[0])>=0;});
-  var sPRO=Object.entries(m.stockActual).filter(function(e){return PRO_.indexOf(e[0])>=0;});
-  var totPapel=sPapel.reduce(function(s,e){return s+e[1];},0)||1;
-  var allVentas=[].concat(m.ventasHistRaw||[]).concat(m.ventasRaw||[]);
-  var compProd={};
-  allVentas.forEach(function(v){
-    if(!v.articulo||!v.cliente||!v.total)return;
-    var art=String(v.articulo).trim();var cl=String(v.cliente).trim().toUpperCase();
-    if(!compProd[art])compProd[art]={};
-    if(!compProd[art][cl])compProd[art][cl]={total:0,ultima:""};
-    compProd[art][cl].total+=Number(v.total||0);
-    var f=String(v.fecha||"").substring(0,10);
-    if(f>compProd[art][cl].ultima)compProd[art][cl].ultima=f;
-  });
-  var dormidosPotencial=fmtM(Math.round((m.dormidos||[]).slice(0,3).reduce(function(a,x){return a+x.total*0.15;},0)));
-  var hoyDate=new Date();
-  var stockCruceRows=sPapel.slice(0,4).map(function(pe){
-    var prod=pe[0];var cant=pe[1];
-    var al=cant<15?"low":cant<40?"mid":"ok";
-    var prodColor=al==="low"?"#ef4444":al==="mid"?"#f59e0b":"#4a9eff";
-    var compradores=Object.entries(compProd[prod]||{}).sort(function(a,b){return b[1].total-a[1].total;}).slice(0,2);
-    return compradores.map(function(ce,ci){
-      var cl=ce[0];var d=ce[1];
-      var dias=d.ultima?Math.round((hoyDate-new Date(d.ultima))/86400000):null;
-      var urg=dias===null||dias>45?"hot":dias>20?"warm":"ok-d";
-      var urgTxt=dias===null||dias>90?"Dormido >90d":dias>45?"Dormido":dias>20?"Llamar":"Activo";
-      var urgIcon=urg==="hot"?"Dormido":urg==="warm"?"Llamar":"OK";
-      return "<div class=\"cli-row prod-row\" style=\"border-left:3px solid "+(ci===0?prodColor:prodColor+"44")+"\">"
-        +(ci===0?"<span class=\"cr-name\">"+prod+" <span class=\"pc\">~"+fmt2(cant)+" u.</span></span>":"<span></span>")
-        +"<span class=\"cr-val\">"+cl+"</span>"
-        +"<span class=\"cr-ticket\">"+fmtM(d.total)+"</span>"
-        +"<span class=\"cr-val\">"+(d.ultima?d.ultima.split("-").reverse().slice(0,2).join("/")+" · "+dias+"d":"--")+"</span>"
-        +"<span class=\"cr-days "+urg+"\">"+urgIcon+"</span>"
-        +"</div>";
-    }).join("");
-  }).join("");
-  var papelCards=sPapel.map(function(pe){
-    var n=pe[0];var c=pe[1];
-    var al=c<15?"low":c<40?"mid":"ok";
-    var col=al==="low"?"#ef4444":al==="mid"?"#f59e0b":"#4a9eff";
-    var brd=al==="low"?"#ef444430":"#2a2f42";
-    var label=al==="low"?"\u26a0 BAJO":al==="mid"?"\u25cf Medio":"\u25cf OK";
-    var pct=Math.min(100,Math.round(c/Math.max.apply(null,sPapel.map(function(x){return x[1];}))*100));
-    return "<div style=\"background:#1a1f2e;border:1px solid "+brd+";border-radius:10px;padding:11px 15px;flex:1;min-width:90px;position:relative;overflow:hidden\">"
-      +"<div style=\"position:absolute;top:0;left:0;right:0;height:2px;background:"+col+"\"></div>"
-      +"<div style=\"font-size:9px;font-weight:700;color:#6b7280;letter-spacing:1px;margin-bottom:5px\">"+n.replace(" 1,60","").replace(" 1,10","")+"</div>"
-      +"<div style=\"font-size:20px;font-weight:800;color:"+(al==="low"?col:"#fff")+";line-height:1\">"+fmt2(c)+"<span style=\"font-size:10px;font-weight:400;color:#6b7280;margin-left:2px\">u.</span></div>"
-      +"<div style=\"height:3px;background:#2a2f42;border-radius:2px;margin-top:7px;overflow:hidden\"><div style=\"width:"+pct+"%;height:100%;background:"+col+";border-radius:2px\"></div></div>"
-      +"<div style=\"font-size:9px;color:"+col+";font-weight:600;margin-top:4px\">"+label+"</div>"
-      +"</div>";
-  }).join("");
-  var cmykCard=function(pe,colTop){
-    var n=pe[0];var c=pe[1];var col=colTop||"#9ca3af";var nm=n.replace(" PRO","");
-    return "<div style=\"background:#1a1f2e;border:1px solid "+col+"20;border-radius:8px;padding:9px 12px;position:relative;overflow:hidden\">"
-      +"<div style=\"position:absolute;top:0;left:0;right:0;height:2px;background:"+col+"\"></div>"
-      +"<div style=\"font-size:9px;font-weight:700;color:#6b7280;margin-bottom:4px\">"+nm+"</div>"
-      +"<div style=\"font-size:19px;font-weight:800;color:#fff;line-height:1\">"+fmt2(c)+"<span style=\"font-size:10px;font-weight:400;color:#6b7280;margin-left:2px\">u.</span></div>"
-      +"<div style=\"height:3px;background:#2a2f42;border-radius:2px;margin-top:6px;overflow:hidden\"><div style=\"width:"+Math.min(100,c*3)+"%;height:100%;background:"+col+";border-radius:2px\"></div></div>"
-      +"</div>";
-  };
-  var dormidosRows=(m.dormidos||[]).map(function(c){
-    var prodKey=Object.keys(compProd).filter(function(p){return compProd[p]&&compProd[p][c.nombre];}).sort(function(a,b){return (compProd[b][c.nombre]||{total:0}).total-(compProd[a][c.nombre]||{total:0}).total;})[0]||"--";
-    return "<div class=\"cli-row dormido-row\">"
-      +"<span class=\"cr-name\">"+c.nombre+"</span>"
-      +"<span class=\"cr-val\">"+c.ultima+"</span>"
-      +"<span class=\"cr-days hot\">"+c.diasSin+" d</span>"
-      +"<span class=\"cr-ticket\">"+fmtM(c.total)+"</span>"
-      +"<span class=\"cr-val\">"+prodKey+"</span>"
-      +"</div>";
-  }).join("");
-  var maxMes=Math.max.apply(null,(m.mesesOrdenados||[]).slice(-12).map(function(x){return x[1];})||[1]);
-  var mesesRows=(m.mesesOrdenados||[]).slice(-12).reverse().map(function(me){
-    var mes=me[0];var total=me[1];
-    var pct=Math.round(total/maxMes*100);
-    return "<tr><td style=\"padding:8px 12px;font-size:11.5px;color:#9ca3af;font-weight:500\">"+mes+"</td>"
-      +"<td style=\"padding:8px 12px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap\">$"+fmt2(total)+"</td>"
-      +"<td style=\"padding:8px 12px;width:45%\"><div style=\"height:8px;background:#2a2f42;border-radius:4px;overflow:hidden\"><div style=\"width:"+pct+"%;height:100%;background:linear-gradient(90deg,#4a9eff,#1d4ed8);border-radius:4px\"></div></div></td></tr>";
-  }).join("");
-  var semana=textos.semana||"Semana actual";
-  var tPct=m.tendPct||0;
-  var promSemanal=m.totalHist>0?Math.round(m.totalHist/((m.mesesOrdenados||[]).length*4.33||1)):0;
-  var prodConPrecio=(m.topProd||[]).slice(0,5).map(function(p,i){
-    var pct2=m.topProd[0]?Math.round(p.total/m.topProd[0].total*100):0;
-    var precProm=p.cantidad>0?Math.round(p.total/p.cantidad):0;
-    var rankClass=["g","s","b","",""][i]||"";
-    return "<div class=\"pi\">"
-      +"<div class=\"rk "+rankClass+"\">"+( i+1)+"</div>"
-      +"<div style=\"flex:1\">"
-      +"<div class=\"pn\">"+p.nombre.replace(" 1,60","").replace(" 1,10","")+"</div>"
-      +"<div class=\"pc\">"+( p.cantidad>0?"·"+fmt2(p.cantidad)+" u.":"")+" · $"+fmt2(precProm)+"/u</div>"
-      +"</div>"
-      +"<div class=\"mb\"><div class=\"mf\" style=\"width:"+pct2+"%\"></div></div>"
-      +"<div class=\"pt\">"+fmtM(p.total)+"</div></div>";
-  }).join("");
-  var cliColors=["linear-gradient(90deg,#4a9eff,#7bb8ff)","linear-gradient(90deg,#4a9eff,#7bb8ff)","linear-gradient(90deg,#8b5cf6,#a78bfa)","linear-gradient(90deg,#f59e0b,#fbbf24)","linear-gradient(90deg,#10b981,#34d399)"];
-  var topCliHtml=(m.topClientes||[]).slice(0,5).map(function(c,i){
-    var pct2=m.totalHist>0?Math.round(c.total/m.totalHist*1000)/10:0;
-    var cliMax=m.topClientes[0]?m.topClientes[0].total:1;
-    var barW=Math.round(c.total/cliMax*100);
-    return "<div class=\"ci\">"
-      +"<div class=\"av\">"+c.nombre[0]+"</div>"
-      +"<div style=\"flex:1\"><div class=\"cn\">"+c.nombre+"</div>"
-      +"<div class=\"cb\"><div class=\"cf\" style=\"width:"+barW+"%;background:"+cliColors[i]+"\"></div></div></div>"
-      +"<div style=\"text-align:right\"><div class=\"ct\">"+fmtM(c.total)+"</div><div class=\"cp\">"+pct2+"% del total</div></div>"
-      +"</div>";
-  }).join("");
-  var accionesHtml="";
-  (textos.accionesInmediatas||[]).forEach(function(ac){
-    var tablaHtml="";
-    if(ac.tabla&&ac.tabla.length){
-      tablaHtml="<div class=\"cli-table\">"
-        +"<div class=\"cli-row cr-head dh\">"
-        +"<span class=\"cr-label\">Cliente</span><span class=\"cr-label\">\xdaltima</span>"
-        +"<span class=\"cr-label\">Ciclo</span><span class=\"cr-label\">Compra t\xedp.</span>"
-        +"<span class=\"cr-label\">Estado</span></div>"
-        +ac.tabla.map(function(r){
-          return "<div class=\"cli-row dormido-row\">"
-            +"<span class=\"cr-name\">"+( r.cliente||"")+"</span>"
-            +"<span class=\"cr-val\">"+( r.ultima||"")+"</span>"
-            +"<span class=\"cr-val\">"+( r.ciclo||"--")+"</span>"
-            +"<span class=\"cr-ticket\">"+( r.producto||"")+"</span>"
-            +"<span class=\"cr-days "+(r.urgencia||"hot")+"\">"+(r.estado||"")+"</span>"
-            +"</div>";
-        }).join("")+"</div>";
-    }
-    accionesHtml+="<div class=\"ac\"><div class=\"ac-ico\">"+(ac.icono||"\uD83D\uDCDE")+"</div>"
-      +"<div class=\"ac-body\"><div class=\"ac-head\"><div class=\"ac-title\">"+(ac.titulo||"")+"</div>"
-      +"<div class=\"ac-tag t-now\">HOY</div></div>"
-      +"<div class=\"ac-detail\">"+(ac.detalle||"")+"</div>"+tablaHtml+"</div></div>";
-  });
-  var semanaAcciones="";
-  (textos.accionesSemana||[]).forEach(function(ac){
-    semanaAcciones+="<div class=\"ac\">"
-      +"<div class=\"ac-ico\">"+(ac.icono||"\uD83D\uDCE6")+"</div>"
-      +"<div class=\"ac-body\"><div class=\"ac-head\"><div class=\"ac-title\">"+(ac.titulo||"")+"</div>"
-      +"<div class=\"ac-tag t-week\">ESTA SEMANA</div></div>"
-      +"<div class=\"ac-detail\">"+(ac.detalle||"")+"</div></div></div>";
-  });
-  var mesAcciones="";
-  (textos.accionesMes||[]).forEach(function(ac){
-    mesAcciones+="<div class=\"ac\">"
-      +"<div class=\"ac-ico\">"+(ac.icono||"\uD83D\uDCC8")+"</div>"
-      +"<div class=\"ac-body\"><div class=\"ac-head\"><div class=\"ac-title\">"+(ac.titulo||"")+"</div>"
-      +"<div class=\"ac-tag t-long\">LARGO PLAZO</div></div>"
-      +"<div class=\"ac-detail\">"+(ac.detalle||"")+"</div></div></div>";
-  });
-  var chartDataStr=JSON.stringify((m.mesesOrdenados||[]).slice(-16).map(function(me){
-    var months=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-    var monthIdx=parseInt(me[0].substring(5,7))-1;
-    var isCur=me[0].substring(0,4)==="2026";
-    var isLast=me[0]===( m.hoyStr||"").substring(0,7);
-    return {l:months[monthIdx]+(isLast?"*":""),v:Math.round(me[1]/100000)/10,cur:isCur};
-  }));
-  var topCliPctVal=m.topClientes&&m.topClientes[0]&&m.totalHist>0?Math.round(m.topClientes[0].total/m.totalHist*1000)/10:0;
-  var h="<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
-    +"<style>*{margin:0;padding:0;box-sizing:border-box}"
-    +"body{font-family:-apple-system,\"Segoe UI\",sans-serif;background:#0f1117;color:#e8eaf0;padding:16px;"
-    +"-webkit-print-color-adjust:exact;print-color-adjust:exact}"
-    +"@media print{body{background:#0f1117;padding:0}@page{margin:8mm size:A4}.container{border-radius:0;box-shadow:none}}"
-    +".container{max-width:920px;margin:0 auto;background:#161922;border-radius:16px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5)}"
-    +".header{background:linear-gradient(135deg,#1a1f2e,#0f1420);border-bottom:1px solid #2a2f42;padding:28px 40px;display:flex;align-items:center;justify-content:space-between}"
-    +".brand{font-size:10px;font-weight:700;letter-spacing:3px;color:#4a9eff;text-transform:uppercase;margin-bottom:5px}"
-    +".h-title{font-size:24px;font-weight:800;color:#fff}.h-title span{color:#4a9eff}"
-    +".h-period{font-size:12px;color:#6b7280;margin-top:3px}"
-    +".badge{background:#4a9eff12;border:1px solid #4a9eff44;border-radius:10px;padding:10px 18px;text-align:center}"
-    +".badge-n{font-size:26px;font-weight:800;color:#fff;display:block}"
-    +".badge-l{font-size:10px;color:#4a9eff;font-weight:700;letter-spacing:1px}"
-    +".gen{font-size:10px;color:#4b5563;margin-top:7px;text-align:right}"
-    +".kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#2a2f42;border-bottom:1px solid #2a2f42}"
-    +".kpi{background:#1a1f2e;padding:20px 22px;position:relative}"
-    +".kpi::before{content:\"\";position:absolute;top:0;left:0;right:0;height:3px}"
-    +".kpi.k1::before{background:linear-gradient(90deg,#4a9eff,#7bb8ff)}"
-    +".kpi.k2::before{background:linear-gradient(90deg,#10b981,#34d399)}"
-    +".kpi.k3::before{background:linear-gradient(90deg,#f59e0b,#fbbf24)}"
-    +".kpi.k4::before{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}"
-    +".kpi-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;color:#6b7280;text-transform:uppercase;margin-bottom:7px}"
-    +".kpi-val{font-size:17px;font-weight:800;color:#fff;line-height:1.2}"
-    +".kpi-sub{font-size:10px;color:#6b7280;margin-top:4px}"
-    +".pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:5px}"
-    +".pup{background:#10b98122;color:#10b981}.pdown{background:#ef444422;color:#ef4444}.pwarn{background:#f59e0b22;color:#f59e0b}"
-    +".body{padding:30px 40px}.section{margin-bottom:32px}.divider{height:1px;background:#2a2f42;margin-bottom:32px}"
-    +".sh{display:flex;align-items:center;gap:10px;margin-bottom:16px}"
-    +".si{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}"
-    +".si-b{background:#4a9eff1a}.si-g{background:#10b9811a}.si-o{background:#f59e0b1a}.si-p{background:#8b5cf61a}"
-    +".st{font-size:14px;font-weight:700;color:#e8eaf0}.ss{font-size:11px;color:#6b7280;margin-top:1px}"
-    +".chart-wrap{background:#1a1f2e;border:1px solid #2a2f42;border-radius:12px;padding:20px}"
-    +".bar-chart{display:flex;align-items:flex-end;gap:4px;height:100px}"
-    +".bg{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end}"
-    +".b{width:100%;border-radius:3px 3px 0 0}.b.cur{background:linear-gradient(180deg,#4a9eff,#1d4ed8)}.b.old{background:#2a2f42}"
-    +".bl{font-size:7px;color:#4b5563;font-weight:600}.bv{font-size:6px;color:#6b7280}"
-    +".leg{display:flex;gap:14px;margin-top:10px}.li{display:flex;align-items:center;gap:5px;font-size:10px;color:#6b7280}"
-    +".ld{width:10px;height:10px;border-radius:2px}"
-    +".two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}"
-    +".prod-list{display:flex;flex-direction:column;gap:7px}"
-    +".pi{background:#1a1f2e;border:1px solid #2a2f42;border-radius:9px;padding:11px 13px;display:flex;align-items:center;gap:9px}"
-    +".rk{width:20px;height:20px;border-radius:5px;background:#2a2f42;font-size:9px;font-weight:700;color:#6b7280;display:flex;align-items:center;justify-content:center;flex-shrink:0}"
-    +".rk.g{background:#f59e0b1a;color:#f59e0b}.rk.s{background:#9ca3af1a;color:#9ca3af}.rk.b{background:#cd7c321a;color:#cd7c32}"
-    +".pn{font-size:11px;font-weight:600;color:#e8eaf0}"
-    +".pc{font-size:9px;color:#6b7280;background:#2a2f42;border-radius:3px;padding:1px 5px;margin-top:2px;display:inline-block}"
-    +".mb{width:60px;height:4px;background:#2a2f42;border-radius:2px;overflow:hidden}"
-    +".mf{height:100%;border-radius:2px;background:linear-gradient(90deg,#4a9eff,#7bb8ff)}"
-    +".pt{font-size:11px;font-weight:700;color:#fff;min-width:56px;text-align:right}"
-    +".cl{display:flex;flex-direction:column;gap:7px}"
-    +".ci{background:#1a1f2e;border:1px solid #2a2f42;border-radius:9px;padding:11px 13px;display:flex;align-items:center;gap:9px}"
-    +".av{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#4a9eff22,#8b5cf622);border:1px solid #4a9eff33;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4a9eff;flex-shrink:0}"
-    +".cn{font-size:11px;font-weight:600;color:#e8eaf0;flex:1}.ct{font-size:11px;font-weight:700;color:#fff}.cp{font-size:9px;color:#6b7280;text-align:right}"
-    +".cb{height:3px;background:#2a2f42;border-radius:2px;margin-top:4px;overflow:hidden}.cf{height:100%;border-radius:2px}"
-    +".ai-box{background:#1a1f2e;border:1px solid #4a9eff33;border-radius:12px;overflow:hidden}"
-    +".ai-hd{background:linear-gradient(90deg,#4a9eff0d,transparent);border-bottom:1px solid #4a9eff1a;padding:13px 18px;display:flex;align-items:center;gap:9px}"
-    +".ai-badge{background:#4a9eff1a;border:1px solid #4a9eff44;border-radius:5px;padding:2px 7px;font-size:9px;font-weight:800;color:#4a9eff;letter-spacing:1.5px}"
-    +".ai-t{font-size:13px;font-weight:600;color:#e8eaf0}"
-    +".ai-body{padding:18px;display:flex;flex-direction:column;gap:18px}"
-    +".ai-blk-title{font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}"
-    +".dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}"
-    +".diag{font-size:12px;color:#9ca3af;line-height:1.75;background:#0d1117;border:1px solid #2a2f42;border-radius:8px;padding:14px 16px}"
-    +".ac{background:#0d1117;border:1px solid #2a2f42;border-radius:9px;padding:13px 15px;display:flex;gap:12px;align-items:flex-start;margin-bottom:8px}"
-    +".ac-ico{font-size:18px;flex-shrink:0;line-height:1}.ac-body{flex:1}"
-    +".ac-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px}"
-    +".ac-title{font-size:12px;font-weight:700;color:#fff}"
-    +".ac-tag{flex-shrink:0;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.5px}"
-    +".t-now{background:#ef444415;color:#ef4444;border:1px solid #ef444430}"
-    +".t-week{background:#f59e0b15;color:#f59e0b;border:1px solid #f59e0b30}"
-    +".t-long{background:#8b5cf615;color:#8b5cf6;border:1px solid #8b5cf630}"
-    +".ac-detail{font-size:11px;color:#9ca3af;line-height:1.6}"
-    +".cli-table{margin-top:8px;display:flex;flex-direction:column;gap:5px}"
-    +".cli-row{display:grid;align-items:center;background:#161922;border:1px solid #2a2f42;border-radius:6px;padding:7px 11px;font-size:11px;gap:8px}"
-    +".prod-row{grid-template-columns:1.5fr 1fr 0.9fr 0.9fr 0.7fr}"
-    +".dormido-row{grid-template-columns:1.3fr 0.9fr 0.7fr 0.9fr 0.8fr}"
-    +".cr-head{background:transparent;border-color:transparent;padding:2px 11px}"
-    +".cr-label{font-size:9px;color:#6b7280;font-weight:600;letter-spacing:.5px;text-transform:uppercase}"
-    +".cr-name{font-weight:700;color:#e8eaf0}.cr-val{color:#9ca3af}.cr-ticket{color:#10b981;font-weight:600}"
-    +".cr-days{font-weight:600}.cr-days.hot{color:#ef4444}.cr-days.warm{color:#f59e0b}.cr-days.ok-d{color:#10b981}"
-    +".proj{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}"
-    +".pc-card{background:#0d1117;border:1px solid #2a2f42;border-radius:9px;padding:15px;text-align:center}"
-    +".pc-lbl{font-size:9px;color:#6b7280;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:7px}"
-    +".pc-val{font-size:19px;font-weight:800}.pc-sub{font-size:10px;color:#6b7280;margin-top:3px;line-height:1.4}"
-    +".footer{border-top:1px solid #2a2f42;padding:18px 40px;display:flex;align-items:center;justify-content:space-between;background:#1a1f2e}"
-    +".ft{font-size:10px;color:#4b5563}.ft strong{color:#6b7280}"
-    +".btn{padding:8px 15px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:none;font-family:inherit}"
-    +".btn-p{background:linear-gradient(135deg,#4a9eff,#2563eb);color:#fff}"
-    +"table{width:100%;border-collapse:collapse}th{font-size:9px;font-weight:700;color:#6b7280;letter-spacing:.06em;text-transform:uppercase;padding:7px 10px;border-bottom:1px solid #2a2f42;text-align:left}"
-    +"td{padding:8px 10px;border-bottom:1px solid #1e2333;color:#9ca3af}tr:last-child td{border-bottom:none}"
-    +"</style></head><body><div class=\"container\">"
-    +"<div class=\"header\"><div>"
-    +"<div class=\"brand\">Super Coating \xb7 Sistema Eliel</div>"
-    +"<div class=\"h-title\">Reporte <span>Semanal</span></div>"
-    +"<div class=\"h-period\">"+semana+" \xb7 "+fmt2(m.totalRegistros)+" registros analizados</div>"
-    +"</div><div>"
-    +"<div class=\"badge\"><span class=\"badge-n\">S\xb7"+new Date().getMonth()+1+"</span><span class=\"badge-l\">"+new Date().toLocaleDateString("es-AR",{month:"long",year:"numeric"}).toUpperCase()+"</span></div>"
-    +"<div class=\"gen\">Generado: "+hoyTime+"</div>"
-    +"</div></div>"
-    +"<div class=\"kpis\">"
-    +"<div class=\"kpi k1\"><div class=\"kpi-lbl\">Ventas \xfaltimos 30 d\xedas</div><div class=\"kpi-val\">"+fmtM(m.u30)+"</div><div class=\"kpi-sub\">Papel + tinta combinados</div><span class=\"pill "+(tPct>=0?"pup":"pdown")+"\">"+(tPct>=0?"\u25b2":"\u25bc")+" "+Math.abs(tPct)+"% vs mes ant.</span></div>"
-    +"<div class=\"kpi k2\"><div class=\"kpi-lbl\">Total hist\xf3rico</div><div class=\"kpi-val\">"+fmtM(m.totalHist)+"</div><div class=\"kpi-sub\">"+fmt2(m.totalRegistros)+" operaciones</div><span class=\"pill pup\">"+fmt2((m.topClientes||[]).length)+" clientes</span></div>"
-    +"<div class=\"kpi k3\"><div class=\"kpi-lbl\">Promedio semanal</div><div class=\"kpi-val\">"+fmtM(promSemanal)+"</div><div class=\"kpi-sub\">Sobre todo el hist\xf3rico</div><span class=\"pill pwarn\">Referencia</span></div>"
-    +"<div class=\"kpi k4\"><div class=\"kpi-lbl\">Tu 30% est.</div><div class=\"kpi-val\">"+fmtM(Math.round(m.u30*0.3))+"</div><div class=\"kpi-sub\">Estimado sobre 30 d\xedas</div><span class=\"pill pup\">&uarr; Ver m\xf3dulo SC</span></div>"
-    +"</div>"
-    +"<div class=\"body\">"
-    +"<div class=\"section\"><div class=\"sh\"><div class=\"si si-b\">\uD83D\uDCCA</div><div><div class=\"st\">Evoluci\xf3n mensual de ventas</div><div class=\"ss\">Hist\xf3rico completo \xb7 Excel + Firebase</div></div></div>"
-    +"<div class=\"chart-wrap\"><div class=\"bar-chart\" id=\"chart\"></div>"
-    +"<div class=\"leg\"><div class=\"li\"><div class=\"ld\" style=\"background:linear-gradient(#4a9eff,#1d4ed8)\"></div>2026</div>"
-    +"<div class=\"li\"><div class=\"ld\" style=\"background:#2a2f42\"></div>2025</div>"
-    +"<div class=\"li\" style=\"margin-left:auto;font-size:9px;color:#4b5563\">* mes en curso</div></div></div></div>"
-    +"<div class=\"divider\"></div>"
-    +"<div class=\"section\"><div class=\"two-col\">"
-    +"<div><div class=\"sh\"><div class=\"si si-o\">\uD83D\uDCE6</div><div><div class=\"st\">Top productos</div><div class=\"ss\">Facturaci\xf3n hist\xf3rica acumulada</div></div></div>"
-    +"<div class=\"prod-list\">"+prodConPrecio+"</div></div>"
-    +"<div><div class=\"sh\"><div class=\"si si-p\">\uD83C\uDFC6</div><div><div class=\"st\">Top clientes</div><div class=\"ss\">Facturaci\xf3n hist\xf3rica \xb7 % del total</div></div></div>"
-    +"<div class=\"cl\">"+topCliHtml+"</div></div>"
-    +"</div></div>"
-    +"<div class=\"divider\"></div>"
-    +"<div class=\"section\"><div class=\"sh\"><div class=\"si si-g\">\uD83D\uDDC4\uFE0F</div><div><div class=\"st\">Stock disponible \xb7 Snapshot</div><div class=\"ss\">Desde Firebase \xb7 Tiempo real</div></div></div>"
-    +"<div style=\"display:flex;gap:8px;flex-wrap:wrap;align-items:stretch\">"
-    +papelCards
-    +(sCMYK.length>0?"<div style=\"width:1px;background:#2a2f42;align-self:stretch;margin:0 4px;flex:none\"></div><div style=\"display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px\"><div style=\"font-size:9px;font-weight:700;color:#6b7280;letter-spacing:1.5px;text-transform:uppercase;padding:0 2px\">Tinta CMYK</div><div style=\"display:grid;grid-template-columns:1fr 1fr;gap:6px\">"+sCMYK.map(function(e){return cmykCard(e,tintaTopColor[e[0]]||"#9ca3af");}).join("")+"</div></div>":"")
-    +(sPRO.length>0?"<div style=\"width:1px;background:#2a2f42;align-self:stretch;margin:0 4px;flex:none\"></div><div style=\"display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px\"><div style=\"font-size:9px;font-weight:700;color:#8b5cf6;letter-spacing:1.5px;text-transform:uppercase;padding:0 2px\">Tinta CMYK PRO</div><div style=\"display:grid;grid-template-columns:1fr 1fr;gap:6px\">"+sPRO.map(function(e){return cmykCard(e,"#8b5cf6");}).join("")+"</div></div>":"")
-    +"</div></div>"
-    +"<div class=\"divider\"></div>"
-    +"<div class=\"section\"><div class=\"sh\"><div class=\"si si-p\">\uD83E\uDD16</div><div><div class=\"st\">An\xe1lisis IA \xb7 Asesor de negocio</div><div class=\"ss\">Basado en "+fmt2(m.totalRegistros)+" registros \xb7 Hist\xf3rico real + stock Firebase</div></div></div>"
-    +"<div class=\"ai-box\"><div class=\"ai-hd\"><div class=\"ai-badge\">CLAUDE AI</div><div class=\"ai-t\">Diagn\xf3stico, acciones y proyecciones \xb7 "+hoyStr+"</div></div>"
-    +"<div class=\"ai-body\">"
-    +"<div class=\"ai-blk\"><div class=\"ai-blk-title\" style=\"color:#9ca3af\"><span class=\"dot\" style=\"background:#4a9eff\"></span> Diagn\xf3stico de la semana</div>"
-    +"<div class=\"diag\">"+(textos.diagnostico||"--")+"</div></div>"
-    +"<div class=\"ai-blk\"><div class=\"ai-blk-title\" style=\"color:#ef4444\"><span class=\"dot\" style=\"background:#ef4444\"></span> Acci\xf3n inmediata \xb7 Clientes con ciclos vencidos</div>"
-    +accionesHtml+"</div>"
-    +"<div class=\"ai-blk\"><div class=\"ai-blk-title\" style=\"color:#10b981\"><span class=\"dot\" style=\"background:#10b981\"></span> Cruce stock \xd7 clientes potenciales</div>"
-    +"<div class=\"ac\"><div class=\"ac-ico\">\uD83D\uDCE6</div><div class=\"ac-body\">"
-    +"<div class=\"ac-head\"><div class=\"ac-title\">Ten\xe9s stock \u2014 \xa1a qui\xe9n llamar por cada producto?</div><div class=\"ac-tag t-week\">ESTA SEMANA</div></div>"
-    +"<div class=\"ac-detail\">Top compradores hist\xf3ricos por producto con su \xfaltima compra.</div>"
-    +"<div class=\"cli-table\"><div class=\"cli-row cr-head prod-row\"><span class=\"cr-label\">Producto (stock)</span><span class=\"cr-label\">Cliente</span><span class=\"cr-label\">Historial</span><span class=\"cr-label\">\xdaltima compra</span><span class=\"cr-label\">Prioridad</span></div>"
-    +stockCruceRows
-    +"</div></div></div></div>"
-    +(semanaAcciones?"<div class=\"ai-blk\"><div class=\"ai-blk-title\" style=\"color:#f59e0b\"><span class=\"dot\" style=\"background:#f59e0b\"></span> Esta semana</div>"+semanaAcciones+"</div>":"")
-    +((m.dormidos||[]).length>0?"<div class=\"ai-blk\"><div class=\"ai-blk-title\" style=\"color:#8b5cf6\"><span class=\"dot\" style=\"background:#8b5cf6\"></span> Investigar \xb7 Clientes con alto historial que desaparecieron</div>"
-    +"<div class=\"ac\"><div class=\"ac-ico\">\uD83D\uDD0D</div><div class=\"ac-body\"><div class=\"ac-head\"><div class=\"ac-title\">Estos clientes ten\xedan volumen y dejaron de comprar</div><div class=\"ac-tag t-long\">MES QUE VIENE</div></div>"
-    +"<div class=\"ac-detail\">Llevan demasiado tiempo inactivos para explicarlo por temporada.</div>"
-    +"<div class=\"cli-table\"><div class=\"cli-row cr-head dh\"><span class=\"cr-label\">Cliente</span><span class=\"cr-label\">\xdaltima</span><span class=\"cr-label\">D\xedas</span><span class=\"cr-label\">Historial</span><span class=\"cr-label\">Producto</span></div>"
-    +dormidosRows
-    +"</div><div class=\"ac-detail\" style=\"margin-top:8px\">Si recuper\xe1s solo 3 \u2192 <strong>+"+dormidosPotencial+" adicionales este mes</strong>. Vale una llamada de 5 minutos.</div>"
-    +"</div></div></div>":"")
-    +(mesAcciones?"<div class=\"ai-blk\"><div class=\"ai-blk-title\" style=\"color:#4a9eff\"><span class=\"dot\" style=\"background:#4a9eff\"></span> Largo plazo</div>"+mesAcciones+"</div>":"")
-    +"<div class=\"ai-blk\"><div class=\"ai-blk-title\" style=\"color:#4a9eff\"><span class=\"dot\" style=\"background:#4a9eff\"></span> Proyecciones \xb7 Basadas en hist\xf3rico real</div>"
-    +"<div class=\"proj\">"
-    +"<div class=\"pc-card\"><div class=\"pc-lbl\">Mes actual</div><div class=\"pc-val\" style=\"color:#f59e0b\">"+(textos.proyMesActual||"--")+"</div><div class=\"pc-sub\">"+(textos.proyContext||"")+"</div></div>"
-    +"<div class=\"pc-card\"><div class=\"pc-lbl\">Mes siguiente</div><div class=\"pc-val\" style=\"color:#10b981\">"+(textos.proyMesSig||"--")+"</div><div class=\"pc-sub\">"+(textos.proySigContext||"")+"</div></div>"
-    +"<div class=\"pc-card\"><div class=\"pc-lbl\">Riesgo concentraci\xf3n</div><div class=\"pc-val\" style=\"color:#ef4444\">"+topCliPctVal+"%</div><div class=\"pc-sub\">"+(m.topClientes&&m.topClientes[0]?m.topClientes[0].nombre:"--")+" = "+topCliPctVal+"% hist\xf3rico. "+(textos.riesgo||"")+"</div></div>"
-    +"</div></div>"
-    +"</div></div>"
-    +"</div>"
-    +"<div class=\"footer\"><div class=\"ft\"><strong>Sistema Eliel</strong> \xb7 Super Coating \xb7 Datos: Excel hist\xf3rico + Firebase</div>"
-    +"<button class=\"btn btn-p\" onclick=\"window.print()\">\u2b07 Descargar PDF</button></div>"
-    +"</div>"
-    +"<scr"+"ipt>var cd="+chartDataStr+"; var mx=0; for(var i=0;i<cd.length;i++){if(cd[i].v>mx)mx=cd[i].v;}"
-    +"var ch=document.getElementById(\"chart\");"
-    +"for(var j=0;j<cd.length;j++){var d=cd[j];var pct=mx>0?(d.v/mx)*100:0;"
-    +"var g=document.createElement(\"div\");g.className=\"bg\";"
-    +"var bv=document.createElement(\"div\");bv.className=\"bv\";bv.textContent=\"$\"+d.v+\"M\";"
-    +"var bar=document.createElement(\"div\");bar.className=\"b \"+(d.cur?\"cur\":\"old\");bar.style.height=pct+\"%\";"
-    +"var bl=document.createElement(\"div\");bl.className=\"bl\";bl.textContent=d.l;"
-    +"g.appendChild(bv);g.appendChild(bar);g.appendChild(bl);ch.appendChild(g);}"
-    +"<\/scr"+"ipt></body></html>";
-  return h;
-};
-
+const APP_VERSION = "v4.0.0";
+const APP_BUILD   = "2026-06-19";
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
 const ESTADOS = ["A despachar","Despachado","A retirar Ezeiza","A retirar Once","Retirado"];
@@ -7136,18 +6799,12 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
 // ═══════════════════════════════════════════════════════════════════
 
 function ReportesView({data,save,showToast}){
-  const {useState,useEffect,useRef}=React;
+  const {useState,useEffect}=React;
   const [tab,setTab]=useState("generar");
   const [loading,setLoading]=useState(false);
   const [loadingMsg,setLoadingMsg]=useState("");
-  const [importando,setImportando]=useState(false);
-  const [importMsg,setImportMsg]=useState("");
-  const [ultimoReporte,setUltimoReporte]=useState(null); // {html, semana, fecha}
+  const [ultimoReporte,setUltimoReporte]=useState(null);
   const [reportes,setReportes]=useState([]);
-  const fileRef=useRef();
-
-  const ventasHist=data.ventasHistoricas||[];
-  const histTiene=ventasHist.length>0;
 
   useEffect(()=>{
     const reps=data.reportesSC||[];
@@ -7156,263 +6813,106 @@ function ReportesView({data,save,showToast}){
     if(lista.length>0)setUltimoReporte(lista[0]);
   },[data.reportesSC]);
 
-  // ── Importar Excel ───────────────────────────────────────────
-  const handleImport=async(e)=>{
-    const file=e.target.files[0];if(!file)return;
-    setImportando(true);setImportMsg("Leyendo archivo...");
-    try{
-      const XLSX=window.XLSX;
-      if(!XLSX)throw new Error("Librería XLSX no disponible");
-      const buf=await file.arrayBuffer();
-      // cellDates:false para obtener seriales y convertir manualmente
-      const wb=XLSX.read(buf,{type:"array",cellDates:false});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{raw:true,defval:null});
-      const excelSerial=n=>{
-        if(n===null||n===undefined||n==="")return null;
-        if(typeof n==="string"&&n.match(/^\d{4}-\d{2}-\d{2}/))return n.substring(0,10);
-        const num=Number(n);
-        if(isNaN(num)||num<1000)return null; // not a date serial
-        const d=new Date(Math.round((num-25569)*86400*1000));
-        if(isNaN(d.getTime()))return null;
-        return d.toISOString().split("T")[0];
-      };
-      const findKey=(row,keywords)=>Object.keys(row).find(k=>keywords.some(kw=>k.toUpperCase().includes(kw)))||null;
-      const clean=[];
-      for(const row of rows){
-        const artKey=findKey(row,["RTIC","ARTIC"]);
-        const cliKey=findKey(row,["LIENT"]);
-        const totKey=findKey(row,["TOTAL","PESO"]);
-        const cantKey=findKey(row,["ANTID"]);
-        const precKey=findKey(row,["RECIO"]);
-        const fechKey=findKey(row,["ECHA"]);
-        const art=artKey?String(row[artKey]||"").trim():"";
-        const cli=cliKey?String(row[cliKey]||"").trim().toUpperCase():"";
-        const tot=totKey?Number(row[totKey]||0):0;
-        const fecha=fechKey?excelSerial(row[fechKey]):null;
-        if(!art||art==="TOTAL GENERAL"||!cli||!tot||!fecha)continue;
-        clean.push({
-          fecha,
-          articulo:art,
-          cantidad:Number(cantKey?row[cantKey]||0:0),
-          cliente:cli,
-          precioVenta:Number(precKey?row[precKey]||0:0),
-          total:tot,
-          fuente:"excel"
-        });
-      }
-      if(clean.length===0)throw new Error("No se encontraron filas válidas. Verificá las columnas: FECHA, ARTÍCULO, CANTIDAD, CLIENTE, PRECIO VENTA, TOTAL EN PESOS");
-      setImportMsg("Guardando "+clean.length+" registros...");
-      await save({...data,ventasHistoricas:clean});
-      setImportMsg("✓ "+clean.length+" registros importados correctamente.");
-      showToast("✓ Histórico importado");
-    }catch(err){
-      setImportMsg("⚠ Error: "+err.message);
-    }finally{
-      setImportando(false);
-      if(fileRef.current)fileRef.current.value="";
-    }
-  };
-
-  // ── Calcular métricas (recibe ventasHist como param para evitar stale closure) ──
-  const calcularMetricas=(vh)=>{
-    const todasVentas=[...vh,...(data.ventas||[])];
-    const hoy=new Date();
-
-    const normalFecha=f=>{
-      if(!f&&f!==0)return null;
-      if(typeof f==="number"&&f>40000){
-        const d=new Date(Math.round((f-25569)*86400*1000));
-        if(!isNaN(d.getTime()))return d.toISOString().split("T")[0];
-        return null;
-      }
-      const s=String(f);
-      if(s.match(/^\d{4}-\d{2}-\d{2}/))return s.substring(0,10);
-      return null;
-    };
-
-    // Ventas por mes
-    const porMes={};
-    todasVentas.forEach(v=>{
-      const f=normalFecha(v.fecha);if(!f)return;
-      const mes=f.substring(0,7);
-      porMes[mes]=(porMes[mes]||0)+Number(v.total||0);
-    });
-    const mesesOrdenados=Object.entries(porMes).sort((a,b)=>a[0].localeCompare(b[0]));
-
-    // Por cliente — con fecha normalizada
-    const porCliente={};
-    todasVentas.forEach(v=>{
-      if(!v.cliente||!v.total)return;
-      const cl=String(v.cliente).trim().toUpperCase();
-      if(!porCliente[cl])porCliente[cl]={total:0,ultima:"",fechas:[]};
-      porCliente[cl].total+=Number(v.total||0);
-      const f=normalFecha(v.fecha);
-      if(f){
-        if(f>porCliente[cl].ultima)porCliente[cl].ultima=f;
-        porCliente[cl].fechas.push(f);
-      }
-    });
-    const topClientes=Object.entries(porCliente)
-      .sort((a,b)=>b[1].total-a[1].total).slice(0,15)
-      .map(([nombre,d])=>{
-        const fs=[...new Set(d.fechas)].sort();
-        const diffs=fs.slice(1).map((f,i)=>Math.round((new Date(f)-new Date(fs[i]))/86400000));
-        const frecProm=diffs.length?Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length):null;
-        const diasSin=d.ultima?Math.round((hoy-new Date(d.ultima))/86400000):null;
-        return{nombre,total:Math.round(d.total),ultima:d.ultima,frecProm,diasSin};
-      });
-
-    // Top productos
-    const porProd={};
-    todasVentas.forEach(v=>{
-      if(!v.articulo)return;
-      if(!porProd[v.articulo])porProd[v.articulo]={total:0,cantidad:0};
-      porProd[v.articulo].total+=Number(v.total||0);
-      porProd[v.articulo].cantidad+=Number(v.cantidad||0);
-    });
-    const topProd=Object.entries(porProd).sort((a,b)=>b[1].total-a[1].total).slice(0,8)
-      .map(([n,d])=>({nombre:n,total:Math.round(d.total),cantidad:Math.round(d.cantidad)}));
-
-    // Stock actual
-    const stockActual={};
-    for(const c of data.contenedores||[]){
-      for(const art of c.articulos||[]){
-        const vendido=(data.ventas||[]).filter(v=>v.contId===c.id&&v.articulo===art.nombre)
-          .reduce((a,v)=>a+Number(v.cantidad||0),0);
-        const disp=Math.max(0,Number(art.cantidad||0)-vendido);
-        if(disp>0)stockActual[art.nombre]=(stockActual[art.nombre]||0)+disp;
-      }
-    }
-
-    // Contenedores
-    const estadoConts=(data.contenedores||[]).map(c=>{
-      const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>{
-        const tot=Number(v.total||0);if(!tot)return a;
-        const pag=Number(v.pago||0)+(data.pagos||[]).filter(p=>p.ventaId===v.id)
-          .reduce((x,p)=>x+Number(p.monto||0),0);
-        return a+Number(v.usd||0)*Math.min(1,pag/tot);
-      },0);
-      const costo=c.costoTotal||0;
-      return{nombre:c.nombre,cobUSD:Math.round(cobUSD),costo,
-        pct:costo>0?Math.round(cobUSD/costo*100):null,
-        enGanancia:costo>0&&cobUSD>=costo};
-    });
-
-    // Períodos para tendencia
-    const f30=new Date(hoy);f30.setDate(f30.getDate()-30);
-    const f60=new Date(hoy);f60.setDate(f60.getDate()-60);
-    const s30=f30.toISOString().split("T")[0];
-    const s60=f60.toISOString().split("T")[0];
-    const hoyStr=hoy.toISOString().split("T")[0];
-    const u30=todasVentas.filter(v=>{const f=normalFecha(v.fecha);return f&&f>=s30&&f<=hoyStr;})
-      .reduce((a,v)=>a+Number(v.total||0),0);
-    const u30_60=todasVentas.filter(v=>{const f=normalFecha(v.fecha);return f&&f>=s60&&f<s30;})
-      .reduce((a,v)=>a+Number(v.total||0),0);
-    const tendPct=u30_60>0?Math.round((u30-u30_60)/u30_60*100):0;
-    const totalHist=todasVentas.reduce((a,v)=>a+Number(v.total||0),0);
-
-    // Clientes dormidos (>45 días, >$1M)
-    const dormidos=topClientes
-      .filter(c=>c.diasSin!==null&&c.diasSin>45&&c.total>1000000)
-      .sort((a,b)=>b.total-a.total).slice(0,6);
-
-    return{mesesOrdenados,topClientes,topProd,stockActual,estadoConts,
-      totalHist:Math.round(totalHist),u30:Math.round(u30),tendPct,
-      totalRegistros:todasVentas.length,ventasHistLen:vh.length,dormidos,
-      hoyStr};
-  };
-
-  // ── Construir PDF fiel al mockup aprobado ─────────────────────
-  const construirPDF=(textos,m)=>window.sc_construirPDF(textos,m);
-
-
   const generarReporte=async()=>{
-    const vh=data.ventasHistoricas||[];
-    if(vh.length===0&&(data.ventas||[]).length===0){
-      showToast("⚠ No hay datos. Importá el Excel primero.");return;
-    }
-    setLoading(true);setLoadingMsg("Calculando métricas...");
+    setLoading(true);setLoadingMsg("Preparando datos...");
     try{
-      // Pasar ventasHist directamente, no desde estado
-      const m=calcularMetricas(vh);
-      console.log("[Reporte] vh.length:",vh.length,"ventas:",( data.ventas||[]).length);
-      console.log("[Reporte] totalHist:",m.totalHist,"topClientes:",m.topClientes.slice(0,3).map(c=>c.nombre+":"+c.diasSin+"d"));
-      setLoadingMsg("Enviando a Claude...");
+      // Armar payload con datos crudos de Firebase — SIN ventasHistoricas (ya está en la skill)
+      const payload={
+        fecha_hoy: new Date().toISOString().split("T")[0],
+        contenedores: (data.contenedores||[]).map(c=>({
+          id:c.id, nombre:c.nombre, costoTotal:c.costoTotal||0,
+          articulos:c.articulos||[], artsCostoDetalle:c.artsCostoDetalle||[]
+        })),
+        ventas: (data.ventas||[]).filter(v=>
+          v.cliente && String(v.cliente).toUpperCase().trim()!=="PRUEBA" && (v.total||0)>1
+        ).map(v=>({
+          id:v.id, contId:v.contId, cliente:v.cliente,
+          articulo:v.articulo, cantidad:v.cantidad||0,
+          total:v.total||0, usd:v.usd||0,
+          pago:parseFloat(v.pago)||0, fecha:v.fecha,
+          estado:v.estado, entrega:v.entrega
+        })),
+        pagos: (data.pagos||[]).map(p=>({
+          id:p.id, ventaId:p.ventaId, monto:parseFloat(p.monto)||0, fecha:p.fecha
+        })),
+        retiros: (data.retiros||[]).map(r=>({
+          id:r.id, montoUSD:parseFloat(r.montoUSD)||0,
+          montoPesos:parseFloat(r.montoPesos)||0, fecha:r.fecha
+        }))
+      };
 
-      // Claude solo escribe los textos — los números ya los tenemos
-      const prompt="Sos asesor de Super Coating. Basándote SOLO en estos datos reales, escribí el análisis en español argentino.\n\n"
-        +"DATOS VERIFICADOS ("+m.hoyStr+"):\n"
-        +"- Facturación histórica: $"+m.totalHist.toLocaleString("es-AR")+"\n"
-        +"- Ventas últimos 30 días: $"+m.u30.toLocaleString("es-AR")+" ("+(m.tendPct>=0?"+":"")+m.tendPct+"% vs período anterior)\n"
-        +"- Total registros analizados: "+m.totalRegistros+"\n\n"
-        +"TOP 10 CLIENTES CON DATOS EXACTOS:\n"
-        +m.topClientes.slice(0,10).map((c,i)=>"  "+(i+1)+". "+c.nombre+": $"+c.total.toLocaleString("es-AR")+" | última compra: "+c.ultima+" | hace exactamente "+c.diasSin+" días"+(c.frecProm?" | compra cada "+c.frecProm+" días en promedio":"")).join("\n")+"\n\n"
-        +"CLIENTES DORMIDOS (más de 45 días sin comprar, historial > $1M):\n"
-        +m.dormidos.map(c=>"  - "+c.nombre+": última compra "+c.ultima+", hace "+c.diasSin+" días, historial $"+c.total.toLocaleString("es-AR")).join("\n")+"\n\n"
-        +"TOP PRODUCTOS:\n"
-        +m.topProd.slice(0,5).map((p,i)=>"  "+(i+1)+". "+p.nombre+": $"+p.total.toLocaleString("es-AR")+" | "+p.cantidad+" u.").join("\n")+"\n\n"
-        +"STOCK ACTUAL:\n"
-        +Object.entries(m.stockActual).map(([n,c])=>"  "+n+": "+c+" u.").join("\n")+"\n\n"
-        +"CONTENEDORES:\n"
-        +m.estadoConts.map(c=>"  "+c.nombre+": "+c.cobUSD.toLocaleString("es-AR")+" USD cobrado / "+c.costo.toLocaleString("es-AR")+" USD inversión"+(c.pct!==null?" ("+c.pct+"%)":"")+(c.enGanancia?" — EN GANANCIA":" — pendiente recupero")).join("\n")+"\n\n"
-        +"Respondé SOLO JSON, sin markdown:\n"
-        +"{\n"
-        +"  \"semana\": \"Semana del [lunes de la semana actual] al [domingo]\",\n"
-        +"  \"diagnostico\": \"5-6 oraciones. Usá los números exactos de arriba. Mencioná la tendencia, los clientes más activos, el producto que más mueve. NO repitas los datos crudos, interpretálos.\",\n"
-        +"  \"accionesInmediatas\": [\n"
-        +"    {\"icono\": \"📞\", \"titulo\": \"Llamar a NOMBRE_REAL — motivo específico\", \"detalle\": \"Detalle con datos exactos del cliente: días sin comprar, producto, ticket promedio, qué decirle\"}\n"
-        +"  ],\n"
-        +"  \"accionesSemana\": [{\"icono\":\"📦\",\"titulo\":\"...\",\"detalle\":\"...\",\"seccion\":\"Alerta de stock\"}],\n"
-        +"  \"accionesMes\": [{\"icono\":\"📈\",\"titulo\":\"...\",\"detalle\":\"...\"}],\n"
-        +"  \"proyMesActual\": \"~$XM\",\n"
-        +"  \"proyContext\": \"contexto de 1 oración\",\n"
-        +"  \"proyMesSig\": \"~$XM\",\n"
-        +"  \"proySigContext\": \"contexto de 1 oración\",\n"
-        +"  \"riesgo\": \"descripción breve del riesgo de concentración\"\n"
-        +"}\n"
-        +"Reglas:\n"
-        +"- accionesInmediatas: 1 sola card con tabla de 3-4 clientes con ciclos vencidos. tabla es array de objetos: {cliente, ultima (DD/MM · N días), ciclo (cada N días), producto (PROD · $XM/compra), estado (🔴/🟡/🟢 + texto), urgencia (hot/warm/ok-d)}.\n"
-        +"- accionesSemana: 2 items. Primero sobre alertas de stock (qué reponer y por qué). Segundo sobre otra acción comercial.\n"
-        +"- accionesMes: 1-2 items sobre estrategia de mediano plazo.\n"
-        +"- En ningún campo inventes números. Todo basado en los datos que te pasé.";
+      setLoadingMsg("Generando reporte con IA...");
+
+      // Leer la skill del archivo SKILL.md si está disponible, sino usar system prompt inline
+      const systemPrompt="Sos el asesor estratégico de Super Coating (negocio de Eliel). "
+        +"Tenés toda la inteligencia del negocio embebida en tu skill: historial de ventas "
+        +"Feb 2025–Jun 2026, perfiles de clientes, ciclos, productos, estacionalidad, "
+        +"mapa de deduplicación de nombres y procedimiento de análisis. "
+        +"El usuario te manda los datos actuales de Firebase (contenedores, ventas recientes, "
+        +"pagos, retiros). Tu tarea: aplicar todo el análisis de la skill con estos datos "
+        +"y devolver el HTML completo del reporte semanal. "
+        +"CRÍTICO: responder SOLO con el HTML completo, empezando con <!DOCTYPE html>. "
+        +"Sin texto antes ni después. Sin markdown. Solo el HTML.";
+
+      const userMsg="Generá el reporte semanal de Super Coating con estos datos actuales de Firebase:\n\n"
+        +JSON.stringify(payload, null, 0);
 
       const resp=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:3000,messages:[{role:"user",content:prompt}]})
+        headers:{
+          "Content-Type":"application/json",
+          "x-api-key":ANTHROPIC_KEY,
+          "anthropic-version":"2023-06-01",
+          "anthropic-dangerous-direct-browser-access":"true"
+        },
+        body:JSON.stringify({
+          model:"claude-sonnet-4-6",
+          max_tokens:8000,
+          system:systemPrompt,
+          messages:[{role:"user",content:userMsg}]
+        })
       });
-      if(!resp.ok){const t=await resp.text();throw new Error("API "+resp.status+": "+t.slice(0,200));}
+
+      if(!resp.ok){
+        const t=await resp.text();
+        throw new Error("Error API "+resp.status+": "+t.slice(0,300));
+      }
+
       const apiData=await resp.json();
-      const raw=(apiData.content&&apiData.content[0]&&apiData.content[0].text)||"";
-      if(!raw)throw new Error("Respuesta vacía de Claude");
-      setLoadingMsg("Construyendo reporte...");
-      let textos;
-      var cleanRaw=raw.trim();if(cleanRaw.indexOf(String.fromCharCode(123))>-1){cleanRaw=cleanRaw.substring(cleanRaw.indexOf(String.fromCharCode(123)),cleanRaw.lastIndexOf(String.fromCharCode(125))+1);}try{textos=JSON.parse(cleanRaw);}
-      catch(e){throw new Error("Error parseando JSON: "+raw.slice(0,200));}
+      const html=(apiData.content&&apiData.content[0]&&apiData.content[0].text)||"";
+      if(!html||!html.includes("<!DOCTYPE"))throw new Error("La respuesta no es un HTML válido");
 
-      const mConRaw={...m,ventasHistRaw:vh,ventasRaw:data.ventas||[]};
-      const html=construirPDF(textos,mConRaw);
-
-      // Guardar
+      setLoadingMsg("Guardando...");
+      const semana="Semana del "+new Date().toLocaleDateString("es-AR",{day:"numeric",month:"long"});
       const lista=[...(data.reportesSC||[])];
-      lista.push({fecha:new Date().toISOString(),semana:textos.semana||"",html});
+      lista.push({fecha:new Date().toISOString(),semana,html});
       await save({...data,reportesSC:lista.slice(-10)});
-      setUltimoReporte({html,semana:textos.semana||"",fecha:new Date().toISOString()});
+      setUltimoReporte({html,semana,fecha:new Date().toISOString()});
       showToast("✓ Reporte generado");
+
     }catch(err){
       showToast("⚠ "+err.message);
-      console.error(err);
+      console.error("[Reporte]",err);
     }finally{
       setLoading(false);setLoadingMsg("");
     }
   };
 
-  const abrirPDF=(html)=>{const w=window.open("","_blank");w.document.write(html);w.document.close();};
+  const abrirHTML=(html)=>{
+    const w=window.open("","_blank");
+    w.document.write(html);
+    w.document.close();
+  };
 
-  const TabBtn2=({id,label})=>(
-    <button onClick={()=>setTab(id)} style={{background:"none",border:"none",padding:"10px 14px",cursor:"pointer",fontSize:12,fontWeight:tab===id?700:400,color:tab===id?"var(--text-primary)":"var(--text-secondary)",borderBottom:tab===id?"2px solid var(--sc-orange)":"2px solid transparent",transition:"all .15s"}}>
-      {label}
+  const TabBtn=({id,label,count})=>(
+    <button onClick={()=>setTab(id)} style={{
+      background:"none",border:"none",padding:"10px 14px",cursor:"pointer",
+      fontSize:12,fontWeight:tab===id?700:400,
+      color:tab===id?"var(--text-primary)":"var(--text-secondary)",
+      borderBottom:tab===id?"2px solid var(--sc-orange)":"2px solid transparent",
+      transition:"all .15s",whiteSpace:"nowrap"
+    }}>
+      {label}{count>0&&<span style={{marginLeft:5,fontSize:10,background:"var(--bg-tint-blue)",color:"var(--text-info)",padding:"1px 5px",borderRadius:"var(--r-pill)"}}>{count}</span>}
     </button>
   );
 
@@ -7421,60 +6921,92 @@ function ReportesView({data,save,showToast}){
       <div style={{marginBottom:20}}>
         <div style={{fontSize:22,fontWeight:700,letterSpacing:"-.02em",color:"var(--text-primary)",marginBottom:3}}>📊 Reportes</div>
         <div style={{fontSize:12,color:"var(--text-secondary)"}}>
-          {histTiene?ventasHist.length.toLocaleString("es-AR")+" históricos · "+(data.ventas||[]).length.toLocaleString("es-AR")+" en sistema":"Sin historial — importá el Excel para análisis completo"}
+          {(data.ventas||[]).length} ventas en sistema · {(data.contenedores||[]).length} contenedores
         </div>
       </div>
 
       <div style={{display:"flex",gap:0,borderBottom:"0.5px solid var(--glass-border)",marginBottom:20}}>
-        <TabBtn2 id="generar" label="Generar"/>
-        <TabBtn2 id="historial" label={"Historial"+(reportes.length>0?" ("+reportes.length+")":"")}/>
-        {!histTiene&&<TabBtn2 id="importar" label="⬆ Importar Excel"/>}
+        <TabBtn id="generar" label="Generar" count={0}/>
+        <TabBtn id="historial" label="Historial" count={reportes.length}/>
       </div>
 
-      {/* TAB GENERAR */}
+      {/* ── TAB GENERAR ── */}
       {tab==="generar"&&(
         <div>
           {loading?(
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"4rem 2rem",gap:16}}>
               <div style={{width:44,height:44,borderRadius:"50%",border:"3px solid rgba(244,121,32,.15)",borderTopColor:"var(--sc-orange)",animation:"sp .8s linear infinite"}}/>
               <div style={{fontSize:14,fontWeight:600,color:"var(--text-primary)"}}>{loadingMsg}</div>
-              <div style={{fontSize:12,color:"var(--text-secondary)"}}>Analizando {(ventasHist.length+(data.ventas||[]).length).toLocaleString("es-AR")} registros...</div>
+              <div style={{fontSize:12,color:"var(--text-secondary)"}}>Claude está analizando todo el negocio...</div>
             </div>
           ):(
             <div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
+              {/* Info cards */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
                 {[
-                  {l:"Ventas históricas",v:ventasHist.length,s:"registros del Excel"},
-                  {l:"Ventas en sistema",v:(data.ventas||[]).length,s:"registros Firebase"},
-                  {l:"Total a analizar",v:ventasHist.length+(data.ventas||[]).length,s:"combinados",hi:true}
+                  {l:"Ventas en sistema",v:(data.ventas||[]).filter(v=>v.cliente&&String(v.cliente).toUpperCase()!=="PRUEBA").length,s:"registros Firebase"},
+                  {l:"Contenedores",v:(data.contenedores||[]).length,s:"activos"},
+                  {l:"Historial fijo",v:"1.041",s:"registros en skill",hi:true}
                 ].map(k=>(
-                  <div key={k.l} style={{background:k.hi?"var(--bg-tint-orange)":"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:k.hi?"0.5px solid rgba(244,121,32,.35)":"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"18px 20px",boxShadow:"var(--glass-shadow-sm)"}}>
-                    <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:k.hi?"var(--sc-orange)":"var(--text-secondary)",marginBottom:8}}>{k.l}</div>
-                    <div style={{fontSize:28,fontWeight:700,color:k.hi?"var(--sc-orange)":"var(--text-primary)",lineHeight:1}}>{k.v.toLocaleString("es-AR")}</div>
-                    <div style={{fontSize:10,color:k.hi?"var(--sc-orange)":"var(--text-secondary)",opacity:.8,marginTop:4}}>{k.s}</div>
+                  <div key={k.l} style={{
+                    background:k.hi?"var(--bg-tint-orange)":"var(--bg-card)",
+                    backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",
+                    border:k.hi?"0.5px solid rgba(244,121,32,.35)":"0.5px solid var(--glass-border)",
+                    borderRadius:"var(--r-xl)",padding:"16px 18px",
+                    boxShadow:"var(--glass-shadow-sm)"
+                  }}>
+                    <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:k.hi?"var(--sc-orange)":"var(--text-secondary)",marginBottom:6}}>{k.l}</div>
+                    <div style={{fontSize:26,fontWeight:700,color:k.hi?"var(--sc-orange)":"var(--text-primary)",lineHeight:1}}>{k.v}</div>
+                    <div style={{fontSize:10,color:"var(--text-secondary)",opacity:.8,marginTop:4}}>{k.s}</div>
                   </div>
                 ))}
               </div>
-              {!histTiene&&(
-                <div style={{background:"var(--bg-tint-amber)",border:"0.5px solid var(--color-border-warning)",borderRadius:"var(--r-lg)",padding:"12px 16px",marginBottom:16,fontSize:12,color:"var(--text-warning)"}}>
-                  ⚠ Sin historial importado. El reporte se generará solo con datos del sistema actual.
-                </div>
-              )}
-              <button onClick={generarReporte} style={{width:"100%",padding:"16px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#fff",border:"none",borderRadius:"var(--r-xl)",fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 24px rgba(244,121,32,.4)",letterSpacing:"-.01em",display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontFamily:"inherit"}}>
-                <span style={{fontSize:18}}>✦</span> Generar reporte con análisis IA
-              </button>
-              <div style={{fontSize:11,color:"var(--text-secondary)",textAlign:"center",marginTop:8}}>El reporte se abre en pestaña nueva · ~15 segundos</div>
 
-              {/* Último reporte generado */}
+              <div style={{background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-lg)",padding:"12px 16px",marginBottom:16,fontSize:12,color:"var(--text-info)"}}>
+                💡 El reporte usa la <strong>skill instalada en Claude</strong> como base de conocimiento del negocio, 
+                combinada con los datos actuales de Firebase. No necesitás importar el Excel.
+              </div>
+
+              <button onClick={generarReporte} style={{
+                width:"100%",padding:"16px",
+                background:"linear-gradient(135deg,#F47920,#e8640a)",
+                color:"#fff",border:"none",borderRadius:"var(--r-xl)",
+                fontSize:15,fontWeight:700,cursor:"pointer",
+                boxShadow:"0 4px 24px rgba(244,121,32,.4)",
+                letterSpacing:"-.01em",display:"flex",alignItems:"center",
+                justifyContent:"center",gap:10,fontFamily:"inherit"
+              }}>
+                <span style={{fontSize:18,lineHeight:1}}>✦</span> Generar reporte semanal
+              </button>
+              <div style={{fontSize:11,color:"var(--text-secondary)",textAlign:"center",marginTop:8}}>
+                Análisis completo con IA · ~20-30 segundos
+              </div>
+
+              {/* Último reporte */}
               {ultimoReporte&&(
-                <div style={{marginTop:20,background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"16px 20px",boxShadow:"var(--glass-shadow-sm)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+                <div style={{
+                  marginTop:20,background:"var(--bg-card)",
+                  backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",
+                  border:"0.5px solid var(--glass-border)",
+                  borderRadius:"var(--r-xl)",padding:"16px 20px",
+                  boxShadow:"var(--glass-shadow-sm)",
+                  display:"flex",justifyContent:"space-between",alignItems:"center",gap:12
+                }}>
                   <div>
                     <div style={{fontSize:11,fontWeight:600,color:"var(--text-success)",marginBottom:3}}>✓ Último reporte generado</div>
                     <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",marginBottom:2}}>{ultimoReporte.semana||"Reporte"}</div>
-                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>{ultimoReporte.fecha?new Date(ultimoReporte.fecha).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>
+                      {ultimoReporte.fecha?new Date(ultimoReporte.fecha).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}
+                    </div>
                   </div>
-                  <button onClick={()=>abrirPDF(ultimoReporte.html)} style={{flexShrink:0,padding:"9px 18px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#fff",border:"none",borderRadius:"var(--r-pill)",fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 2px 12px rgba(244,121,32,.35)",fontFamily:"inherit"}}>
-                    ⬇ Abrir PDF
+                  <button onClick={()=>abrirHTML(ultimoReporte.html)} style={{
+                    flexShrink:0,padding:"9px 18px",
+                    background:"linear-gradient(135deg,#F47920,#e8640a)",
+                    color:"#fff",border:"none",borderRadius:"var(--r-pill)",
+                    fontSize:12,fontWeight:700,cursor:"pointer",
+                    boxShadow:"0 2px 12px rgba(244,121,32,.35)",fontFamily:"inherit"
+                  }}>
+                    ↗ Abrir
                   </button>
                 </div>
               )}
@@ -7483,54 +7015,42 @@ function ReportesView({data,save,showToast}){
         </div>
       )}
 
-      {/* TAB HISTORIAL */}
+      {/* ── TAB HISTORIAL ── */}
       {tab==="historial"&&(
         <div>
           {reportes.length===0?(
-            <div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",borderRadius:"var(--r-xl)",border:"0.5px solid var(--glass-border)"}}>Sin reportes generados aún.</div>
+            <div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,
+              background:"var(--bg-card)",borderRadius:"var(--r-xl)",border:"0.5px solid var(--glass-border)"}}>
+              Sin reportes generados aún.
+            </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {reportes.map(r=>(
-                <div key={r.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"16px 20px",boxShadow:"var(--glass-shadow-sm)",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+                <div key={r.id} style={{
+                  background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",
+                  border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",
+                  padding:"16px 20px",boxShadow:"var(--glass-shadow-sm)",
+                  display:"flex",justifyContent:"space-between",alignItems:"center",gap:12
+                }}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",marginBottom:3}}>{r.semana||"Reporte"}</div>
-                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>{r.fecha?new Date(r.fecha).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>
+                      {r.fecha?new Date(r.fecha).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}
+                    </div>
                   </div>
-                  <button onClick={()=>abrirPDF(r.html)} style={{flexShrink:0,padding:"8px 16px",background:"linear-gradient(135deg,#F47920,#e8640a)",color:"#fff",border:"none",borderRadius:"var(--r-pill)",fontSize:12,fontWeight:600,cursor:"pointer",boxShadow:"0 2px 10px rgba(244,121,32,.3)",fontFamily:"inherit"}}>
-                    ⬇ Abrir PDF
+                  <button onClick={()=>abrirHTML(r.html)} style={{
+                    flexShrink:0,padding:"8px 16px",
+                    background:"linear-gradient(135deg,#F47920,#e8640a)",
+                    color:"#fff",border:"none",borderRadius:"var(--r-pill)",
+                    fontSize:12,fontWeight:600,cursor:"pointer",
+                    boxShadow:"0 2px 10px rgba(244,121,32,.3)",fontFamily:"inherit"
+                  }}>
+                    ↗ Abrir
                   </button>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {/* TAB IMPORTAR */}
-      {tab==="importar"&&(
-        <div>
-          <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"28px 32px",boxShadow:"var(--glass-shadow)",marginBottom:16}}>
-            <div style={{fontSize:15,fontWeight:700,color:"var(--text-primary)",marginBottom:6}}>Importar historial desde Excel</div>
-            <div style={{fontSize:12,color:"var(--text-secondary)",marginBottom:20,lineHeight:1.7}}>
-              Columnas requeridas: <strong>FECHA · ARTÍCULO · CANTIDAD · CLIENTE · PRECIO VENTA · TOTAL EN PESOS</strong><br/>
-              Se guarda en Firebase junto con el resto de los datos — no toca ventas, stock ni deudas existentes.
-            </div>
-            <div style={{border:"2px dashed rgba(244,121,32,.3)",borderRadius:"var(--r-lg)",padding:"28px",textAlign:"center",marginBottom:importMsg?16:0,cursor:"pointer",background:"var(--bg-tint-orange)"}} onClick={()=>fileRef.current&&fileRef.current.click()}>
-              <div style={{fontSize:28,marginBottom:8}}>📂</div>
-              <div style={{fontSize:13,fontWeight:600,color:"var(--sc-orange)",marginBottom:4}}>Seleccionar archivo Excel</div>
-              <div style={{fontSize:11,color:"var(--text-secondary)"}}>Formatos: .xlsx · .xls</div>
-            </div>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleImport} style={{display:"none"}}/>
-            {importando&&(
-              <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)"}}>
-                <div style={{width:16,height:16,borderRadius:"50%",border:"2px solid rgba(26,95,165,.2)",borderTopColor:"var(--text-info)",animation:"sp .7s linear infinite",flexShrink:0}}/>
-                <div style={{fontSize:12,color:"var(--text-info)",fontWeight:500}}>{importMsg}</div>
-              </div>
-            )}
-            {!importando&&importMsg&&(
-              <div style={{fontSize:12,fontWeight:600,padding:"10px 14px",background:importMsg.startsWith("✓")?"var(--bg-tint-green)":"var(--bg-tint-red)",color:importMsg.startsWith("✓")?"var(--text-success)":"var(--text-danger)",borderRadius:"var(--r-md)"}}>{importMsg}</div>
-            )}
-          </div>
         </div>
       )}
     </div>
