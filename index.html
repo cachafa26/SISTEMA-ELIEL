@@ -7188,6 +7188,10 @@ function ReportesView({data,save,showToast}){
         retiros:(data.retiros||[]).map(r=>({
           id:r.id,montoUSD:parseFloat(r.montoUSD)||0,
           montoPesos:parseFloat(r.montoPesos)||0,fecha:r.fecha
+        })),
+        ventasHistoricas:(data.ventasHistoricas||[]).map(v=>({
+          cliente:v.cliente,articulo:v.articulo,
+          cantidad:v.cantidad||0,total:v.total||0,fecha:v.fecha
         }))
       };
 
@@ -7208,7 +7212,7 @@ function ReportesView({data,save,showToast}){
           system:window.SC_SYSTEM_PROMPT,
           messages:[{role:"user",content:"Generá el reporte semanal completo de Super Coating.\n\n"
           +"INSTRUCCIONES:\n"
-          +"1. Usá el historial de ventas COMPLETO de la skill (Feb 2025-Jun 2026, 1041 registros, 192 clientes) + los datos de Firebase adjuntos\n"
+          +"1. El payload incluye ventasHistoricas[] con 1041 registros reales del Excel (Feb 2025-Jun 2026) + ventas[] con las ventas recientes del sistema. Usá AMBAS como historial completo\n"
           +"2. Aplicá TODO el procedimiento de análisis de la skill: PASO 0 (limpieza), PASO 1 (unificar), PASO 2 (ciclos), PASO 3 (stock), PASO 4 (cruce stock×demanda), PASO 5 (30% Eliel)\n"
           +"3. Generá el HTML completo con TODAS las secciones: header, 4 KPIs, chart mensual, top productos, top clientes, stock contenedores, y el análisis IA con diagnóstico + llamar HOY + esta semana + dormidos + proyecciones + insight\n"
           +"4. Usá el CSS exacto de la skill para el diseño dark\n"
@@ -7287,7 +7291,7 @@ function ReportesView({data,save,showToast}){
                 {[
                   {l:"Ventas en sistema",v:(data.ventas||[]).filter(v=>v.cliente&&String(v.cliente).toUpperCase()!=="PRUEBA").length,s:"registros Firebase"},
                   {l:"Contenedores",v:(data.contenedores||[]).length,s:"activos"},
-                  {l:"Historial fijo",v:"1.041",s:"registros en skill",hi:true}
+                  {l:"Historial Excel",v:(data.ventasHistoricas||[]).length||1041,s:"registros incluidos",hi:true}
                 ].map(k=>(
                   <div key={k.l} style={{
                     background:k.hi?"var(--bg-tint-orange)":"var(--bg-card)",
