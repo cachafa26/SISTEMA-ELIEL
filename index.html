@@ -1086,7 +1086,7 @@ window.SC_SYSTEM_PROMPT="Sos el asesor estrat\u00e9gico de Super Coating para El
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v4.0.0";
+const APP_VERSION = "v4.1.0";
 const APP_BUILD   = "2026-06-18";
 
 // ── SC Reporte PDF ─────────────────────────────────────────────────
@@ -7333,7 +7333,7 @@ function ReportesView({data,save,showToast}){
                   <div>
                     <div style={{fontSize:11,fontWeight:600,color:"var(--text-success)",marginBottom:3}}>✓ Último reporte</div>
                     <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",marginBottom:2}}>{ultimoReporte.semana}</div>
-                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>{ultimoReporte.fecha?new Date(ultimoReporte.fecha).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric"}):""}</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>{ultimoReporte.fecha?new Date(ultimoReporte.fecha).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):""}</div>
                   </div>
                   <button onClick={()=>abrirHTML(ultimoReporte.html)} style={{
                     flexShrink:0,padding:"9px 18px",background:"linear-gradient(135deg,#F47920,#e8640a)",
