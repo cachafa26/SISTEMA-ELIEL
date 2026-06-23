@@ -1848,7 +1848,7 @@ function App(){
     {id:"cuentas",label:"Cuentas"},
     {id:"extracto",label:"Extracto"},
     {id:"mi30",label:"Mi 30%"},
-    {id:"despachos",label:"Despachos"},
+    {id:"despachos",label:"Expresos"},
     {id:"reportes",label:"📊 Reportes"},
   ];
 
@@ -2028,7 +2028,7 @@ function App(){
                   fontSize:13,fontWeight:600,flex:1,textAlign:"left",
                   color:"var(--text-primary)",letterSpacing:"-.01em",
                 }}>
-                  {[{id:"dashboard",label:"Resumen"},{id:"contenedores",label:"Contenedores"},{id:"stock",label:"Stock"},{id:"ventas",label:"Ventas"},{id:"cuentas",label:"Cuentas"},{id:"extracto",label:"Extracto"},{id:"mi30",label:"Mi 30%"},{id:"despachos",label:"Despachos"},{id:"reportes",label:"Reportes"}].find(n=>n.id===view)?.label||"Menú"}
+                  {[{id:"dashboard",label:"Resumen"},{id:"contenedores",label:"Contenedores"},{id:"stock",label:"Stock"},{id:"ventas",label:"Ventas"},{id:"cuentas",label:"Cuentas"},{id:"extracto",label:"Extracto"},{id:"mi30",label:"Mi 30%"},{id:"despachos",label:"Expresos"},{id:"reportes",label:"Reportes"}].find(n=>n.id===view)?.label||"Menú"}
                 </span>
                 {/* Animated chevron */}
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
@@ -2079,7 +2079,7 @@ function App(){
                     {id:"cuentas",icon:"👤",label:"Cuentas"},
                     {id:"extracto",icon:"📋",label:"Extracto"},
                     {id:"mi30",icon:"✦",label:"Mi 30%"},
-                    {id:"despachos",icon:"🚚",label:"Despachos"},
+                    {id:"despachos",icon:"🚚",label:"Expresos"},
                     {id:"reportes",icon:"📊",label:"Reportes"},
                   ].map(n=>(
                     <button key={n.id}
@@ -7397,7 +7397,7 @@ function DespachosView({data,save,showToast}){
     if(!form.cliente)return;
     save({...data,despachos:[...(data.despachos||[]),{id:Date.now().toString(),fecha:hoy(),...form,estado:"Pendiente"}]});
     setForm({cliente:"",dni:"",direccion:"",localidad:"",provincia:"",expreso:"",articulos:""});
-    setManual(false);showToast("Despacho agregado");
+    setManual(false);showToast("Expreso agregado");
   };
   const actualizarEstado=(id,estado)=>{
     // Map despacho estado → venta estado
@@ -7491,11 +7491,11 @@ function DespachosView({data,save,showToast}){
     abrirPDF(todasEtiquetas,"Rótulos — "+pendientes.length+" despachos");
     const nuevosDespachos=data.despachos.map(d=>pendientes.some(p=>p.id===d.id)?{...d,estado:"Despachado"}:d);
     save({...data,despachos:nuevosDespachos});
-    showToast(pendientes.length+" despachos · "+totalBultos+" etiquetas generadas");
+    showToast(pendientes.length+" expresos · "+totalBultos+" etiquetas generadas");
   };
   return(<div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-      <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Despachos</h2>
+      <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Expresos</h2>
       <div style={{display:"flex",gap:6}}>
         {pendientes.length>0&&<button onClick={imprimirTodosPendientes} style={{fontSize:11,padding:"6px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-border-info)",color:"var(--color-background-primary)",fontWeight:500}}>🖨️ Imprimir {pendientes.length} pendientes</button>}
         <button onClick={()=>setManual(true)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>+ Manual</button>
