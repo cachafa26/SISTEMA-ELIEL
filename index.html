@@ -1806,12 +1806,12 @@ function App(){
   },0);
   const djGanancia=djGananciaUSD; // alias for backward compat
   const djCobrado=djCobradoUSD;
-  // DJ cobrado en ARS: pagos ARS directamente + pagos USD convertidos a ARS
+  // DJ cobrado en ARS: SOLO pagos cobrados efectivamente en pesos (no convertir USD)
   const djCobradoARS=djEventos.reduce((a,e)=>{
     if(e.estado==="Pendiente") return a;
     return a+(e.pagos||[]).reduce((s,p)=>{
       if(p.moneda==="ARS") return s+Number(p.monto||0);
-      return s+Number(p.montoUSD||0)*(blue||1450);
+      return s; // pagos en USD no afectan el balance en pesos
     },0);
   },0);
 
@@ -1825,7 +1825,7 @@ function App(){
   const ingresosFX_USD=(data.fin?.fx||[]).filter(f=>f.tipo==="compra").reduce((a,f)=>a+Number(f.cantUSD||0),0);
   const totalGastosUSD=(data.fin?.gastos||[]).filter(g=>g.moneda==="USD").reduce((a,g)=>a+Number(g.montoOriginal||0),0)+gastosFX_USD;
   const totalGastos=totalGastosARS; // para compatibilidad con FinanzasView (ARS)
-  const totalRetSCPesos=(data.retiros||[]).reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0);
+  const totalRetSCPesos=(data.retiros||[]).filter(r=>r.moneda!=="USD").reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0);
   // Ingresos ARS: solo lo efectivamente cobrado/retirado en pesos + ingresos extra en ARS
   const ingresosExtraARSTotal=(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="ARS").reduce((a,f)=>a+Number(f.monto||0),0);
   const totalIngresos=totalRetSCPesos+bhCobradoTotal+djCobradoARS+ingresosExtraARSTotal; // SC retirado + BH cobrado + DJ cobrado ARS + extras ARS
@@ -1848,7 +1848,7 @@ function App(){
     {id:"cuentas",label:"Cuentas"},
     {id:"extracto",label:"Extracto"},
     {id:"mi30",label:"Mi 30%"},
-    {id:"despachos",label:"Expresos"},
+    {id:"despachos",label:"Despachos"},
     {id:"reportes",label:"📊 Reportes"},
   ];
 
@@ -2028,7 +2028,7 @@ function App(){
                   fontSize:13,fontWeight:600,flex:1,textAlign:"left",
                   color:"var(--text-primary)",letterSpacing:"-.01em",
                 }}>
-                  {[{id:"dashboard",label:"Resumen"},{id:"contenedores",label:"Contenedores"},{id:"stock",label:"Stock"},{id:"ventas",label:"Ventas"},{id:"cuentas",label:"Cuentas"},{id:"extracto",label:"Extracto"},{id:"mi30",label:"Mi 30%"},{id:"despachos",label:"Expresos"},{id:"reportes",label:"Reportes"}].find(n=>n.id===view)?.label||"Menú"}
+                  {[{id:"dashboard",label:"Resumen"},{id:"contenedores",label:"Contenedores"},{id:"stock",label:"Stock"},{id:"ventas",label:"Ventas"},{id:"cuentas",label:"Cuentas"},{id:"extracto",label:"Extracto"},{id:"mi30",label:"Mi 30%"},{id:"despachos",label:"Despachos"},{id:"reportes",label:"Reportes"}].find(n=>n.id===view)?.label||"Menú"}
                 </span>
                 {/* Animated chevron */}
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
@@ -2079,7 +2079,7 @@ function App(){
                     {id:"cuentas",icon:"👤",label:"Cuentas"},
                     {id:"extracto",icon:"📋",label:"Extracto"},
                     {id:"mi30",icon:"✦",label:"Mi 30%"},
-                    {id:"despachos",icon:"🚚",label:"Expresos"},
+                    {id:"despachos",icon:"🚚",label:"Despachos"},
                     {id:"reportes",icon:"📊",label:"Reportes"},
                   ].map(n=>(
                     <button key={n.id}
@@ -5229,7 +5229,14 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
   const [cliente,setCliente]=useState("");
   const [fecha,setFecha]=useState(hoy());
   const [tc,setTc]=useState(blue?String(Math.round(blue)):"1450");
-  const [items,setItems]=useState([{nombre:ARTS[0],cantidad:"",precioUnitario:"",moneda:"ARS"}]);
+  // Último precio de venta registrado para un artículo (en su moneda original, ARS por defecto)
+  const ultimoPrecioArt=nombre=>{
+    const vs=(data.ventas||[]).filter(v=>v.articulo===nombre&&Number(v.precioVenta||0)>0);
+    if(!vs.length)return "";
+    const ultima=[...vs].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||(b.id||"").localeCompare(a.id||""))[0];
+    return String(ultima.precioVenta||"");
+  };
+  const [items,setItems]=useState([{nombre:ARTS[0],cantidad:"",precioUnitario:ultimoPrecioArt(ARTS[0]),moneda:"ARS"}]);
   const [pagoTotal,setPagoTotal]=useState("");
   const [pagoCompleto,setPagoCompleto]=useState(false);
   const [entrega,setEntrega]=useState("Retira Once");
@@ -5244,8 +5251,13 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
     }
   };
 
-  const addItem=()=>setItems([...items,{nombre:ARTS[0],cantidad:"",precioUnitario:"",moneda:"ARS"}]);
+  const addItem=()=>setItems([...items,{nombre:ARTS[0],cantidad:"",precioUnitario:ultimoPrecioArt(ARTS[0]),moneda:"ARS"}]);
   const updItem=(i,f,v)=>{const its=[...items];its[i]={...its[i],[f]:v};setItems(its);};
+  const updArticulo=(i,nombre)=>{
+    const its=[...items];
+    its[i]={...its[i],nombre,precioUnitario:ultimoPrecioArt(nombre),moneda:"ARS"};
+    setItems(its);
+  };
   const remItem=i=>setItems(items.filter((_,idx)=>idx!==i));
   const calcARS=it=>it.moneda==="USD"?Number(it.precioUnitario||0)*Number(tc):Number(it.precioUnitario||0);
   const totalPedido=items.reduce((a,it)=>a+calcARS(it)*Number(it.cantidad||0),0);
@@ -5317,7 +5329,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
                 {items.length>1&&<button onClick={()=>remItem(i)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:12}}>✕</button>}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 70px",gap:6}}>
-                <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={it.nombre} onChange={e=>updItem(i,"nombre",e.target.value)} style={{width:"100%",marginTop:2,fontSize:12}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
+                <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={it.nombre} onChange={e=>updArticulo(i,e.target.value)} style={{width:"100%",marginTop:2,fontSize:12}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
                 <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cant.</label><input type="number" value={it.cantidad} onChange={e=>updItem(i,"cantidad",e.target.value)} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
                 <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Precio</label><input type="number" value={it.precioUnitario} onChange={e=>updItem(i,"precioUnitario",e.target.value)} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
                 <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Moneda</label><select value={it.moneda} onChange={e=>updItem(i,"moneda",e.target.value)} style={{width:"100%",marginTop:2,fontSize:12}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div>
@@ -7397,7 +7409,7 @@ function DespachosView({data,save,showToast}){
     if(!form.cliente)return;
     save({...data,despachos:[...(data.despachos||[]),{id:Date.now().toString(),fecha:hoy(),...form,estado:"Pendiente"}]});
     setForm({cliente:"",dni:"",direccion:"",localidad:"",provincia:"",expreso:"",articulos:""});
-    setManual(false);showToast("Expreso agregado");
+    setManual(false);showToast("Despacho agregado");
   };
   const actualizarEstado=(id,estado)=>{
     // Map despacho estado → venta estado
@@ -7491,11 +7503,11 @@ function DespachosView({data,save,showToast}){
     abrirPDF(todasEtiquetas,"Rótulos — "+pendientes.length+" despachos");
     const nuevosDespachos=data.despachos.map(d=>pendientes.some(p=>p.id===d.id)?{...d,estado:"Despachado"}:d);
     save({...data,despachos:nuevosDespachos});
-    showToast(pendientes.length+" expresos · "+totalBultos+" etiquetas generadas");
+    showToast(pendientes.length+" despachos · "+totalBultos+" etiquetas generadas");
   };
   return(<div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-      <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Expresos</h2>
+      <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Despachos</h2>
       <div style={{display:"flex",gap:6}}>
         {pendientes.length>0&&<button onClick={imprimirTodosPendientes} style={{fontSize:11,padding:"6px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-border-info)",color:"var(--color-background-primary)",fontWeight:500}}>🖨️ Imprimir {pendientes.length} pendientes</button>}
         <button onClick={()=>setManual(true)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>+ Manual</button>
