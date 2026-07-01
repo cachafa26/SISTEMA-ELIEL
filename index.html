@@ -1806,12 +1806,12 @@ function App(){
   },0);
   const djGanancia=djGananciaUSD; // alias for backward compat
   const djCobrado=djCobradoUSD;
-  // DJ cobrado en ARS: SOLO pagos cobrados efectivamente en pesos (no convertir USD)
+  // DJ cobrado en ARS: SOLO pagos cobrados efectivamente en pesos
   const djCobradoARS=djEventos.reduce((a,e)=>{
     if(e.estado==="Pendiente") return a;
     return a+(e.pagos||[]).reduce((s,p)=>{
       if(p.moneda==="ARS") return s+Number(p.monto||0);
-      return s; // pagos en USD no afectan el balance en pesos
+      return s; // pagos en USD no afectan balance en pesos
     },0);
   },0);
 
@@ -1848,7 +1848,7 @@ function App(){
     {id:"cuentas",label:"Cuentas"},
     {id:"extracto",label:"Extracto"},
     {id:"mi30",label:"Mi 30%"},
-    {id:"despachos",label:"Despachos"},
+    {id:"despachos",label:"Expresos"},
     {id:"reportes",label:"📊 Reportes"},
   ];
 
@@ -2028,7 +2028,7 @@ function App(){
                   fontSize:13,fontWeight:600,flex:1,textAlign:"left",
                   color:"var(--text-primary)",letterSpacing:"-.01em",
                 }}>
-                  {[{id:"dashboard",label:"Resumen"},{id:"contenedores",label:"Contenedores"},{id:"stock",label:"Stock"},{id:"ventas",label:"Ventas"},{id:"cuentas",label:"Cuentas"},{id:"extracto",label:"Extracto"},{id:"mi30",label:"Mi 30%"},{id:"despachos",label:"Despachos"},{id:"reportes",label:"Reportes"}].find(n=>n.id===view)?.label||"Menú"}
+                  {[{id:"dashboard",label:"Resumen"},{id:"contenedores",label:"Contenedores"},{id:"stock",label:"Stock"},{id:"ventas",label:"Ventas"},{id:"cuentas",label:"Cuentas"},{id:"extracto",label:"Extracto"},{id:"mi30",label:"Mi 30%"},{id:"despachos",label:"Expresos"},{id:"reportes",label:"Reportes"}].find(n=>n.id===view)?.label||"Menú"}
                 </span>
                 {/* Animated chevron */}
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
@@ -2079,7 +2079,7 @@ function App(){
                     {id:"cuentas",icon:"👤",label:"Cuentas"},
                     {id:"extracto",icon:"📋",label:"Extracto"},
                     {id:"mi30",icon:"✦",label:"Mi 30%"},
-                    {id:"despachos",icon:"🚚",label:"Despachos"},
+                    {id:"despachos",icon:"🚚",label:"Expresos"},
                     {id:"reportes",icon:"📊",label:"Reportes"},
                   ].map(n=>(
                     <button key={n.id}
@@ -3304,10 +3304,15 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
   // DJ: ganancia cobrada en ARS (para comparar en la misma escala)
   const djGananciaCobradaUSD=djGananciaUSD||0;
   const djGananciaCobradaARS=Math.round(djGananciaCobradaUSD*(blue||1450));
+  // 30d for bar chart display
+  const _h30f=new Date();_h30f.setDate(_h30f.getDate()-30);const _h30fstr=_h30f.toISOString().split("T")[0];
+  const sc30ARS=(data.retiros||[]).filter(r=>r.moneda!=="USD"&&(r.fecha||"")>=_h30fstr).reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0);
+  const bh30ARS=(data.bh?.cobros||[]).filter(c2=>c2.moneda!=="USD"&&(c2.fecha||"")>=_h30fstr).reduce((a,c2)=>a+Number(c2.monto||0),0);
+  const dj30ARS=Math.round((data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="ARS"&&(p.fecha||"")>=_h30fstr).reduce((a,p)=>a+Number(p.monto||0),0));
   const fuentes=[
-    {n:"Super Coating",v:totalRetSCPesos,c:"var(--text-success)",sub:fmtUSD(totalRetSCPesos/(blue||1450))},
-    {n:"BH Trade",v:bhCobradoTotal,c:"var(--text-info)"},
-    {n:"DJ",v:djGananciaCobradaARS,c:"var(--text-warning)",sub:fmtUSD(djGananciaCobradaUSD)},
+    {n:"Super Coating 30d",v:sc30ARS,c:"var(--text-success)",sub:fmtUSD(sc30ARS/(blue||1450))},
+    {n:"BH Trade 30d",v:bh30ARS,c:"var(--text-info)"},
+    {n:"DJ 30d",v:dj30ARS,c:"var(--text-warning)"},
   ];
   const maxBar=Math.max(...fuentes.map(f=>f.v),1);
 
@@ -3331,6 +3336,16 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
         const djCobradoUSDtotal=(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD").reduce((a,p)=>a+Number(p.montoUSD||0),0);
         const fxCompradoUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="compra").reduce((a,f)=>a+Number(f.cantUSD||0),0);
         const fxVendidoUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="venta").reduce((a,f)=>a+Number(f.cantUSD||0),0);
+        // 30d USD display (balance still uses full history)
+        const _hace30usd=new Date();_hace30usd.setDate(_hace30usd.getDate()-30);const _h30usd=_hace30usd.toISOString().split("T")[0];
+        const ingresosUSD30=(data.retiros||[]).filter(r=>r.moneda==="USD"&&(r.fecha||"")>=_h30usd).reduce((a,r)=>a+Number(r.montoUSD||0),0)
+          +(data.bh?.cobros||[]).filter(c2=>c2.moneda==="USD"&&(c2.fecha||"")>=_h30usd).reduce((a,c2)=>a+Number(c2.monto||0),0)
+          +(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD"&&(p.fecha||"")>=_h30usd).reduce((a,p)=>a+Number(p.montoUSD||0),0)
+          +(data.fin?.fx||[]).filter(f=>f.tipo==="compra"&&(f.fecha||"")>=_h30usd).reduce((a,f)=>a+Number(f.cantUSD||0),0)
+          -(data.fin?.fx||[]).filter(f=>f.tipo==="venta"&&(f.fecha||"")>=_h30usd).reduce((a,f)=>a+Number(f.cantUSD||0),0)
+          +(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="USD"&&(f.fecha||"")>=_h30usd).reduce((a,f)=>a+Number(f.monto||0),0);
+        const egresoUSD30=(data.fin?.gastos||[]).filter(g=>g.moneda==="USD"&&(g.fecha||"")>=_h30usd).reduce((a,g)=>a+Number(g.montoOriginal||0),0)
+          +(data.fin?.fx||[]).filter(f=>f.tipo==="venta"&&(f.fecha||"")>=_h30usd).reduce((a,f)=>a+Number(f.cantUSD||0),0);
         const ingresosExtraUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="USD").reduce((a,f)=>a+Number(f.monto||0),0);
         const ingresosExtraARS=(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="ARS").reduce((a,f)=>a+Number(f.monto||0),0);
         const ingresosUSD=retirosUSD+bhCobrosUSD+djCobradoUSDtotal+fxCompradoUSD-fxVendidoUSD+ingresosExtraUSD;
@@ -3378,8 +3393,8 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
             <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Patrimonio (USD)</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.5rem"}}>
               <Card label="Balance USD" value={fmtUSD(balanceUSD)} color={balanceUSD>=0?"var(--text-success)":"var(--text-danger)"} sub={balanceUSD>=0?"superávit":"déficit"}/>
-              <Card label="Ingresos en USD" value={fmtUSD(ingresosUSD)} sub="SC+BH+DJ cobrado en USD" color={ingresosUSD>0?"var(--text-success)":undefined}/>
-              <Card label="Egresos en USD" value={fmtUSD(egresoUSD)} sub="gastos en USD" color={egresoUSD>0?"var(--text-danger)":undefined}/>
+              <Card label="Ingresos USD 30d" value={fmtUSD(ingresosUSD30)} sub="últimos 30 días" color={ingresosUSD30>0?"var(--text-success)":undefined}/>
+              <Card label="Egresos USD 30d" value={fmtUSD(egresoUSD30)} sub="últimos 30 días" color={egresoUSD30>0?"var(--text-danger)":undefined}/>
               <Card label="DJ pendiente cobrar" value={fmtUSD(djSaldoPendiente)} sub={(djEventos||[]).filter(e=>e.estado==="Confirmado").length+" eventos confirmados"} color={djSaldoPendiente>0?"var(--text-warning)":undefined} onClick={()=>goModulo("dj")}/>
             </div>
           </>
@@ -4117,6 +4132,17 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     const cobrado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
     return a+Math.max(0,cobrado-Number(e.costoUSD||0));
   },0);
+  // 30d display only
+  const _h30dj=new Date();_h30dj.setDate(_h30dj.getDate()-30);const _h30djstr=_h30dj.toISOString().split("T")[0];
+  const cobroTotal30d=eventos.reduce((a,e)=>{
+    if(e.estado==="Pendiente") return a;
+    return a+(e.pagos||[]).filter(p=>(p.fecha||"")>=_h30djstr).reduce((s,p)=>s+Number(p.montoUSD||0),0);
+  },0);
+  const ganTotal30d=eventos.reduce((a,e)=>{
+    if(e.estado==="Pendiente") return a;
+    const cobrado30=(e.pagos||[]).filter(p=>(p.fecha||"")>=_h30djstr).reduce((s,p)=>s+Number(p.montoUSD||0),0);
+    return a+Math.max(0,cobrado30-Number(e.costoUSD||0));
+  },0);
   const saldoTotal=confirmados.filter(e=>e.saldo>0).reduce((a,e)=>a+Number(e.saldo||0),0);
 
   const previewCobroUSD=form.monedaCobro==="ARS"?Number(form.cobro||0)/tc:Number(form.cobro||0);
@@ -4308,8 +4334,8 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
         {[
           {l:"Presupuestados",v:presupuestos.filter(p=>p.estado==="Pendiente").length},
           {l:"Confirmados",v:confirmados.length,info:true},
-          {l:"Cobrado USD",v:fmtUSD(cobroTotal),green:cobroTotal>0},
-          {l:"Ganancia USD",v:fmtUSD(ganTotal),green:ganTotal>0},
+          {l:"Cobrado USD 30d",v:fmtUSD(cobroTotal30d),green:cobroTotal30d>0},
+          {l:"Ganancia USD 30d",v:fmtUSD(ganTotal30d),green:ganTotal30d>0},
           ...(saldoTotal>0?[{l:"Saldo pendiente",v:fmtUSD(saldoTotal),warn:true}]:[]),
         ].map(x=>(
           <div key={x.l} style={{background:x.green?"var(--bg-tint-green)":x.warn?"var(--bg-tint-amber)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.10)",border:"0.5px solid "+(x.green?"var(--border-success)":x.warn?"rgba(244,121,32,.3)":x.info?"var(--border-info)":"var(--glass-border)"),borderRadius:"var(--r-lg)",padding:"12px 14px",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
@@ -4853,8 +4879,29 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
 
       {/* Métricas */}
       {(()=>{
-        const totalIngresosUSD=(totalCobUSD||0)+(djCobradoUSD||0);
+        // Ingresos USD: solo retiros en USD + cobros BH en USD + pagos DJ en USD + FX + extras
+        const _retirosUSD=(data.retiros||[]).filter(r=>r.moneda==="USD").reduce((a,r)=>a+Number(r.montoUSD||0),0);
+        const _bhCobrosUSD=(data.bh?.cobros||[]).filter(c2=>c2.moneda==="USD").reduce((a,c2)=>a+Number(c2.monto||0),0);
+        const _djCobradoUSDtotal=(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD").reduce((a,p)=>a+Number(p.montoUSD||0),0);
+        const _fxCompradoUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="compra").reduce((a,f)=>a+Number(f.cantUSD||0),0);
+        const _fxVendidoUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="venta").reduce((a,f)=>a+Number(f.cantUSD||0),0);
+        const _ingresosExtraUSD=(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="USD").reduce((a,f)=>a+Number(f.monto||0),0);
+        const totalIngresosUSD=_retirosUSD+_bhCobrosUSD+_djCobradoUSDtotal+_fxCompradoUSD-_fxVendidoUSD+_ingresosExtraUSD;
         const balanceUSD=totalIngresosUSD-(totalGastosUSD||0);
+        // 30d display calcs
+        const _h30fin=new Date();_h30fin.setDate(_h30fin.getDate()-30);const _h30finstr=_h30fin.toISOString().split("T")[0];
+        const ingresos30ARSfin=(data.retiros||[]).filter(r=>r.moneda!=="USD"&&(r.fecha||"")>=_h30finstr).reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0)
+          +(data.bh?.cobros||[]).filter(c2=>c2.moneda!=="USD"&&(c2.fecha||"")>=_h30finstr).reduce((a,c2)=>a+Number(c2.monto||0),0)
+          +(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="ARS"&&(p.fecha||"")>=_h30finstr).reduce((a,p)=>a+Number(p.monto||0),0)
+          +(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="ARS"&&(f.fecha||"")>=_h30finstr).reduce((a,f)=>a+Number(f.monto||0),0);
+        const gastos30ARSfin=(data.fin?.gastos||[]).filter(g=>g.moneda!=="USD"&&(g.fecha||"")>=_h30finstr).reduce((a,g)=>a+g.monto,0);
+        const ingresos30USDfin=_retirosUSD>0?(data.retiros||[]).filter(r=>r.moneda==="USD"&&(r.fecha||"")>=_h30finstr).reduce((a,r)=>a+Number(r.montoUSD||0),0):0;
+        const totalIngresos30USDfin=(data.retiros||[]).filter(r=>r.moneda==="USD"&&(r.fecha||"")>=_h30finstr).reduce((a,r)=>a+Number(r.montoUSD||0),0)
+          +(data.bh?.cobros||[]).filter(c2=>c2.moneda==="USD"&&(c2.fecha||"")>=_h30finstr).reduce((a,c2)=>a+Number(c2.monto||0),0)
+          +(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD"&&(p.fecha||"")>=_h30finstr).reduce((a,p)=>a+Number(p.montoUSD||0),0)
+          +(data.fin?.fx||[]).filter(f=>f.tipo==="compra"&&(f.fecha||"")>=_h30finstr).reduce((a,f)=>a+Number(f.cantUSD||0),0)
+          +(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="USD"&&(f.fecha||"")>=_h30finstr).reduce((a,f)=>a+Number(f.monto||0),0);
+        const gastos30USDfin=(data.fin?.gastos||[]).filter(g=>g.moneda==="USD"&&(g.fecha||"")>=_h30finstr).reduce((a,g)=>a+Number(g.montoOriginal||0),0);
         const MetCard=({label,value,green,danger,sub})=>(
           <div style={{background:green?"var(--color-background-success)":danger?"var(--color-background-danger)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
             <div style={{fontSize:10,fontWeight:600,letterSpacing:".04em",textTransform:"uppercase",color:green?"var(--color-text-success)":danger?"var(--color-text-danger)":"var(--color-text-secondary)",marginBottom:4}}>{label}</div>
@@ -4867,14 +4914,14 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
             <div style={{fontSize:10,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--color-text-secondary)",marginBottom:8}}>En pesos</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:"1.25rem"}}>
               <MetCard label="Balance" value={"$"+fmt(balance)} green={balance>=0} danger={balance<0}/>
-              <MetCard label="Ingresos" value={"$"+fmt(totalIngresos)}/>
-              <MetCard label="Gastado" value={"$"+fmt(totalGastos)} danger={totalGastos>0}/>
+              <MetCard label="Ingresos 30d" value={"$"+fmt(ingresos30ARSfin)} sub="últimos 30 días"/>
+              <MetCard label="Gastado 30d" value={"$"+fmt(gastos30ARSfin)} danger={gastos30ARSfin>0} sub="últimos 30 días"/>
             </div>
             <div style={{fontSize:10,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--color-text-secondary)",marginBottom:8}}>En dólares</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:"1.5rem"}}>
               <MetCard label="Balance" value={fmtUSD(balanceUSD)} green={balanceUSD>=0} danger={balanceUSD<0}/>
-              <MetCard label="Ingresos" value={fmtUSD(totalIngresosUSD)} sub="SC + DJ cobrado"/>
-              <MetCard label="Gastado" value={fmtUSD(totalGastosUSD||0)} danger={(totalGastosUSD||0)>0}/>
+              <MetCard label="Ingresos 30d" value={fmtUSD(totalIngresos30USDfin)} sub="últimos 30 días"/>
+              <MetCard label="Gastado 30d" value={fmtUSD(gastos30USDfin)} danger={gastos30USDfin>0} sub="últimos 30 días"/>
             </div>
           </>
         );
@@ -5229,13 +5276,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
   const [cliente,setCliente]=useState("");
   const [fecha,setFecha]=useState(hoy());
   const [tc,setTc]=useState(blue?String(Math.round(blue)):"1450");
-  // Último precio de venta registrado para un artículo (en su moneda original, ARS por defecto)
-  const ultimoPrecioArt=nombre=>{
-    const vs=(data.ventas||[]).filter(v=>v.articulo===nombre&&Number(v.precioVenta||0)>0);
-    if(!vs.length)return "";
-    const ultima=[...vs].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||(b.id||"").localeCompare(a.id||""))[0];
-    return String(ultima.precioVenta||"");
-  };
+  const ultimoPrecioArt=nombre=>{const vs=(data.ventas||[]).filter(v=>v.articulo===nombre&&Number(v.precioVenta||0)>0);if(!vs.length)return "";const ultima=[...vs].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")||(b.id||"").localeCompare(a.id||""))[0];return String(ultima.precioVenta||"");};
   const [items,setItems]=useState([{nombre:ARTS[0],cantidad:"",precioUnitario:ultimoPrecioArt(ARTS[0]),moneda:"ARS"}]);
   const [pagoTotal,setPagoTotal]=useState("");
   const [pagoCompleto,setPagoCompleto]=useState(false);
@@ -5253,11 +5294,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
 
   const addItem=()=>setItems([...items,{nombre:ARTS[0],cantidad:"",precioUnitario:ultimoPrecioArt(ARTS[0]),moneda:"ARS"}]);
   const updItem=(i,f,v)=>{const its=[...items];its[i]={...its[i],[f]:v};setItems(its);};
-  const updArticulo=(i,nombre)=>{
-    const its=[...items];
-    its[i]={...its[i],nombre,precioUnitario:ultimoPrecioArt(nombre),moneda:"ARS"};
-    setItems(its);
-  };
+  const updArticulo=(i,nombre)=>{const its=[...items];its[i]={...its[i],nombre,precioUnitario:ultimoPrecioArt(nombre),moneda:"ARS"};setItems(its);};
   const remItem=i=>setItems(items.filter((_,idx)=>idx!==i));
   const calcARS=it=>it.moneda==="USD"?Number(it.precioUnitario||0)*Number(tc):Number(it.precioUnitario||0);
   const totalPedido=items.reduce((a,it)=>a+calcARS(it)*Number(it.cantidad||0),0);
@@ -5420,7 +5457,11 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
 // ══════════════════════════════════════════════════════════════════════════
 function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setContSel,setContTab}){
   const tc=blue||1450;
-  const totalFactUSD=(data.ventas||[]).reduce((a,v)=>a+Number(v.usd||0),0);
+  const hace30=new Date();hace30.setDate(hace30.getDate()-30);const hace30str=hace30.toISOString().split("T")[0];
+  const ventas30d=(data.ventas||[]).filter(v=>(v.fecha||"")>=hace30str);
+  const totalFactUSD=ventas30d.reduce((a,v)=>a+Number(v.usd||0),0);
+  const totalCobUSD30d=ventas30d.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+  const mi30Total30d=mi30Total>0?Math.max(0,totalFactUSD-((data.contenedores||[]).reduce((a2,cont)=>a2+(cont.costoTotal||0),0)))*0.3:0;
   const totalCobUSD=(data.ventas||[]).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
 
   const stockPapel={}, stockTinta={};
@@ -5447,9 +5488,8 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.25rem"}}>
         <MC l="Mi 30% PENDIENTE"     v={fmtUSD(pendienteRetiro)} green={pendienteRetiro>0} sub={"≈$"+fmt(pendienteRetiro*tc)+" ARS"}/>
-        <MC l="30% devengado total"  v={fmtUSD(mi30Total)}/>
-        <MC l="Facturado (USD)"      v={fmtUSD(totalFactUSD)} info/>
-        <MC l="Cobrado (USD)"        v={fmtUSD(totalCobUSD)}/>
+        <MC l="Facturado (USD) 30d"  v={fmtUSD(totalFactUSD)} info sub="últimos 30 días"/>
+        <MC l="Cobrado (USD) 30d"    v={fmtUSD(totalCobUSD30d)} sub="últimos 30 días"/>
         <MC l="Stock papel"          v={fmt(totalPapel)+" rollos"}/>
         <MC l="Stock tinta"          v={fmt(totalTinta)+" u"} info/>
       </div>
@@ -7409,7 +7449,7 @@ function DespachosView({data,save,showToast}){
     if(!form.cliente)return;
     save({...data,despachos:[...(data.despachos||[]),{id:Date.now().toString(),fecha:hoy(),...form,estado:"Pendiente"}]});
     setForm({cliente:"",dni:"",direccion:"",localidad:"",provincia:"",expreso:"",articulos:""});
-    setManual(false);showToast("Despacho agregado");
+    setManual(false);showToast("Expreso agregado");
   };
   const actualizarEstado=(id,estado)=>{
     // Map despacho estado → venta estado
@@ -7503,11 +7543,11 @@ function DespachosView({data,save,showToast}){
     abrirPDF(todasEtiquetas,"Rótulos — "+pendientes.length+" despachos");
     const nuevosDespachos=data.despachos.map(d=>pendientes.some(p=>p.id===d.id)?{...d,estado:"Despachado"}:d);
     save({...data,despachos:nuevosDespachos});
-    showToast(pendientes.length+" despachos · "+totalBultos+" etiquetas generadas");
+    showToast(pendientes.length+" expresos · "+totalBultos+" etiquetas generadas");
   };
   return(<div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-      <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Despachos</h2>
+      <h2 style={{fontSize:18,fontWeight:500,margin:0}}>Expresos</h2>
       <div style={{display:"flex",gap:6}}>
         {pendientes.length>0&&<button onClick={imprimirTodosPendientes} style={{fontSize:11,padding:"6px 10px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"none",background:"var(--color-border-info)",color:"var(--color-background-primary)",fontWeight:500}}>🖨️ Imprimir {pendientes.length} pendientes</button>}
         <button onClick={()=>setManual(true)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>+ Manual</button>
