@@ -2484,8 +2484,10 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           gananciaUSD, margen: cobroUSD>0?(gananciaUSD/cobroUSD*100):0,
           notas: d.notas||"", tcUsado: tc
         };
-        save({...data,dj:{...data.dj,eventos:[...(data.dj?.eventos||[]),evento]}});
-        showToast("✓ Evento DJ cargado");
+        const deudaChat=crearDeudaDJCosto?crearDeudaDJCosto(evento.id,evento.nombre,costoRaw,d.monedaCosto,tc):(costoRaw>0?{id:Date.now().toString()+"d",desc:"Costo DJ: "+evento.nombre,monto:costoRaw,moneda:d.monedaCosto||"ARS",fecha:hoy(),nota:"Auto-generada al confirmar evento",historialPagos:[],eventoId:evento.id}:null);
+        const deudasChat=deudaChat?[...(data.fin?.deudas||[]),deudaChat]:(data.fin?.deudas||[]);
+        save({...data,dj:{...data.dj,eventos:[...(data.dj?.eventos||[]),evento]},fin:{...data.fin,deudas:deudasChat}});
+        showToast("✓ Evento DJ cargado"+(deudaChat?" · Deuda de costo registrada":""));
         setPendingAction(null);
       }
       else if(action.action==="REGISTRAR_PAGO_DJ"){
@@ -4395,6 +4397,21 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   const previewGanUSD=previewCobroUSD-previewCostoUSD;
   const showPreview=Number(form.cobro||0)>0||Number(form.costo||0)>0;
 
+  // Crea una deuda en fin.deudas a partir del costo de un evento DJ
+  const crearDeudaDJCosto=(eventoId,eventoNombre,costoRaw,monedaCosto,tc2)=>{
+    if(!costoRaw||Number(costoRaw)<=0)return null;
+    return {
+      id:Date.now().toString()+"d",
+      desc:"Costo DJ: "+eventoNombre,
+      monto:Number(costoRaw),
+      moneda:monedaCosto||"ARS",
+      fecha:hoy(),
+      nota:"Generada automáticamente al confirmar evento",
+      historialPagos:[],
+      eventoId,
+    };
+  };
+
   const guardarEvento=()=>{
     if(!form.nombre.trim())return;
     const cobroRaw=Number(form.cobro||0),costoRaw=Number(form.costo||0);
@@ -4426,9 +4443,12 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
       pagos,
     };
     const nuevos=editId?eventos.map(e=>e.id===editId?evento:e):[...eventos,evento];
-    save({...data,dj:{...data.dj,eventos:nuevos}});
+    // Si es nuevo y tiene costo, generar deuda automáticamente
+    const deudaCosto=!editId?crearDeudaDJCosto(evento.id,evento.nombre,costoRaw,form.monedaCosto,tc):null;
+    const nuevasDeudas=deudaCosto?[...(data.fin?.deudas||[]),deudaCosto]:(data.fin?.deudas||[]);
+    save({...data,dj:{...data.dj,eventos:nuevos},fin:{...data.fin,deudas:nuevasDeudas}});
     setForm(initForm);setEditId(null);setTab("confirmados");
-    showToast(editId?"Evento actualizado":"Evento cargado");
+    showToast(editId?"Evento actualizado":deudaCosto?"Evento cargado · Deuda de costo registrada":"Evento cargado");
   };
 
   const editar=e=>{setEditId(e.id);setForm({
@@ -4499,8 +4519,10 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     };
     const nuevosEventos=[...eventos,evento];
     const nuevosPresupuestos=(data.dj?.presupuestos||[]).map(x=>x.id===p.id?{...x,estado:"Confirmado"}:x);
-    save({...data,dj:{...data.dj,eventos:nuevosEventos,presupuestos:nuevosPresupuestos}});
-    showToast("✓ Evento confirmado");
+    const deudaEC=crearDeudaDJCosto(evento.id,evento.nombre,costoRaw,monedaCostoConf,tc);
+    const deudasEC=deudaEC?[...(data.fin?.deudas||[]),deudaEC]:(data.fin?.deudas||[]);
+    save({...data,dj:{...data.dj,eventos:nuevosEventos,presupuestos:nuevosPresupuestos},fin:{...data.fin,deudas:deudasEC}});
+    showToast(deudaEC?"✓ Evento confirmado · Deuda de costo registrada":"✓ Evento confirmado");
     setModalConfirmar(null);setFormaPagoConf("cuotas");setSenaConf("");setDescuentoConf(false);setCostoConfirmar("");setTab("confirmados");
   };
 
