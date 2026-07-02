@@ -3242,6 +3242,19 @@ function GestorDeudas({data,save,showToast,blue}){
     showToast("Deuda eliminada");
   };
 
+  const revertirPago=(deudaId,pagoId,gastoId)=>{
+    if(!window.confirm("¿Revertir este pago? Se eliminará el gasto y se restaurará el saldo de la deuda."))return;
+    const nuevosGastos=(data.fin?.gastos||[]).filter(g=>g.id!==gastoId);
+    const nuevasDeudas=(data.fin?.deudas||[]).map(d=>{
+      if(d.id!==deudaId)return d;
+      const nuevoHist=(d.historialPagos||[]).filter(p=>p.id!==pagoId);
+      const nuevoSaldo=Number(d.monto||0)-nuevoHist.reduce((a,p)=>a+Number(p.monto||0),0);
+      return {...d,historialPagos:nuevoHist,saldada:nuevoSaldo<=0};
+    });
+    save({...data,fin:{...data.fin,gastos:nuevosGastos,deudas:nuevasDeudas}});
+    showToast("Pago revertido y gasto eliminado");
+  };
+
   const pagarDeuda=()=>{
     const d=modalPago;
     if(!formPago.monto||!d)return;
@@ -3253,21 +3266,15 @@ function GestorDeudas({data,save,showToast,blue}){
     const nuevoPago={id:Date.now().toString(),monto:aplicar,fecha:formPago.fecha,nota:formPago.nota};
     const nuevoHistorial=[...(d.historialPagos||[]),nuevoPago];
     const saldoNuevo=saldoActual-aplicar;
-    // Registrar también como gasto (para que baje del balance y aparezca en movimientos)
-    const nuevoGasto={
-      id:Date.now().toString()+"g",
-      desc:"Pago deuda: "+d.desc+(formPago.nota?" ("+formPago.nota+")":""),
-      moneda:d.moneda,
-      montoOriginal:aplicar,
-      cotiz:d.moneda==="USD"?tc:null,
-      monto:d.moneda==="USD"?Math.round(aplicar*tc):aplicar,
-      cat:"Deudas",
-      fecha:formPago.fecha,
-      fuente:"Otros",
-    };
-    const nuevaDeuda={...d,monto:Number(d.monto||0),historialPagos:nuevoHistorial};
+    const gastoId=Date.now().toString()+"g";
+    const nuevoGasto={id:gastoId,desc:"Pago deuda: "+d.desc+(formPago.nota?" ("+formPago.nota+")":""),moneda:d.moneda,montoOriginal:aplicar,cotiz:d.moneda==="USD"?tc:null,monto:d.moneda==="USD"?Math.round(aplicar*tc):aplicar,cat:"Deudas",fecha:formPago.fecha,fuente:"Otros",deudaId:d.id};
+    const pagoConLink={...nuevoPago,gastoId};
+    const histConLink=[...(d.historialPagos||[]),pagoConLink];
+    // Si queda saldada, guardarla en deudas como saldada (para poder revertir)
+    const deudaSaldada={...d,monto:Number(d.monto||0),historialPagos:histConLink,saldada:true};
+    const nuevaDeuda={...d,monto:Number(d.monto||0),historialPagos:histConLink};
     const nuevasDeudas=saldoNuevo<=0
-      ? deudas.filter(x=>x.id!==d.id) // deuda saldada: eliminar
+      ? [...deudas.filter(x=>x.id!==d.id),deudaSaldada] // saldada: queda oculta pero existe para rollback
       : deudas.map(x=>x.id===d.id?nuevaDeuda:x);
     save({...data,
       fin:{...data.fin,
@@ -3280,11 +3287,12 @@ function GestorDeudas({data,save,showToast,blue}){
     showToast(saldoNuevo<=0?"✓ Deuda saldada y eliminada":"✓ Pago parcial registrado");
   };
 
-  const totalARS=deudas.filter(d=>d.moneda!=="USD").reduce((a,d)=>{
+  const deudasActivas=deudas.filter(d=>!d.saldada);
+  const totalARS=deudasActivas.filter(d=>d.moneda!=="USD").reduce((a,d)=>{
     const saldo=Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0);
     return a+Math.max(0,saldo);
   },0);
-  const totalUSD=deudas.filter(d=>d.moneda==="USD").reduce((a,d)=>{
+  const totalUSD=deudasActivas.filter(d=>d.moneda==="USD").reduce((a,d)=>{
     const saldo=Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0);
     return a+Math.max(0,saldo);
   },0);
@@ -3383,10 +3391,10 @@ function GestorDeudas({data,save,showToast,blue}){
       )}
 
       {/* Lista deudas */}
-      {deudas.length===0
+      {deudasActivas.length===0
         ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)"}}>Sin deudas registradas.</div>
         :<div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {[...deudas].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(d=>{
+          {[...deudasActivas].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(d=>{
             const pagadoHist=(d.historialPagos||[]).reduce((a,p)=>a+Number(p.monto||0),0);
             const saldo=Math.max(0,Number(d.monto||0)-pagadoHist);
             const pct=Number(d.monto||0)>0?(pagadoHist/Number(d.monto||0))*100:0;
@@ -3411,9 +3419,12 @@ function GestorDeudas({data,save,showToast,blue}){
                 {(d.historialPagos||[]).length>0&&(
                   <div style={{marginBottom:8}}>
                     {(d.historialPagos||[]).map(p=>(
-                      <div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"3px 0",color:"var(--text-secondary)",borderBottom:"0.5px solid rgba(120,120,128,0.08)"}}>
+                      <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,padding:"3px 0",color:"var(--text-secondary)",borderBottom:"0.5px solid rgba(120,120,128,0.08)"}}>
                         <span>💳 Pago parcial · {p.fecha}{p.nota&&" · "+p.nota}</span>
-                        <span style={{color:"var(--text-success)",fontWeight:600}}>−{fmtD(Number(p.monto||0))}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{color:"var(--text-success)",fontWeight:600}}>−{fmtD(Number(p.monto||0))}</span>
+                          {p.gastoId&&<button onClick={()=>revertirPago(d.id,p.id,p.gastoId)} title="Revertir este pago" style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-danger)",fontSize:13,padding:"0 2px",lineHeight:1}}>↩</button>}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -3585,7 +3596,7 @@ function DashboardCentral({data,save,showToast,blue,mi30Total,pendienteRetiro,to
               <Card label="Mi 30% SC en pesos" value={"$"+fmt(mi30Pesos)} sub={fmtUSD(pendienteRetiro)+" · TC $"+fmt(tc)} color={mi30Pesos>0?"var(--text-success)":undefined} onClick={()=>goModulo("supercoating")}/>
             </div>
             {(()=>{
-              const _deudasARS=(data.fin?.deudas||[]).filter(d=>d.moneda!=="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
+              const _deudasARS=(data.fin?.deudas||[]).filter(d=>d.moneda!=="USD"&&!d.saldada).reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
               const _porCobrarARS=mi30Pesos+bhPendienteCobro;
               const _pnARS=balanceARS+_porCobrarARS-_deudasARS;
               return(
@@ -3630,7 +3641,7 @@ function DashboardCentral({data,save,showToast,blue,mi30Total,pendienteRetiro,to
               <Card label="DJ pendiente cobrar" value={fmtUSD(djSaldoPendiente)} sub={(djEventos||[]).filter(e=>e.estado==="Confirmado").length+" eventos confirmados"} color={djSaldoPendiente>0?"var(--text-warning)":undefined} onClick={()=>goModulo("dj")}/>
             </div>
             {(()=>{
-              const _deudasUSD=(data.fin?.deudas||[]).filter(d=>d.moneda==="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
+              const _deudasUSD=(data.fin?.deudas||[]).filter(d=>d.moneda==="USD"&&!d.saldada).reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
               const _porCobrarUSD=djSaldoPendiente; // solo DJ — SC 30% va en ARS
               const _pnUSD=balanceUSD+_porCobrarUSD-_deudasUSD;
               return(
@@ -5145,7 +5156,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
                 const tc2=blue||1450;
                 const _bhPendFin=Math.max(0,bhTotalAnio-bhCobradoTotal);
                 const _mi30p=Math.round(pendienteRetiro*tc2);
-                const _deudasARS=(data.fin?.deudas||[]).filter(d=>d.moneda!=="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
+                const _deudasARS=(data.fin?.deudas||[]).filter(d=>d.moneda!=="USD"&&!d.saldada).reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
                 const _pnARS=balance+_mi30p+_bhPendFin-_deudasARS;
                 return(<>
                   <MetCard label="Deudas $" value={"$"+fmt(_deudasARS)} danger={_deudasARS>0} sub={(data.fin?.deudas||[]).filter(d=>d.moneda!=="USD").length+" registro/s"}/>
@@ -5159,7 +5170,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
               <MetCard label="Ingresos USD 30d" value={fmtUSD(_ing30USD)} sub="30 días" green={_ing30USD>0}/>
               <MetCard label="Gastado USD 30d" value={fmtUSD(_gast30USD)} danger={_gast30USD>0} sub="30 días"/>
               {(()=>{
-                const _deudasUSD=(data.fin?.deudas||[]).filter(d=>d.moneda==="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
+                const _deudasUSD=(data.fin?.deudas||[]).filter(d=>d.moneda==="USD"&&!d.saldada).reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
                 const _djPendFin=djSaldoPendiente||0;
                 const _pnUSD=balanceUSD+_djPendFin-_deudasUSD; // solo DJ — SC 30% va en ARS
                 return(<>
