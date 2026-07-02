@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v4.0.0 · 2026-06-18 -->
+  <!-- v4.4.0 · 2026-06-18 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -1443,7 +1443,7 @@ const EMPTY = {
   clientes:{},          // persistente en Firebase
   bh:{ despachos:[], cobros:[] },
   dj:{ eventos:[], presupuestos:[] },
-  fin:{ gastos:[], presupuestos:{}, fx:[] },
+  fin:{ gastos:[], presupuestos:{}, fx:[], deudas:[] },
   _v:10
 };
 
@@ -2115,7 +2115,7 @@ function App(){
         {/* DASHBOARD CENTRAL */}
         {modulo==="dashboard"&&(
           <DashboardCentral
-            data={data} blue={blue}
+            data={data} save={save} showToast={showToast} blue={blue}
             mi30Total={mi30Total} pendienteRetiro={pendienteRetiro} totalRetirado={totalRetirado}
             bhTotalAnio={bhTotalAnio} bhSueldo={bhSueldo} bhCobradoTotal={bhCobradoTotal}
             djGanancia={djGanancia} djCobrado={djCobrado} djEventos={djEventos} djGananciaUSD={djGananciaUSD} djCobradoUSD={djCobradoUSD} djRealizados={djRealizados}
@@ -2153,10 +2153,10 @@ function App(){
         {modulo==="finanzas"&&(
           <FinanzasView
             data={data} save={save} showToast={showToast} blue={blue}
-            totalIngresos={totalIngresos} totalGastos={totalGastos}
+            totalIngresos={totalIngresos} totalGastos={totalGastos} totalGastosARS={totalGastosARS}
             totalGastosUSD={totalGastosUSD} totalCobUSD={totalCobUSD} djCobradoUSD={djCobradoUSD}
             bhTotalAnio={bhTotalAnio} bhCobradoTotal={bhCobradoTotal} djCobrado={djCobrado} totalRetSCPesos={totalRetSCPesos}
-            bhSueldo={bhSueldo} pendienteRetiro={pendienteRetiro}
+            bhSueldo={bhSueldo} pendienteRetiro={pendienteRetiro} djSaldoPendiente={djSaldoPendiente}
           />
         )}
       </div>
@@ -3214,7 +3214,223 @@ function SearchModal({data,onClose,goModulo,setView}){
 // ══════════════════════════════════════════════════════════════════════════
 // DASHBOARD CENTRAL
 // ══════════════════════════════════════════════════════════════════════════
-function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,bhCobradoTotal,djGanancia,djCobrado,djEventos,djGananciaUSD,djCobradoUSD,djRealizados,totalGastos,totalGastosARS,totalGastosUSD,totalIngresos,totalRetSCPesos,totalVentaUSD,totalCobUSD,stockUni,goModulo}){
+
+// ══════════════════════════════════════════════════════════════════════════
+// GESTOR DE DEUDAS — listado + pagar parcial/total
+// ══════════════════════════════════════════════════════════════════════════
+function GestorDeudas({data,save,showToast,blue}){
+  const tc=blue||1450;
+  const deudas=data.fin?.deudas||[];
+  const [showForm,setShowForm]=useState(false);
+  const [modalPago,setModalPago]=useState(null); // {deuda}
+  const [formPago,setFormPago]=useState({monto:"",fecha:new Date().toISOString().split("T")[0],nota:""});
+  const [form,setForm]=useState({desc:"",monto:"",moneda:"ARS",fecha:new Date().toISOString().split("T")[0],nota:""});
+
+  const guardarDeuda=()=>{
+    if(!form.desc.trim()||!form.monto){showToast("Completá descripción y monto");return;}
+    const nueva={id:Date.now().toString(),desc:form.desc.trim(),monto:Number(form.monto),moneda:form.moneda,fecha:form.fecha,nota:form.nota,historialPagos:[]};
+    save({...data,fin:{...data.fin,deudas:[...deudas,nueva]}});
+    setForm({desc:"",monto:"",moneda:"ARS",fecha:new Date().toISOString().split("T")[0],nota:""});
+    setShowForm(false);
+    showToast("✓ Deuda registrada");
+  };
+
+  const eliminarDeuda=id=>{
+    if(!window.confirm("¿Eliminar esta deuda?"))return;
+    save({...data,fin:{...data.fin,deudas:deudas.filter(d=>d.id!==id)}});
+    showToast("Deuda eliminada");
+  };
+
+  const pagarDeuda=()=>{
+    const d=modalPago;
+    if(!formPago.monto||!d)return;
+    const montoN=Number(formPago.monto);
+    if(montoN<=0){showToast("Monto inválido");return;}
+    // Restar del saldo de la deuda
+    const saldoActual=Number(d.monto||0)-(d.historialPagos||[]).reduce((a,p)=>a+Number(p.monto||0),0);
+    const aplicar=Math.min(montoN,saldoActual);
+    const nuevoPago={id:Date.now().toString(),monto:aplicar,fecha:formPago.fecha,nota:formPago.nota};
+    const nuevoHistorial=[...(d.historialPagos||[]),nuevoPago];
+    const saldoNuevo=saldoActual-aplicar;
+    // Registrar también como gasto (para que baje del balance y aparezca en movimientos)
+    const nuevoGasto={
+      id:Date.now().toString()+"g",
+      desc:"Pago deuda: "+d.desc+(formPago.nota?" ("+formPago.nota+")":""),
+      moneda:d.moneda,
+      montoOriginal:aplicar,
+      cotiz:d.moneda==="USD"?tc:null,
+      monto:d.moneda==="USD"?Math.round(aplicar*tc):aplicar,
+      cat:"Deudas",
+      fecha:formPago.fecha,
+      fuente:"Otros",
+    };
+    const nuevaDeuda={...d,monto:Number(d.monto||0),historialPagos:nuevoHistorial};
+    const nuevasDeudas=saldoNuevo<=0
+      ? deudas.filter(x=>x.id!==d.id) // deuda saldada: eliminar
+      : deudas.map(x=>x.id===d.id?nuevaDeuda:x);
+    save({...data,
+      fin:{...data.fin,
+        deudas:nuevasDeudas,
+        gastos:[...(data.fin?.gastos||[]),nuevoGasto]
+      }
+    });
+    setModalPago(null);
+    setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:""});
+    showToast(saldoNuevo<=0?"✓ Deuda saldada y eliminada":"✓ Pago parcial registrado");
+  };
+
+  const totalARS=deudas.filter(d=>d.moneda!=="USD").reduce((a,d)=>{
+    const saldo=Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0);
+    return a+Math.max(0,saldo);
+  },0);
+  const totalUSD=deudas.filter(d=>d.moneda==="USD").reduce((a,d)=>{
+    const saldo=Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0);
+    return a+Math.max(0,saldo);
+  },0);
+
+  return(
+    <div>
+      {/* Modal pago */}
+      {modalPago&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:380,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
+            <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 3px",color:"var(--text-primary)"}}>Pagar deuda</h3>
+            <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 14px"}}>{modalPago.desc}</p>
+            {(()=>{
+              const saldoActual=Number(modalPago.monto||0)-(modalPago.historialPagos||[]).reduce((a,p)=>a+Number(p.monto||0),0);
+              return(
+                <div style={{background:modalPago.moneda==="USD"?"var(--bg-tint-blue)":"var(--bg-tint-amber)",border:"0.5px solid "+(modalPago.moneda==="USD"?"var(--border-info)":"rgba(178,80,0,0.3)"),borderRadius:"var(--r-md)",padding:"10px 14px",marginBottom:14,fontSize:12}}>
+                  <span style={{color:"var(--text-secondary)"}}>Saldo pendiente: </span>
+                  <strong style={{color:"var(--text-primary)"}}>{modalPago.moneda==="USD"?"USD "+saldoActual.toLocaleString("es-AR",{maximumFractionDigits:2}):"$"+Math.round(saldoActual).toLocaleString("es-AR")}</strong>
+                  <button onClick={()=>setFormPago(f=>({...f,monto:String(saldoActual)}))} style={{marginLeft:12,fontSize:10,padding:"2px 8px",borderRadius:"var(--r-pill)",border:"none",background:"var(--sc-orange)",color:"#fff",cursor:"pointer",fontWeight:600}}>Saldar todo</button>
+                </div>
+              );
+            })()}
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto a pagar ({modalPago.moneda})</label>
+              <input type="number" value={formPago.monto} onChange={e=>setFormPago(f=>({...f,monto:e.target.value}))} placeholder="0" autoFocus inputMode="decimal"/>
+            </div>
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label>
+              <input type="date" value={formPago.fecha} onChange={e=>setFormPago(f=>({...f,fecha:e.target.value}))}/>
+            </div>
+            <div style={{marginBottom:16}}>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota (opcional)</label>
+              <input value={formPago.nota} onChange={e=>setFormPago(f=>({...f,nota:e.target.value}))} placeholder="Ej: cuota enero, pago parcial..."/>
+            </div>
+            {formPago.monto&&Number(formPago.monto)>0&&modalPago.moneda==="USD"&&(
+              <div style={{fontSize:11,color:"var(--text-info)",marginBottom:12,padding:"7px 10px",background:"var(--bg-tint-blue)",borderRadius:"var(--r-md)"}}>
+                = ${Math.round(Number(formPago.monto)*tc).toLocaleString("es-AR")} ARS al TC ${tc.toLocaleString("es-AR")}
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={pagarDeuda} style={{flex:1,fontSize:13,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>✓ Registrar pago</button>
+              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:""}); }} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+        <div>
+          <h2 style={{fontSize:18,fontWeight:700,margin:"0 0 2px",color:"var(--text-primary)"}}>Deudas</h2>
+          {deudas.length>0&&<div style={{fontSize:11,color:"var(--text-secondary)"}}>
+            {totalARS>0&&<span style={{marginRight:10}}>ARS: ${Math.round(totalARS).toLocaleString("es-AR")}</span>}
+            {totalUSD>0&&<span>USD: {totalUSD.toLocaleString("es-AR",{maximumFractionDigits:2})}</span>}
+          </div>}
+        </div>
+        <button onClick={()=>setShowForm(s=>!s)} style={{fontSize:12,padding:"7px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer",boxShadow:"0 3px 12px rgba(192,57,43,0.35)"}}>
+          {showForm?"✕ Cancelar":"＋ Nueva deuda"}
+        </button>
+      </div>
+
+      {/* Form nueva deuda */}
+      {showForm&&(
+        <div style={{background:"rgba(192,57,43,0.06)",border:"0.5px solid rgba(192,57,43,0.25)",borderRadius:"var(--r-lg)",padding:"16px",marginBottom:"1rem"}}>
+          <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-danger)",marginBottom:10}}>Nueva deuda</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <div style={{gridColumn:"1/-1"}}>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Descripción</label>
+              <input value={form.desc} onChange={e=>setForm(f=>({...f,desc:e.target.value}))} placeholder="Alquiler, tarjeta, préstamo..."/>
+            </div>
+            <div>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto total</label>
+              <input type="number" value={form.monto} onChange={e=>setForm(f=>({...f,monto:e.target.value}))} placeholder="0" inputMode="decimal"/>
+            </div>
+            <div>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Moneda</label>
+              <select value={form.moneda} onChange={e=>setForm(f=>({...f,moneda:e.target.value}))}>
+                <option value="ARS">$ ARS</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label>
+              <input type="date" value={form.fecha} onChange={e=>setForm(f=>({...f,fecha:e.target.value}))}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota (opcional)</label>
+              <input value={form.nota} onChange={e=>setForm(f=>({...f,nota:e.target.value}))} placeholder="Vence el 10 de cada mes..."/>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={guardarDeuda} style={{fontSize:13,padding:"8px 20px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>Guardar deuda</button>
+            <button onClick={()=>setShowForm(false)} style={{fontSize:13,padding:"8px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista deudas */}
+      {deudas.length===0
+        ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)"}}>Sin deudas registradas.</div>
+        :<div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {[...deudas].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(d=>{
+            const pagadoHist=(d.historialPagos||[]).reduce((a,p)=>a+Number(p.monto||0),0);
+            const saldo=Math.max(0,Number(d.monto||0)-pagadoHist);
+            const pct=Number(d.monto||0)>0?(pagadoHist/Number(d.monto||0))*100:0;
+            const fmtD=v=>d.moneda==="USD"?"USD "+v.toLocaleString("es-AR",{maximumFractionDigits:2}):"$"+Math.round(v).toLocaleString("es-AR");
+            return(
+              <div key={d.id} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid rgba(192,57,43,0.3)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:14,color:"var(--text-primary)",marginBottom:2}}>{d.desc}</div>
+                    <div style={{fontSize:10,color:"var(--text-secondary)"}}>{d.fecha}{d.nota&&" · "+d.nota}</div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0,marginLeft:12}}>
+                    <div style={{fontSize:15,fontWeight:700,color:"var(--text-danger)"}}>{fmtD(saldo)}</div>
+                    {pagadoHist>0&&<div style={{fontSize:10,color:"var(--text-secondary)",marginTop:1}}>de {fmtD(Number(d.monto||0))} · pagado {fmtD(pagadoHist)}</div>}
+                  </div>
+                </div>
+                {pagadoHist>0&&(
+                  <div style={{height:4,background:"rgba(120,120,128,0.15)",borderRadius:2,overflow:"hidden",marginBottom:8}}>
+                    <div style={{height:"100%",width:pct+"%",background:"linear-gradient(90deg,#C0392B,#E74C3C)",borderRadius:2,transition:"width .4s"}}/>
+                  </div>
+                )}
+                {(d.historialPagos||[]).length>0&&(
+                  <div style={{marginBottom:8}}>
+                    {(d.historialPagos||[]).map(p=>(
+                      <div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"3px 0",color:"var(--text-secondary)",borderBottom:"0.5px solid rgba(120,120,128,0.08)"}}>
+                        <span>💳 Pago parcial · {p.fecha}{p.nota&&" · "+p.nota}</span>
+                        <span style={{color:"var(--text-success)",fontWeight:600}}>−{fmtD(Number(p.monto||0))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{setModalPago(d);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:""}); }} style={{fontSize:12,padding:"6px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>💳 Pagar</button>
+                  <button onClick={()=>eliminarDeuda(d.id)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>✕ Eliminar</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      }
+    </div>
+  );
+}
+
+function DashboardCentral({data,save,showToast,blue,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,bhCobradoTotal,djGanancia,djCobrado,djEventos,djGananciaUSD,djCobradoUSD,djRealizados,totalGastos,totalGastosARS,totalGastosUSD,totalIngresos,totalRetSCPesos,totalVentaUSD,totalCobUSD,stockUni,goModulo}){
   const [verTodo,setVerTodo]=useState(false);
   const [fDesde,setFDesde]=useState("");
   const [fHasta,setFHasta]=useState("");
@@ -3224,6 +3440,15 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
   const balance=totalIngresos-totalGastos;
   const djSaldoPendiente=(djEventos||[]).filter(e=>e.estado==="Confirmado").reduce((a,e)=>a+Number(e.saldo||0),0);
   const bhPendienteCobro=Math.max(0,bhTotalAnio-bhCobradoTotal);
+  // Balances reales para Patrimonio Neto
+  const _balARSdc=totalIngresos-(totalGastosARS||totalGastos);
+  const _rUSDdc=(data.retiros||[]).filter(r=>r.moneda==="USD").reduce((a,r)=>a+Number(r.montoUSD||0),0);
+  const _bUSDdc=(data.bh?.cobros||[]).filter(cc=>cc.moneda==="USD").reduce((a,cc)=>a+Number(cc.monto||0),0);
+  const _dUSDdc=(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD").reduce((a,p)=>a+Number(p.montoUSD||0),0);
+  const _fcUSDdc=(data.fin?.fx||[]).filter(f=>f.tipo==="compra").reduce((a,f)=>a+Number(f.cantUSD||0),0);
+  const _fvUSDdc=(data.fin?.fx||[]).filter(f=>f.tipo==="venta").reduce((a,f)=>a+Number(f.cantUSD||0),0);
+  const _exUSDdc=(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="USD").reduce((a,f)=>a+Number(f.monto||0),0);
+  const _balUSDdc=(_rUSDdc+_bUSDdc+_dUSDdc+_fcUSDdc-_fvUSDdc+_exUSDdc)-(totalGastosUSD||0);
   const Card=({label,value,sub,color,onClick})=>(
     <div onClick={onClick}
       style={{
@@ -3348,6 +3573,17 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
               <Card label="BH Trade pendiente" value={"$"+fmt(bhPendienteCobro)} sub={"Cobrado: $"+fmt(bhCobradoTotal)} color={bhPendienteCobro>0?"var(--text-warning)":undefined} onClick={()=>goModulo("bhtrade")}/>
               <Card label="Mi 30% SC en pesos" value={"$"+fmt(mi30Pesos)} sub={fmtUSD(pendienteRetiro)+" · TC $"+fmt(tc)} color={mi30Pesos>0?"var(--text-success)":undefined} onClick={()=>goModulo("supercoating")}/>
             </div>
+            {(()=>{
+              const _deudasARS=(data.fin?.deudas||[]).filter(d=>d.moneda!=="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
+              const _porCobrarARS=mi30Pesos+bhPendienteCobro;
+              const _pnARS=balanceARS+_porCobrarARS-_deudasARS;
+              return(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:"1.25rem"}}>
+                  <Card label="Deudas ARS" value={"$"+fmt(_deudasARS)} color={_deudasARS>0?"var(--text-danger)":"var(--text-success)"} sub={_deudasARS>0?(data.fin?.deudas||[]).filter(d=>d.moneda!=="USD").length+" deuda/s":"Sin deudas"} onClick={()=>goModulo("finanzas")}/>
+                  <Card label="Patrimonio Neto $" value={"$"+fmt(_pnARS)} color={_pnARS>=0?"var(--text-success)":"var(--text-danger)"} sub={"balance + cobrar − deudas"}/>
+                </div>
+              );
+            })()}
             {/* ── TOTAL PENDIENTE DE RETIRO ── */}
             {(()=>{
               const totalPendARS=mi30Pesos+(bhPendienteCobro||0);
@@ -3376,12 +3612,23 @@ function DashboardCentral({data,blue,mi30Total,pendienteRetiro,totalRetirado,bhT
 
             {/* ── SECCIÓN 2: Patrimonio USD ── */}
             <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Patrimonio (USD)</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.5rem"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:"1.25rem"}}>
               <Card label="Balance USD" value={fmtUSD(balanceUSD)} color={balanceUSD>=0?"var(--text-success)":"var(--text-danger)"} sub={balanceUSD>=0?"superávit":"déficit"}/>
               <Card label="Ingresos en USD" value={fmtUSD(ingresosUSD)} sub="SC+BH+DJ cobrado en USD" color={ingresosUSD>0?"var(--text-success)":undefined}/>
               <Card label="Egresos en USD" value={fmtUSD(egresoUSD)} sub="gastos en USD" color={egresoUSD>0?"var(--text-danger)":undefined}/>
               <Card label="DJ pendiente cobrar" value={fmtUSD(djSaldoPendiente)} sub={(djEventos||[]).filter(e=>e.estado==="Confirmado").length+" eventos confirmados"} color={djSaldoPendiente>0?"var(--text-warning)":undefined} onClick={()=>goModulo("dj")}/>
             </div>
+            {(()=>{
+              const _deudasUSD=(data.fin?.deudas||[]).filter(d=>d.moneda==="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
+              const _porCobrarUSD=pendienteRetiro+djSaldoPendiente;
+              const _pnUSD=balanceUSD+_porCobrarUSD-_deudasUSD;
+              return(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:"1.5rem"}}>
+                  <Card label="Deudas USD" value={fmtUSD(_deudasUSD)} color={_deudasUSD>0?"var(--text-danger)":"var(--text-success)"} sub={_deudasUSD>0?(data.fin?.deudas||[]).filter(d=>d.moneda==="USD").length+" deuda/s":"Sin deudas"} onClick={()=>goModulo("finanzas")}/>
+                  <Card label="Patrimonio Neto USD" value={fmtUSD(_pnUSD)} color={_pnUSD>=0?"var(--text-success)":"var(--text-danger)"} sub={"balance + cobrar − deudas"}/>
+                </div>
+              );
+            })()}
           </>
         );
       })()}
@@ -4732,7 +4979,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 // ══════════════════════════════════════════════════════════════════════════
 // FINANZAS PERSONALES
 // ══════════════════════════════════════════════════════════════════════════
-function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalGastosUSD,totalCobUSD,djCobradoUSD,bhTotalAnio,bhCobradoTotal,djCobrado,totalRetSCPesos,bhSueldo,pendienteRetiro}){
+function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalGastosARS,totalGastosUSD,totalCobUSD,djCobradoUSD,bhTotalAnio,bhCobradoTotal,djCobrado,totalRetSCPesos,bhSueldo,pendienteRetiro,djSaldoPendiente}){
   const tcBlue=blue||1450;
   const initForm={desc:"",moneda:"ARS",monto:"",cotiz:String(Math.round(tcBlue)),cat:"Alimentación",fecha:hoy(),fuente:"Otros"};
   const [form,setForm]=useState(initForm);
@@ -4865,16 +5112,36 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
         return(
           <>
             <div style={{fontSize:10,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--color-text-secondary)",marginBottom:8}}>En pesos</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:"1.25rem"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:"1.25rem"}}>
               <MetCard label="Balance" value={"$"+fmt(balance)} green={balance>=0} danger={balance<0}/>
               <MetCard label="Ingresos" value={"$"+fmt(totalIngresos)}/>
               <MetCard label="Gastado" value={"$"+fmt(totalGastos)} danger={totalGastos>0}/>
+              {(()=>{
+                const tc2=blue||1450;
+                const _bhPendFin=Math.max(0,bhTotalAnio-bhCobradoTotal);
+                const _mi30p=Math.round(pendienteRetiro*tc2);
+                const _deudasARS=(data.fin?.deudas||[]).filter(d=>d.moneda!=="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
+                const _pnARS=balance+_mi30p+_bhPendFin-_deudasARS;
+                return(<>
+                  <MetCard label="Deudas $" value={"$"+fmt(_deudasARS)} danger={_deudasARS>0} sub={(data.fin?.deudas||[]).filter(d=>d.moneda!=="USD").length+" registro/s"}/>
+                  <MetCard label="Patrimonio $ Neto" value={"$"+fmt(_pnARS)} green={_pnARS>=0} danger={_pnARS<0} sub="balance + cobrar − deudas"/>
+                </>);
+              })()}
             </div>
             <div style={{fontSize:10,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--color-text-secondary)",marginBottom:8}}>En dólares</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:"1.5rem"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:"1.5rem"}}>
               <MetCard label="Balance" value={fmtUSD(balanceUSD)} green={balanceUSD>=0} danger={balanceUSD<0}/>
               <MetCard label="Ingresos" value={fmtUSD(totalIngresosUSD)} sub="SC + DJ cobrado"/>
               <MetCard label="Gastado" value={fmtUSD(totalGastosUSD||0)} danger={(totalGastosUSD||0)>0}/>
+              {(()=>{
+                const _deudasUSD=(data.fin?.deudas||[]).filter(d=>d.moneda==="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
+                const _djPendFin=djSaldoPendiente||0;
+                const _pnUSD=balanceUSD+pendienteRetiro+_djPendFin-_deudasUSD;
+                return(<>
+                  <MetCard label="Deudas USD" value={fmtUSD(_deudasUSD)} danger={_deudasUSD>0} sub={(data.fin?.deudas||[]).filter(d=>d.moneda==="USD").length+" registro/s"}/>
+                  <MetCard label="Patrimonio USD Neto" value={fmtUSD(_pnUSD)} green={_pnUSD>=0} danger={_pnUSD<0} sub="balance + cobrar − deudas"/>
+                </>);
+              })()}
             </div>
           </>
         );
@@ -5268,7 +5535,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
     const totalG=resultado.reduce((a,r)=>a+r.subtotal,0);
     const pagoN=Number(pagoTotal||0);const tcN=Number(tc)||1450;const pid=Date.now().toString();
     const nuevasVentas=resultado.map(r=>{
-      const prop=Math.round(totalG>0?(r.subtotal/totalG)*pagoN:0);
+      const prop=totalG>0?(r.subtotal/totalG)*pagoN:0;
       const estado=entrega==="Expreso"?"A despachar":entrega.includes("Ezeiza")?"A retirar Ezeiza":"A retirar Once";
       return{id:pid+Math.random().toString(36).slice(2,5),contId:r.contId,fecha,articulo:r.artNombre,cantidad:r.cantidad,cliente,precioVenta:r.precioUnitario,total:r.subtotal,usd:r.subtotal/tcN,pago:prop,tipoCambioUsado:tcN,pedidoId:pid,entrega,estado};
     });
@@ -6629,7 +6896,7 @@ function CuentasView({data,save,showToast}){
     const cl=v.cliente||"(sin nombre)";
     if(!perfilClientes[cl])perfilClientes[cl]={nombre:cl,ventas:[],debe:0,favor:0,totalHistorico:0,totalUSD:0};
     const cob=pagadoVenta(v,data.pagos);
-    const saldo=Math.round(Number(v.total||0)-cob); // Math.round elimina errores de float (ej: 114999.9999...)
+    const saldo=Number(v.total||0)-cob;
     perfilClientes[cl].ventas.push({...v,saldo,cob});
     if(saldo>0)perfilClientes[cl].debe+=saldo;
     else if(saldo<0)perfilClientes[cl].favor+=Math.abs(saldo);
@@ -6902,21 +7169,8 @@ function CuentasView({data,save,showToast}){
 function ExtractoView({data}){
   const [desde,setDesde]=useState("");const[hasta,setHasta]=useState("");
   const movs=[];
-  // Agrupar ventas por pedidoId para mostrar el pago del pedido completo (no por línea)
-  const pedidoMap={};
-  for(const v of(data.ventas||[])){
-    const pid=v.pedidoId||v.id;
-    if(!pedidoMap[pid]){pedidoMap[pid]={pid,fecha:v.fecha,cliente:v.cliente,pagoTotal:0,arts:[],contId:v.contId};}
-    pedidoMap[pid].pagoTotal+=Math.round(Number(v.pago||0));
-    pedidoMap[pid].arts.push(v.articulo+(v.cantidad>1?" ×"+v.cantidad:""));
-  }
-  for(const ped of Object.values(pedidoMap)){
-    if(ped.pagoTotal>0){
-      const detalle=ped.arts.length===1?ped.arts[0]:ped.arts.length+" artículos";
-      movs.push({id:ped.pid,fecha:ped.fecha,tipo:"Pago inicial",cliente:ped.cliente,monto:ped.pagoTotal,detalle,contId:ped.contId});
-    }
-  }
-  for(const p of(data.pagos||[])){const v=(data.ventas||[]).find(v=>v.id===p.ventaId);if(v){const pid=v.pedidoId||v.id;const arts=(data.ventas||[]).filter(x=>(x.pedidoId||x.id)===pid).map(x=>x.articulo+(x.cantidad>1?" ×"+x.cantidad:""));const detalle=arts.length===1?arts[0]:arts.length+" artículos";movs.push({id:p.id,fecha:p.fecha,tipo:"Pago posterior",cliente:v.cliente,monto:Number(p.monto),detalle,contId:v.contId});}}
+  for(const v of(data.ventas||[])){if(Number(v.pago||0)>0)movs.push({id:v.id,fecha:v.fecha,tipo:"Pago inicial",cliente:v.cliente,monto:Number(v.pago),detalle:v.articulo+" ×"+v.cantidad,contId:v.contId});}
+  for(const p of(data.pagos||[])){const v=(data.ventas||[]).find(v=>v.id===p.ventaId);if(v)movs.push({id:p.id,fecha:p.fecha,tipo:"Pago posterior",cliente:v.cliente,monto:Number(p.monto),detalle:v.articulo+" ×"+v.cantidad,contId:v.contId});}
   for(const r of(data.retiros||[])){movs.push({id:r.id,fecha:r.fecha,tipo:"Retiro 30%",cliente:"—",monto:0,montoUSD:Number(r.montoUSD),detalle:r.nota||"",contId:null});}
   const filtrados=movs.filter(m=>(!desde||m.fecha>=desde)&&(!hasta||m.fecha<=hasta)).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)||(b.id||"").localeCompare(a.id||""));
   const totalCob=filtrados.filter(m=>m.tipo!=="Retiro 30%").reduce((a,m)=>a+m.monto,0);
