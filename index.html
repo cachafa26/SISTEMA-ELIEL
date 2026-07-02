@@ -5121,6 +5121,12 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
         const _exUSDfin=(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="USD").reduce((a,f)=>a+Number(f.monto||0),0);
         const totalIngresosUSD=_rUSDfin+_bUSDfin+_dUSDfin+_fcUSDfin-_fvUSDfin+_exUSDfin;
         const balanceUSD=totalIngresosUSD-(totalGastosUSD||0);
+        // 30d vars — sacar del JSX para evitar error de Babel con const en IIFE inline
+        const _h30fin=new Date();_h30fin.setDate(_h30fin.getDate()-30);const _h30finstr=_h30fin.toISOString().split("T")[0];
+        const _ing30ARS=(data.retiros||[]).filter(r=>r.moneda!=="USD"&&(r.fecha||"")>=_h30finstr).reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0)+(data.bh?.cobros||[]).filter(c2=>c2.moneda!=="USD"&&(c2.fecha||"")>=_h30finstr).reduce((a,c2)=>a+Number(c2.monto||0),0)+(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="ARS"&&(p.fecha||"")>=_h30finstr).reduce((a,p)=>a+Number(p.monto||0),0);
+        const _gast30ARS=(data.fin?.gastos||[]).filter(g=>g.moneda!=="USD"&&(g.fecha||"")>=_h30finstr).reduce((a,g)=>a+g.monto,0);
+        const _ing30USD=(data.retiros||[]).filter(r=>r.moneda==="USD"&&(r.fecha||"")>=_h30finstr).reduce((a,r)=>a+Number(r.montoUSD||0),0)+(data.bh?.cobros||[]).filter(c2=>c2.moneda==="USD"&&(c2.fecha||"")>=_h30finstr).reduce((a,c2)=>a+Number(c2.monto||0),0)+(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD"&&(p.fecha||"")>=_h30finstr).reduce((a,p)=>a+Number(p.montoUSD||0),0);
+        const _gast30USD=(data.fin?.gastos||[]).filter(g=>g.moneda==="USD"&&(g.fecha||"")>=_h30finstr).reduce((a,g)=>a+Number(g.montoOriginal||0),0);
         const MetCard=({label,value,green,danger,sub})=>(
           <div style={{background:green?"var(--color-background-success)":danger?"var(--color-background-danger)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
             <div style={{fontSize:10,fontWeight:600,letterSpacing:".04em",textTransform:"uppercase",color:green?"var(--color-text-success)":danger?"var(--color-text-danger)":"var(--color-text-secondary)",marginBottom:4}}>{label}</div>
@@ -5133,8 +5139,8 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
             <div style={{fontSize:10,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--color-text-secondary)",marginBottom:8}}>En pesos</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:"1.25rem"}}>
               <MetCard label="Balance" value={"$"+fmt(balance)} green={balance>=0} danger={balance<0}/>
-              <MetCard label="Ingresos 30d" value={"$"+(()=>{const h=new Date();h.setDate(h.getDate()-30);const hs=h.toISOString().split("T")[0];return(data.retiros||[]).filter(r=>r.moneda!=="USD"&&(r.fecha||"")>=hs).reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0)+(data.bh?.cobros||[]).filter(c2=>c2.moneda!=="USD"&&(c2.fecha||"")>=hs).reduce((a,c2)=>a+Number(c2.monto||0),0)+(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="ARS"&&(p.fecha||"")>=hs).reduce((a,p)=>a+Number(p.monto||0),0);})().toLocaleString("es-AR",{maximumFractionDigits:0})} sub="30 días"/>
-              <MetCard label="Gastado 30d" value={"$"+(()=>{const h=new Date();h.setDate(h.getDate()-30);const hs=h.toISOString().split("T")[0];return(data.fin?.gastos||[]).filter(g=>g.moneda!=="USD"&&(g.fecha||"")>=hs).reduce((a,g)=>a+g.monto,0);})().toLocaleString("es-AR",{maximumFractionDigits:0})} danger={totalGastos>0} sub="30 días"/>
+              <MetCard label="Ingresos 30d" value={"$"+fmt(_ing30ARS)} sub="30 días"/>
+              <MetCard label="Gastado 30d" value={"$"+fmt(_gast30ARS)} danger={_gast30ARS>0} sub="30 días"/>
               {(()=>{
                 const tc2=blue||1450;
                 const _bhPendFin=Math.max(0,bhTotalAnio-bhCobradoTotal);
@@ -5150,8 +5156,8 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
             <div style={{fontSize:10,fontWeight:700,letterSpacing:".06em",textTransform:"uppercase",color:"var(--color-text-secondary)",marginBottom:8}}>En dólares</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:"1.5rem"}}>
               <MetCard label="Balance" value={fmtUSD(balanceUSD)} green={balanceUSD>=0} danger={balanceUSD<0}/>
-              <MetCard label="Ingresos USD 30d" value={fmtUSD((()=>{const h=new Date();h.setDate(h.getDate()-30);const hs=h.toISOString().split("T")[0];return(data.retiros||[]).filter(r=>r.moneda==="USD"&&(r.fecha||"")>=hs).reduce((a,r)=>a+Number(r.montoUSD||0),0)+(data.bh?.cobros||[]).filter(c2=>c2.moneda==="USD"&&(c2.fecha||"")>=hs).reduce((a,c2)=>a+Number(c2.monto||0),0)+(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD"&&(p.fecha||"")>=hs).reduce((a,p)=>a+Number(p.montoUSD||0),0);})()} sub="30 días" green={totalIngresosUSD>0}/>
-              <MetCard label="Gastado USD 30d" value={fmtUSD((()=>{const h=new Date();h.setDate(h.getDate()-30);const hs=h.toISOString().split("T")[0];return(data.fin?.gastos||[]).filter(g=>g.moneda==="USD"&&(g.fecha||"")>=hs).reduce((a,g)=>a+Number(g.montoOriginal||0),0);})())} danger={(totalGastosUSD||0)>0} sub="30 días"/>
+              <MetCard label="Ingresos USD 30d" value={fmtUSD(_ing30USD)} sub="30 días" green={_ing30USD>0}/>
+              <MetCard label="Gastado USD 30d" value={fmtUSD(_gast30USD)} danger={_gast30USD>0} sub="30 días"/>
               {(()=>{
                 const _deudasUSD=(data.fin?.deudas||[]).filter(d=>d.moneda==="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
                 const _djPendFin=djSaldoPendiente||0;
