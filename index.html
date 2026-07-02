@@ -3631,7 +3631,7 @@ function DashboardCentral({data,save,showToast,blue,mi30Total,pendienteRetiro,to
             </div>
             {(()=>{
               const _deudasUSD=(data.fin?.deudas||[]).filter(d=>d.moneda==="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
-              const _porCobrarUSD=pendienteRetiro+djSaldoPendiente;
+              const _porCobrarUSD=djSaldoPendiente; // solo DJ — SC 30% va en ARS
               const _pnUSD=balanceUSD+_porCobrarUSD-_deudasUSD;
               return(
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:"1.5rem"}}>
@@ -5125,7 +5125,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
         const _h30fin=new Date();_h30fin.setDate(_h30fin.getDate()-30);const _h30finstr=_h30fin.toISOString().split("T")[0];
         const _ing30ARS=(data.retiros||[]).filter(r=>r.moneda!=="USD"&&(r.fecha||"")>=_h30finstr).reduce((a,r)=>a+Number(r.montoPesos||r.montoUSD*(blue||1450)),0)+(data.bh?.cobros||[]).filter(c2=>c2.moneda!=="USD"&&(c2.fecha||"")>=_h30finstr).reduce((a,c2)=>a+Number(c2.monto||0),0)+(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="ARS"&&(p.fecha||"")>=_h30finstr).reduce((a,p)=>a+Number(p.monto||0),0);
         const _gast30ARS=(data.fin?.gastos||[]).filter(g=>g.moneda!=="USD"&&(g.fecha||"")>=_h30finstr).reduce((a,g)=>a+g.monto,0);
-        const _ing30USD=(data.retiros||[]).filter(r=>r.moneda==="USD"&&(r.fecha||"")>=_h30finstr).reduce((a,r)=>a+Number(r.montoUSD||0),0)+(data.bh?.cobros||[]).filter(c2=>c2.moneda==="USD"&&(c2.fecha||"")>=_h30finstr).reduce((a,c2)=>a+Number(c2.monto||0),0)+(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD"&&(p.fecha||"")>=_h30finstr).reduce((a,p)=>a+Number(p.montoUSD||0),0);
+        const _ing30USD=(data.retiros||[]).filter(r=>r.moneda==="USD"&&(r.fecha||"")>=_h30finstr).reduce((a,r)=>a+Number(r.montoUSD||0),0)+(data.bh?.cobros||[]).filter(c2=>c2.moneda==="USD"&&(c2.fecha||"")>=_h30finstr).reduce((a,c2)=>a+Number(c2.monto||0),0)+(data.dj?.eventos||[]).flatMap(e=>e.pagos||[]).filter(p=>p.moneda==="USD"&&(p.fecha||"")>=_h30finstr).reduce((a,p)=>a+Number(p.montoUSD||0),0)+(data.fin?.fx||[]).filter(f=>f.tipo==="ingreso_extra"&&f.moneda==="USD"&&(f.fecha||"")>=_h30finstr).reduce((a,f)=>a+Number(f.monto||0),0);
         const _gast30USD=(data.fin?.gastos||[]).filter(g=>g.moneda==="USD"&&(g.fecha||"")>=_h30finstr).reduce((a,g)=>a+Number(g.montoOriginal||0),0);
         const MetCard=({label,value,green,danger,sub})=>(
           <div style={{background:green?"var(--color-background-success)":danger?"var(--color-background-danger)":"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"12px 14px"}}>
@@ -5161,7 +5161,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
               {(()=>{
                 const _deudasUSD=(data.fin?.deudas||[]).filter(d=>d.moneda==="USD").reduce((a,d)=>a+Math.max(0,Number(d.monto||0)-(d.historialPagos||[]).reduce((s,p)=>s+Number(p.monto||0),0)),0);
                 const _djPendFin=djSaldoPendiente||0;
-                const _pnUSD=balanceUSD+pendienteRetiro+_djPendFin-_deudasUSD;
+                const _pnUSD=balanceUSD+_djPendFin-_deudasUSD; // solo DJ — SC 30% va en ARS
                 return(<>
                   <MetCard label="Deudas USD" value={fmtUSD(_deudasUSD)} danger={_deudasUSD>0} sub={(data.fin?.deudas||[]).filter(d=>d.moneda==="USD").length+" registro/s"}/>
                   <MetCard label="Patrimonio USD Neto" value={fmtUSD(_pnUSD)} green={_pnUSD>=0} danger={_pnUSD<0} sub="balance + cobrar − deudas"/>
@@ -5485,6 +5485,9 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
       </div>
 
       {/* Lista gastos */}
+      {/* ── Gestión de Deudas ── */}
+      <div style={{marginBottom:"1rem"}}><GestorDeudas data={data} save={save} showToast={showToast} blue={blue}/></div>
+
       {gastos.length>0&&(
         <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
           <div style={{fontSize:13,fontWeight:500,marginBottom:12}}>Historial de gastos</div>
