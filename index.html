@@ -4394,9 +4394,9 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     const cobrado=(e.pagos||[]).reduce((s,p)=>s+Number(p.montoUSD||0),0)||Number(e.senaUSD||0);
     return a+Math.max(0,cobrado-Number(e.costoUSD||0));
   },0);
-  const _h30dj=new Date();_h30dj.setDate(_h30dj.getDate()-30);const _h30djstr=_h30dj.toISOString().split("T")[0];
-  const cobroTotal30d=eventos.reduce((a,e)=>{if(e.estado==="Pendiente")return a;return a+(e.pagos||[]).filter(p=>(p.fecha||"")>=_h30djstr).reduce((s,p)=>s+Number(p.montoUSD||0),0);},0);
-  const ganTotal30d=eventos.reduce((a,e)=>{if(e.estado==="Pendiente")return a;const c30=(e.pagos||[]).filter(p=>(p.fecha||"")>=_h30djstr).reduce((s,p)=>s+Number(p.montoUSD||0),0);return a+Math.max(0,c30-Number(e.costoUSD||0));},0);
+  const _h12dj=new Date();_h12dj.setFullYear(_h12dj.getFullYear()-1);const _h12djstr=_h12dj.toISOString().split("T")[0];
+  const cobroTotal30d=eventos.reduce((a,e)=>{if(e.estado==="Pendiente")return a;return a+(e.pagos||[]).filter(p=>(p.fecha||"")>=_h12djstr).reduce((s,p)=>s+Number(p.montoUSD||0),0);},0);
+  const ganTotal30d=eventos.reduce((a,e)=>{if(e.estado==="Pendiente")return a;const c12=(e.pagos||[]).filter(p=>(p.fecha||"")>=_h12djstr).reduce((s,p)=>s+Number(p.montoUSD||0),0);return a+Math.max(0,c12-Number(e.costoUSD||0));},0);
   const saldoTotal=confirmados.filter(e=>e.saldo>0).reduce((a,e)=>a+Number(e.saldo||0),0);
 
   const previewCobroUSD=form.monedaCobro==="ARS"?Number(form.cobro||0)/tc:Number(form.cobro||0);
@@ -4608,8 +4608,8 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
         {[
           {l:"Presupuestados",v:presupuestos.filter(p=>p.estado==="Pendiente").length},
           {l:"Confirmados",v:confirmados.length,info:true},
-          {l:"Cobrado USD 30d",v:fmtUSD(cobroTotal30d),green:cobroTotal30d>0},
-          {l:"Ganancia USD 30d",v:fmtUSD(ganTotal30d),green:ganTotal30d>0},
+          {l:"Cobrado USD 12m",v:fmtUSD(cobroTotal30d),green:cobroTotal30d>0},
+          {l:"Ganancia USD 12m",v:fmtUSD(ganTotal30d),green:ganTotal30d>0},
           ...(saldoTotal>0?[{l:"Saldo pendiente",v:fmtUSD(saldoTotal),warn:true}]:[]),
         ].map(x=>(
           <div key={x.l} style={{background:x.green?"var(--bg-tint-green)":x.warn?"var(--bg-tint-amber)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.10)",border:"0.5px solid "+(x.green?"var(--border-success)":x.warn?"rgba(244,121,32,.3)":x.info?"var(--border-info)":"var(--glass-border)"),borderRadius:"var(--r-lg)",padding:"12px 14px",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
