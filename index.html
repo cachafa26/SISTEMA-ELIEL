@@ -280,7 +280,7 @@
 
     /* ── INPUTS ─────────────────────────────────────────────────────── */
     input,select,textarea{
-      font-family:inherit;font-size:14px;padding:9px 12px;
+      font-family:inherit;font-size:16px;padding:9px 12px;
       border:var(--border-input);border-radius:var(--r-sm);
       background:var(--bg-input);
       backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
@@ -409,7 +409,8 @@
       border-radius:var(--r-xl);width:100%;max-width:560px;padding:24px;
       margin:auto;animation:modalIn .3s cubic-bezier(.34,1.2,.64,1);
     }
-    @keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(60px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
 
     /* ── SC HEADER GRADIENT ──────────────────────────────────────────── */
     .sc-header{
@@ -3309,8 +3310,8 @@ function GestorDeudas({data,save,showToast,blue}){
     <div>
       {/* Modal pago */}
       {modalPago&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
-          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:380,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
+          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl) var(--r-xl) 0 0",padding:"24px 24px calc(24px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:480,border:"0.5px solid var(--glass-border)",borderBottom:"none",boxShadow:"var(--glass-shadow-lg)",animation:"slideUp .25s cubic-bezier(.34,1.2,.64,1)"}}>
             <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 3px",color:"var(--text-primary)"}}>Pagar deuda</h3>
             <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 14px"}}>{modalPago.desc}</p>
             {(()=>{
@@ -3327,7 +3328,7 @@ function GestorDeudas({data,save,showToast,blue}){
               <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto a pagar ({modalPago.moneda})</label>
               <input type="number" value={formPago.monto} onChange={e=>setFormPago(f=>({...f,monto:e.target.value}))} placeholder="0" autoFocus inputMode="decimal"/>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8,marginBottom:16}}>
               <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label><input type="date" value={formPago.fecha} onChange={e=>setFormPago(f=>({...f,fecha:e.target.value}))}/></div>
               <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota</label><input value={formPago.nota} onChange={e=>setFormPago(f=>({...f,nota:e.target.value}))} placeholder="Opcional"/></div>
             </div>
@@ -3365,7 +3366,7 @@ function GestorDeudas({data,save,showToast,blue}){
             <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-danger)"}}>{editando?"✏️ Editar deuda":"Nueva deuda"}</div>
             <button onClick={()=>{setShowForm(false);setEditando(null);resetForm();}} style={{border:"none",background:"none",cursor:"pointer",color:"var(--text-secondary)",fontSize:16}}>✕</button>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:8}}>
             <div style={{gridColumn:"1/-1"}}>
               <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Descripción</label>
               <input value={form.desc} onChange={e=>setForm(f=>({...f,desc:e.target.value}))} placeholder="Alquiler, tarjeta, préstamo..." autoFocus/>
@@ -4050,7 +4051,7 @@ function BHTradeView({data,save,showToast,blue}){
         </div>
         {showCobro&&(
           <div style={{background:"rgba(120,120,128,0.06)",borderRadius:"var(--r-md)",padding:"12px",marginBottom:12,border:"0.5px solid var(--glass-border)"}}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:8}}>
               <div>
               <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto cobrado</label>
               <div style={{display:"flex",gap:6}}>
@@ -4161,7 +4162,7 @@ function EditPagoInline({eventoId,eventos,data,save,showToast,blue}){
   return(
     <div style={{background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)",padding:"12px",marginTop:6}}>
       <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:8}}>Agregar pago</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:8}}>
         <div>
           <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:3}}>Monto</label>
           <div style={{display:"flex",gap:4}}>
@@ -4259,7 +4260,7 @@ function DeudoresDJ({eventos,data,save,showToast,blue}){
 
       {/* Modal pago */}
       {modalPago&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
           <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"22px",width:"100%",maxWidth:360,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
             <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Registrar pago</h3>
             <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{modalPago.nombre} · Saldo: {fmtUSD(modalPago.saldoUSD)}</p>
@@ -4620,7 +4621,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 
       {/* Pago modal */}
       {modalPago&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
           <div style={{background:"var(--bg-modal,#13132A)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:360,boxShadow:"0 24px 60px rgba(0,0,0,0.5)"}}>
             <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Registrar pago</h3>
             <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 14px"}}>{modalPago.nombre}</p>
@@ -4685,8 +4686,8 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 
       {/* Confirm presupuesto modal */}
       {modalConfirmar&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
-          <div style={{background:"var(--bg-modal,#13132A)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:400,boxShadow:"0 24px 60px rgba(0,0,0,0.5)",maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
+          <div style={{background:"var(--bg-modal,#13132A)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl) var(--r-xl) 0 0",padding:"24px 24px calc(24px + env(safe-area-inset-bottom,0px))",width:"100%",maxWidth:400,boxShadow:"0 24px 60px rgba(0,0,0,0.5)",maxHeight:"90vh",overflowY:"auto"}}>
             <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 2px",color:"var(--text-primary)"}}>Confirmar evento</h3>
             <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 14px"}}>{modalConfirmar.cliente} — {modalConfirmar.tipoEvento}{modalConfirmar.salon?" · "+modalConfirmar.salon:""}<br/><span style={{color:"var(--text-secondary)"}}>{modalConfirmar.fecha}</span></p>
 
@@ -5482,8 +5483,8 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
 
       {/* MODAL DEUDAS */}
       {showDeudas&&(
-        <div onClick={e=>{if(e.target===e.currentTarget)setShowDeudas(false);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:2000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"1rem",overflowY:"auto"}}>
-          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px) saturate(2)",WebkitBackdropFilter:"blur(40px) saturate(2)",borderRadius:"var(--r-xl)",padding:"22px",width:"100%",maxWidth:560,margin:"auto",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
+        <div onClick={e=>{if(e.target===e.currentTarget)setShowDeudas(false);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:2000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"env(safe-area-inset-top, 1rem) 1rem 1rem",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px) saturate(2)",WebkitBackdropFilter:"blur(40px) saturate(2)",borderRadius:"var(--r-xl)",padding:"22px",width:"100%",maxWidth:560,margin:"auto",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)",alignSelf:"flex-start"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
               <div style={{fontSize:16,fontWeight:700,color:"var(--text-primary)"}}>Gestión de Deudas</div>
               <button onClick={()=>setShowDeudas(false)} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",cursor:"pointer",fontSize:14,color:"var(--text-secondary)",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
@@ -5501,7 +5502,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
         </div>
         {showPresupuesto&&(
           <div style={{background:"rgba(120,120,128,0.06)",borderRadius:"var(--r-md)",padding:"12px",marginBottom:12,border:"0.5px solid var(--glass-border)"}}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:8}}>
               <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Categoría</label><select value={presupCat} onChange={e=>setPresupCat(e.target.value)}><option value="">Elegir...</option>{CATS_GASTO.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
               <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Límite mensual ($)</label><input type="number" value={presupMonto} onChange={e=>setPresupMonto(e.target.value)} placeholder="0"/></div>
             </div>
@@ -6232,7 +6233,7 @@ function TabArmado({cont,updateCont,showToast}){
       </div>
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>{editId?"Editar artículo":"Agregar artículo"}</p>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:8}}>
           <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.nombre} onChange={e=>{
               const nombre=e.target.value;
               // Auto-parse: "33GR 1,60x500" → gramaje=33, ancho=1.60, largo=500
@@ -6604,7 +6605,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
       )}
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>Registrar venta manual</p>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:8}}>
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Fecha</label><input type="date" value={form.fecha} onChange={e=>setForm({...form,fecha:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.articulo} onChange={e=>setForm({...form,articulo:e.target.value})} style={{width:"100%",marginTop:2}}>{(cont.articulos||[]).map(a=><option key={a.nombre}>{a.nombre}</option>)}</select></div>
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cantidad</label><input type="number" value={form.cantidad} onChange={e=>setForm({...form,cantidad:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
@@ -6864,7 +6865,7 @@ function VentasView({data,save,showToast}){
       {/* Modal edición de pedido */}
       {editPedido&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",overflowY:"auto"}}>
-          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:480,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",maxHeight:"90vh",overflowY:"auto"}}>
+          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl) var(--r-xl) 0 0",padding:"24px 24px calc(24px + env(safe-area-inset-bottom,0px))",width:"100%",maxWidth:480,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",maxHeight:"90vh",overflowY:"auto"}}>
             <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Editar pedido</h3>
             <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{editPedido.cliente} · {editPedido.fecha}</p>
             {editLineas.map((l,i)=>(
@@ -7118,7 +7119,7 @@ function CuentasView({data,save,showToast}){
 
         {/* Payment modal */}
         {modal&&(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
             <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"22px",width:"100%",maxWidth:360,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
               <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Registrar pago</h3>
               <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{modal.cliente}{modal.saldoTotal?" · Saldo total: $"+fmt(modal.saldoTotal):""}</p>
@@ -7893,7 +7894,7 @@ function DespachosView({data,save,showToast}){
     </div>
     {manual&&(<div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
       <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>Nuevo despacho manual</p>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:8}}>
         <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Nombre completo</label><input value={form.cliente} onChange={e=>setForm({...form,cliente:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
         <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>DNI</label><input value={form.dni} onChange={e=>setForm({...form,dni:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
         <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Expreso</label><input value={form.expreso} onChange={e=>setForm({...form,expreso:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
