@@ -3878,7 +3878,9 @@ function DashboardCentral({data,save,showToast,blue,onOpenDeudas,mi30Total,pendi
           )}
           {/* ── CARD NORMAL (últimos 8) ── */}
           <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            
+              <GraficoFacturacion ventas={data.ventas} ventasHistoricas={data.ventasHistoricas}/>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
               <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",textTransform:"uppercase",letterSpacing:"0.05em"}}>Últimos movimientos</div>
               {todosMovimientos.length>0&&<button onClick={()=>setVerTodo(true)} style={{fontSize:11,padding:"4px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-info)",cursor:"pointer",fontWeight:500}}>Ver todo →</button>}
             </div>
@@ -6116,9 +6118,12 @@ function ContenedorDetail({cont,data,save,tab,setTab,onBack,showToast,blue}){
               const color=pct>0.5?"var(--text-success)":pct>0.2?"var(--text-warning)":"var(--text-danger)";
               return(
                 <div key={art.id||art.nombre} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"12px 16px"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art.nombre}</div>
-                    <div style={{fontSize:18,fontWeight:700,color}}>{disponible} <span style={{fontSize:11,fontWeight:400,color:"var(--text-secondary)"}}>/ {art.cantidad} u</span></div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art.nombre}</div>
+                      <div style={{marginTop:4}}><ProyTag art={art.nombre} ventas={data.ventas} disp={disponible}/></div>
+                    </div>
+                    <div style={{fontSize:18,fontWeight:700,color,flexShrink:0,marginLeft:8}}>{disponible} <span style={{fontSize:11,fontWeight:400,color:"var(--text-secondary)"}}>/ {art.cantidad} u</span></div>
                   </div>
                   <div style={{height:6,borderRadius:3,background:"rgba(120,120,128,0.15)",overflow:"hidden"}}>
                     <div style={{height:"100%",width:(pct*100)+"%",background:color,borderRadius:3,transition:"width .3s"}}/>
@@ -6713,6 +6718,231 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
     </div>
   );
 }
+// ── Proyección de agotamiento ─────────────────────────────────────
+function proyeccionAgot(artNombre,ventasAll,dispActual){
+  const hoy=new Date();
+  const hace60=new Date(hoy);hace60.setDate(hace60.getDate()-60);
+  const h60=hace60.toISOString().split("T")[0];
+  const v60=(ventasAll||[]).filter(v=>v.articulo===artNombre&&(v.fecha||"")>=h60).reduce((a,v)=>a+Number(v.cantidad||0),0);
+  const vel=v60/60;
+  if(dispActual<=0)return{tipo:"agotado"};
+  if(vel<0.01)return{tipo:"sin_mov"};
+  const dias=Math.round(dispActual/vel);
+  const f=new Date(hoy);f.setDate(f.getDate()+dias);
+  const ms=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const label=dias>365?"> 1 año":`${f.getDate()} ${ms[f.getMonth()]} ${f.getFullYear()}`;
+  return{tipo:"ok",dias,label,vel:vel.toFixed(2)};
+}
+function ProyTag({art,ventas,disp}){
+  const p=proyeccionAgot(art,ventas,disp);
+  if(p.tipo==="agotado")return <span style={{fontSize:10,color:"var(--text-danger)",fontWeight:600}}>Agotado</span>;
+  if(p.tipo==="sin_mov")return <span style={{fontSize:10,color:"var(--text-secondary)"}}>Sin movimiento reciente</span>;
+  const color=p.dias<30?"var(--text-danger)":p.dias<90?"var(--text-warning)":"var(--text-success)";
+  return(
+    <span style={{fontSize:10,color}}>
+      Se agota ~{p.label} · {p.vel}u/día
+    </span>
+  );
+}
+
+
+// ── Gráfico de Facturación ────────────────────────────────────────
+function GraficoFacturacion({ventas,ventasHistoricas}){
+  const [modo,setModo]=React.useState("mensual");
+  const [tooltip,setTooltip]=React.useState(null);
+  const MODOS=[
+    {id:"semanal",l:"Semanal"},
+    {id:"6meses",l:"6 meses"},
+    {id:"mensual",l:"Mensual"},
+    {id:"anual",l:"Anual"},
+    {id:"interanual",l:"Interanual"},
+  ];
+  const todasVentas=React.useMemo(()=>{
+    const hist=(ventasHistoricas||[]).map(v=>{
+      // Convert DD/MM/YYYY to YYYY-MM-DD if needed
+      let f=v.fecha||"";
+      if(f.includes("/")&&f.length===10){const[d,m,y]=f.split("/");f=`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;}
+      return{...v,fecha:f,total:Number(v.total||0)};
+    });
+    const sys=(ventas||[]).map(v=>({...v,total:Number(v.total||0)}));
+    return [...hist,...sys].filter(v=>v.fecha&&v.total>0);
+  },[ventas,ventasHistoricas]);
+
+  const puntos=React.useMemo(()=>{
+    const hoy=new Date();
+    const ms=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    if(modo==="semanal"){
+      const pts=[];
+      for(let i=11;i>=0;i--){
+        const d1=new Date(hoy);d1.setDate(d1.getDate()-i*7-6);
+        const d2=new Date(hoy);d2.setDate(d2.getDate()-i*7);
+        const s1=d1.toISOString().split("T")[0];const s2=d2.toISOString().split("T")[0];
+        const tot=todasVentas.filter(v=>v.fecha>=s1&&v.fecha<=s2).reduce((a,v)=>a+v.total,0);
+        const lbl=`${d1.getDate()}/${d1.getMonth()+1}–${d2.getDate()}/${d2.getMonth()+1}`;
+        pts.push({lbl,tot,s1,s2});
+      }
+      return pts;
+    }
+    if(modo==="6meses"){
+      const pts=[];
+      for(let i=5;i>=0;i--){
+        const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);
+        const y=d.getFullYear(),m=d.getMonth();
+        const s1=`${y}-${String(m+1).padStart(2,"0")}-01`;
+        const last=new Date(y,m+1,0);const s2=`${y}-${String(m+1).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`;
+        const tot=todasVentas.filter(v=>v.fecha>=s1&&v.fecha<=s2).reduce((a,v)=>a+v.total,0);
+        pts.push({lbl:`${ms[m]} ${y}`,tot,s1,s2});
+      }
+      return pts;
+    }
+    if(modo==="mensual"){
+      const pts=[];
+      for(let i=11;i>=0;i--){
+        const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);
+        const y=d.getFullYear(),m=d.getMonth();
+        const s1=`${y}-${String(m+1).padStart(2,"0")}-01`;
+        const last=new Date(y,m+1,0);const s2=`${y}-${String(m+1).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`;
+        const tot=todasVentas.filter(v=>v.fecha>=s1&&v.fecha<=s2).reduce((a,v)=>a+v.total,0);
+        pts.push({lbl:`${ms[m]} ${String(y).slice(2)}`,tot,s1,s2});
+      }
+      return pts;
+    }
+    if(modo==="anual"){
+      const años=[...new Set(todasVentas.map(v=>v.fecha.slice(0,4)))].sort();
+      return años.map(y=>{
+        const tot=todasVentas.filter(v=>v.fecha.startsWith(y)).reduce((a,v)=>a+v.total,0);
+        return{lbl:y,tot,s1:`${y}-01-01`,s2:`${y}-12-31`};
+      });
+    }
+    if(modo==="interanual"){
+      // Same month each year
+      const pts=[];
+      const años=[...new Set(todasVentas.map(v=>v.fecha.slice(0,4)))].sort();
+      const mesActual=hoy.getMonth();
+      años.forEach(y=>{
+        const m=mesActual;
+        const s1=`${y}-${String(m+1).padStart(2,"0")}-01`;
+        const last=new Date(Number(y),m+1,0);
+        const s2=`${y}-${String(m+1).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`;
+        const tot=todasVentas.filter(v=>v.fecha>=s1&&v.fecha<=s2).reduce((a,v)=>a+v.total,0);
+        pts.push({lbl:`${ms[m]} ${y}`,tot,s1,s2});
+      });
+      return pts;
+    }
+    return[];
+  },[modo,todasVentas]);
+
+  const fmtM=v=>{
+    if(v>=1000000)return "$"+(v/1000000).toFixed(1)+"M";
+    if(v>=1000)return "$"+(v/1000).toFixed(0)+"K";
+    return "$"+v;
+  };
+  const fmtFull=v=>"$"+Number(v).toLocaleString("es-AR",{maximumFractionDigits:0});
+
+  const W=600,H=200,PAD={t:20,r:20,b:36,l:52};
+  const gW=W-PAD.l-PAD.r,gH=H-PAD.t-PAD.b;
+  const maxV=Math.max(...puntos.map(p=>p.tot),1);
+  const pts=puntos.map((p,i)=>({
+    x:PAD.l+i/(Math.max(puntos.length-1,1))*gW,
+    y:PAD.t+gH-(p.tot/maxV)*gH,
+    ...p
+  }));
+
+  const pathD=pts.length<2?"":pts.map((p,i)=>`${i===0?"M":"L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const areaD=pts.length<2?"":
+    `M${pts[0].x.toFixed(1)},${(PAD.t+gH).toFixed(1)} `+
+    pts.map(p=>`L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")+
+    ` L${pts[pts.length-1].x.toFixed(1)},${(PAD.t+gH).toFixed(1)} Z`;
+
+  const handleMove=(e,svgEl)=>{
+    const rect=svgEl.getBoundingClientRect();
+    const scaleX=W/rect.width;
+    const cx=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+    const cxS=cx*scaleX;
+    let best=null,bestD=Infinity;
+    pts.forEach(p=>{const d=Math.abs(p.x-cxS);if(d<bestD){bestD=d;best=p;}});
+    if(best)setTooltip(best);
+  };
+
+  const gradId="gf"+modo;
+  return(
+    <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(20px) saturate(1.8)",WebkitBackdropFilter:"blur(20px) saturate(1.8)",border:"0.5px solid rgba(255,255,255,0.12)",borderRadius:"var(--r-xl,16px)",padding:"18px 16px 12px",marginBottom:"1.5rem",boxShadow:"0 4px 24px rgba(0,0,0,.15)"}}>
+      {/* Title + pills */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+        <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary,#e8eaf0)"}}>Evolución de facturación</div>
+        <div style={{display:"flex",gap:4,background:"rgba(120,120,128,0.12)",borderRadius:20,padding:3}}>
+          {MODOS.map(m=>(
+            <button key={m.id} onClick={()=>{setModo(m.id);setTooltip(null);}} style={{
+              fontSize:10,padding:"4px 10px",borderRadius:16,border:"none",cursor:"pointer",fontWeight:600,
+              background:modo===m.id?"rgba(255,255,255,0.18)":"transparent",
+              color:modo===m.id?"var(--text-primary,#fff)":"var(--text-secondary,#9ca3af)",
+              backdropFilter:modo===m.id?"blur(8px)":"none",
+              WebkitBackdropFilter:modo===m.id?"blur(8px)":"none",
+              boxShadow:modo===m.id?"0 1px 4px rgba(0,0,0,.2)":"none",
+              transition:"all .15s"
+            }}>{m.l}</button>
+          ))}
+        </div>
+      </div>
+      {/* Tooltip */}
+      {tooltip&&(
+        <div style={{background:"rgba(30,30,40,0.92)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"8px 12px",marginBottom:10,display:"inline-block"}}>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.6)",marginBottom:2}}>{tooltip.lbl}</div>
+          <div style={{fontSize:16,fontWeight:700,color:"#fff"}}>{fmtFull(tooltip.tot)}</div>
+        </div>
+      )}
+      {/* SVG Chart */}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",display:"block",overflow:"visible"}}
+        onMouseMove={e=>handleMove(e,e.currentTarget)}
+        onMouseLeave={()=>setTooltip(null)}
+        onTouchMove={e=>{e.preventDefault();handleMove(e,e.currentTarget);}}
+        onTouchEnd={()=>setTooltip(null)}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#4a9eff" stopOpacity="0.35"/>
+            <stop offset="100%" stopColor="#4a9eff" stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {/* Grid lines */}
+        {[0.25,0.5,0.75,1].map(f=>{
+          const y=PAD.t+gH*(1-f);
+          return(
+            <g key={f}>
+              <line x1={PAD.l} y1={y} x2={PAD.l+gW} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1"/>
+              <text x={PAD.l-6} y={y+4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="9">{fmtM(maxV*f)}</text>
+            </g>
+          );
+        })}
+        {/* Area */}
+        {areaD&&<path d={areaD} fill={`url(#${gradId})`}/>}
+        {/* Line */}
+        {pathD&&<path d={pathD} fill="none" stroke="#4a9eff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>}
+        {/* X labels — show every Nth */}
+        {pts.map((p,i)=>{
+          const step=Math.ceil(pts.length/6);
+          if(i%step!==0&&i!==pts.length-1)return null;
+          return <text key={i} x={p.x} y={H-6} textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="9">{p.lbl}</text>;
+        })}
+        {/* Dots + hover highlight */}
+        {pts.map((p,i)=>{
+          const active=tooltip&&tooltip.lbl===p.lbl;
+          return(
+            <g key={i}>
+              {active&&<line x1={p.x} y1={PAD.t} x2={p.x} y2={PAD.t+gH} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3,3"/>}
+              <circle cx={p.x} cy={p.y} r={active?5:3}
+                fill={active?"#fff":"#4a9eff"}
+                stroke={active?"#4a9eff":"rgba(30,40,60,0.8)"}
+                strokeWidth={active?2:1}
+                style={{transition:"r .1s,fill .1s"}}/>
+            </g>
+          );
+        })}
+      </svg>
+      {!tooltip&&<div style={{fontSize:10,color:"rgba(255,255,255,0.25)",textAlign:"center",marginTop:4}}>Pasá el cursor o tocá el gráfico para ver el detalle</div>}
+    </div>
+  );
+}
+
 function StockView({stockUni,data}){
   const stockPapel={}, stockTinta={};
   let totalPapel=0, totalTinta=0;
@@ -6729,10 +6959,11 @@ function StockView({stockUni,data}){
       return Math.max(0, Number(art2.cantidad)-vendido) > 0;
     }).map(c=>c.nombre).join(", ");
     return(
-      <div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",boxShadow:"var(--glass-shadow-sm)"}}>
+      <div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",boxShadow:"var(--glass-shadow-sm)"}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art}</div>
           <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis"}}>{conts}</div>
+          <div style={{marginTop:4}}><ProyTag art={art} ventas={data.ventas} disp={cant}/></div>
         </div>
         <div style={{fontSize:20,fontWeight:700,color:esTinta?"var(--text-info)":"var(--text-primary)",marginLeft:8,flexShrink:0}}>{fmt(cant)}</div>
       </div>
