@@ -5984,7 +5984,7 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
 
   const stockPapel={}, stockTinta={};
   let totalPapel=0, totalTinta=0;
-  Object.entries(stockUni).forEach(([nombre,cant])=>{
+  Object.entries(stockUni).filter(([,v])=>v>0).forEach(([nombre,cant])=>{
     if(nombre.includes("TINTA")){stockTinta[nombre]=cant;totalTinta+=cant;}
     else{stockPapel[nombre]=cant;totalPapel+=cant;}
   });
@@ -7137,7 +7137,7 @@ function GraficoFacturacion({ventas,ventasHistoricas}){
 function StockView({stockUni,data}){
   const stockPapel={}, stockTinta={};
   let totalPapel=0, totalTinta=0;
-  Object.entries(stockUni).forEach(([nombre,cant])=>{
+  Object.entries(stockUni).filter(([,v])=>v>0).forEach(([nombre,cant])=>{
     if(nombre.includes("TINTA")){stockTinta[nombre]=cant;totalTinta+=cant;}
     else{stockPapel[nombre]=cant;totalPapel+=cant;}
   });
