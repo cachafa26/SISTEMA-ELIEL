@@ -633,7 +633,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v5.3.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v5.3.1</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1087,7 +1087,7 @@ window.SC_SYSTEM_PROMPT="Sos el asesor estrat\u00e9gico de Super Coating para El
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v5.3.0";
+const APP_VERSION = "v5.3.1";
 const APP_BUILD   = "2026-07-02";
 
 // ── SC Reporte PDF ─────────────────────────────────────────────────
@@ -3592,11 +3592,10 @@ function GraficoIngresosPersonales({data,blue}){
       {/* Tooltip — muestra ARS y USD por separado */}
       {tooltip
         ?<div style={{background:"rgba(30,30,40,0.92)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"9px 13px",marginBottom:10,display:"inline-block"}}>
-          <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginBottom:4}}>{tooltip.lbl}</div>
-          <div style={{fontSize:15,fontWeight:700,color:"#fff",marginBottom:2}}>{fmtFull(tooltip.total)}</div>
-          <div style={{display:"flex",gap:12,fontSize:11}}>
-            <span style={{color:"#4a9eff"}}>$ {fmtFull(tooltip.totARS)}</span>
-            {tooltip.totUSD>0&&<span style={{color:"#10b981"}}>USD {fmtUSD(tooltip.totUSD).replace("USD ","")}</span>}
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginBottom:6}}>{tooltip.lbl}</div>
+          <div style={{display:"flex",gap:16,alignItems:"center"}}>
+            <div><div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginBottom:2}}>PESOS</div><div style={{fontSize:15,fontWeight:700,color:"#4a9eff"}}>{fmtFull(tooltip.totARS)}</div></div>
+            {tooltip.totUSD>0&&<div><div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginBottom:2}}>USD</div><div style={{fontSize:15,fontWeight:700,color:"#10b981"}}>{fmtUSD(tooltip.totUSD)}</div></div>}
           </div>
         </div>
         :<div style={{fontSize:10,color:"rgba(255,255,255,0.25)",marginBottom:10}}>Tocá o pasá el cursor para ver el detalle</div>
@@ -3871,6 +3870,9 @@ function DashboardCentral({data,save,showToast,blue,onOpenDeudas,mi30Total,pendi
             </div>
           ))}
         </div>
+
+        {/* ── GRÁFICO INGRESOS PERSONALES ── */}
+        <GraficoIngresosPersonales data={data} blue={blue}/>
 
         <>
           {/* ── MODAL FLOTANTE VER TODO ── */}
@@ -5683,9 +5685,6 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
           </div>
         </div>
       )}
-
-      {/* ── GRÁFICO INGRESOS PERSONALES ── */}
-      <GraficoIngresosPersonales data={data} blue={blue}/>
 
       {/* ── PRESUPUESTO MENSUAL ── */}
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px 18px",marginBottom:"1.5rem",boxShadow:"var(--glass-shadow-sm)"}}>
