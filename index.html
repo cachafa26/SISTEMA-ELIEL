@@ -4608,13 +4608,14 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
         {[
           {l:"Presupuestados",v:presupuestos.filter(p=>p.estado==="Pendiente").length},
           {l:"Confirmados",v:confirmados.length,info:true},
-          {l:"Cobrado USD 12m",v:fmtUSD(cobroTotal30d),green:cobroTotal30d>0},
-          {l:"Ganancia USD 12m",v:fmtUSD(ganTotal30d),green:ganTotal30d>0},
+          {l:"Cobrado USD 12m",v:fmtUSD(cobroTotal30d),green:cobroTotal30d>0,sub:"últimos 12 meses"},
+          {l:"Ganancia USD 12m",v:fmtUSD(ganTotal30d),green:ganTotal30d>0,sub:"últimos 12 meses"},
           ...(saldoTotal>0?[{l:"Saldo pendiente",v:fmtUSD(saldoTotal),warn:true}]:[]),
         ].map(x=>(
           <div key={x.l} style={{background:x.green?"var(--bg-tint-green)":x.warn?"var(--bg-tint-amber)":x.info?"var(--bg-tint-blue)":"rgba(120,120,128,0.10)",border:"0.5px solid "+(x.green?"var(--border-success)":x.warn?"rgba(244,121,32,.3)":x.info?"var(--border-info)":"var(--glass-border)"),borderRadius:"var(--r-lg)",padding:"12px 14px",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
             <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:x.green?"var(--text-success)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-secondary)",marginBottom:4}}>{x.l}</div>
             <div style={{fontSize:16,fontWeight:700,color:x.green?"var(--text-success)":x.warn?"var(--text-warning)":x.info?"var(--text-info)":"var(--text-primary)"}}>{x.v}</div>
+            {x.sub&&<div style={{fontSize:9,color:"var(--text-secondary)",marginTop:2}}>{x.sub}</div>}
           </div>
         ))}
       </div>
@@ -5875,6 +5876,7 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
           );
         })}
       </div>
+
     </div>
   );
 }
