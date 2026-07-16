@@ -3465,18 +3465,18 @@ function GraficoIngresosPersonales({data,blue}){
     for(const r of data.retiros||[]){
       if(!r.fecha)continue;
       if(r.moneda==="USD"){
-        movs.push({fecha:r.fecha,ars:Number(r.montoUSD||0)*tc,usd:Number(r.montoUSD||0)});
+        movs.push({fecha:r.fecha,ars:Number(r.montoUSD||0)*tc,arsPuro:0,usd:Number(r.montoUSD||0)});
       } else {
-        movs.push({fecha:r.fecha,ars:Number(r.montoPesos||r.montoUSD*tc||0),usd:0});
+        movs.push({fecha:r.fecha,ars:Number(r.montoPesos||r.montoUSD*tc||0),arsPuro:Number(r.montoPesos||r.montoUSD*tc||0),usd:0});
       }
     }
     // BH cobros
     for(const c2 of data.bh?.cobros||[]){
       if(!c2.fecha)continue;
       if(c2.moneda==="USD"){
-        movs.push({fecha:c2.fecha,ars:Number(c2.monto||0)*tc,usd:Number(c2.monto||0)});
+        movs.push({fecha:c2.fecha,ars:Number(c2.monto||0)*tc,arsPuro:0,usd:Number(c2.monto||0)});
       } else {
-        movs.push({fecha:c2.fecha,ars:Number(c2.monto||0),usd:0});
+        movs.push({fecha:c2.fecha,ars:Number(c2.monto||0),arsPuro:Number(c2.monto||0),usd:0});
       }
     }
     // DJ pagos
@@ -3484,9 +3484,9 @@ function GraficoIngresosPersonales({data,blue}){
       for(const p of e.pagos||[]){
         if(!p.fecha)continue;
         if(p.moneda==="USD"){
-          movs.push({fecha:p.fecha,ars:Number(p.montoUSD||0)*tc,usd:Number(p.montoUSD||0)});
+          movs.push({fecha:p.fecha,ars:Number(p.montoUSD||0)*tc,arsPuro:0,usd:Number(p.montoUSD||0)});
         } else {
-          movs.push({fecha:p.fecha,ars:Number(p.monto||0),usd:0});
+          movs.push({fecha:p.fecha,ars:Number(p.monto||0),arsPuro:Number(p.monto||0),usd:0});
         }
       }
     }
@@ -3494,9 +3494,9 @@ function GraficoIngresosPersonales({data,blue}){
     for(const f of data.fin?.fx||[]){
       if(f.tipo!=="ingreso_extra"||!f.fecha)continue;
       if(f.moneda==="USD"){
-        movs.push({fecha:f.fecha,ars:Number(f.monto||0)*tc,usd:Number(f.monto||0)});
+        movs.push({fecha:f.fecha,ars:Number(f.monto||0)*tc,arsPuro:0,usd:Number(f.monto||0)});
       } else {
-        movs.push({fecha:f.fecha,ars:Number(f.monto||0),usd:0});
+        movs.push({fecha:f.fecha,ars:Number(f.monto||0),arsPuro:Number(f.monto||0),usd:0});
       }
     }
     return movs;
@@ -3507,9 +3507,10 @@ function GraficoIngresosPersonales({data,blue}){
     const ms=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
     const agregar=(s1,s2,lbl)=>{
       const sub=movimientos.filter(m=>m.fecha>=s1&&m.fecha<=s2);
-      const totARS=sub.reduce((a,m)=>a+m.ars,0);
+      const totARS=sub.reduce((a,m)=>a+m.ars,0);         // para la línea (incluye USD→ARS)
+      const totARSpuro=sub.reduce((a,m)=>a+m.arsPuro,0); // solo pesos reales (tooltip)
       const totUSD=sub.reduce((a,m)=>a+m.usd,0);
-      return{lbl,totARS,totUSD,total:totARS};
+      return{lbl,totARS,totARSpuro,totUSD,total:totARS};
     };
     if(modo==="semanal"){
       const pts=[];
@@ -3548,7 +3549,7 @@ function GraficoIngresosPersonales({data,blue}){
   const fmtFull=v=>"$"+Number(v).toLocaleString("es-AR",{maximumFractionDigits:0});
   const fmtUSD=v=>"USD "+Number(v).toLocaleString("es-AR",{maximumFractionDigits:0});
 
-  const W=600,H=200,PAD={t:20,r:20,b:36,l:52};
+  const W=600,H=220,PAD={t:20,r:16,b:36,l:48};
   const gW=W-PAD.l-PAD.r,gH=H-PAD.t-PAD.b;
   const maxV=Math.max(...puntos.map(p=>p.total),1);
   const pts=puntos.map((p,i)=>({
@@ -3573,7 +3574,7 @@ function GraficoIngresosPersonales({data,blue}){
   };
 
   return(
-    <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(20px) saturate(1.8)",WebkitBackdropFilter:"blur(20px) saturate(1.8)",border:"0.5px solid rgba(255,255,255,0.12)",borderRadius:"var(--r-xl)",padding:"18px 16px 12px",marginBottom:"1.5rem",boxShadow:"0 4px 24px rgba(0,0,0,.15)"}}>
+    <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(20px) saturate(1.8)",WebkitBackdropFilter:"blur(20px) saturate(1.8)",border:"0.5px solid rgba(255,255,255,0.12)",borderRadius:"var(--r-xl)",padding:"16px 14px 10px",marginBottom:"1rem",boxShadow:"0 4px 24px rgba(0,0,0,.15)",width:"100%",boxSizing:"border-box"}}>
       {/* Title + pills */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,flexWrap:"wrap",gap:8}}>
         <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)"}}>Ingresos personales</div>
@@ -3594,7 +3595,7 @@ function GraficoIngresosPersonales({data,blue}){
         ?<div style={{background:"rgba(30,30,40,0.92)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"9px 13px",marginBottom:10,display:"inline-block"}}>
           <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginBottom:6}}>{tooltip.lbl}</div>
           <div style={{display:"flex",gap:16,alignItems:"center"}}>
-            <div><div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginBottom:2}}>PESOS</div><div style={{fontSize:15,fontWeight:700,color:"#4a9eff"}}>{fmtFull(tooltip.totARS)}</div></div>
+            <div><div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginBottom:2}}>PESOS</div><div style={{fontSize:15,fontWeight:700,color:"#4a9eff"}}>{fmtFull(tooltip.totARSpuro)}</div></div>
             {tooltip.totUSD>0&&<div><div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginBottom:2}}>USD</div><div style={{fontSize:15,fontWeight:700,color:"#10b981"}}>{fmtUSD(tooltip.totUSD)}</div></div>}
           </div>
         </div>
@@ -3852,8 +3853,10 @@ function DashboardCentral({data,save,showToast,blue,onOpenDeudas,mi30Total,pendi
         );
       })()}
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:"1rem"}}>
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px"}}>
+      {/* ── GRÁFICO INGRESOS PERSONALES ── */}
+      <GraficoIngresosPersonales data={data} blue={blue}/>
+
+      <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",marginBottom:12}}>
           <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Ingresos por módulo</div>
           {fuentes.map(f=>(
             <div key={f.n} style={{marginBottom:10}}>
@@ -3871,8 +3874,6 @@ function DashboardCentral({data,save,showToast,blue,onOpenDeudas,mi30Total,pendi
           ))}
         </div>
 
-        {/* ── GRÁFICO INGRESOS PERSONALES ── */}
-        <GraficoIngresosPersonales data={data} blue={blue}/>
 
         <>
           {/* ── MODAL FLOTANTE VER TODO ── */}
