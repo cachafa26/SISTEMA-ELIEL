@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v5.2.0 · 2026-07-06 -->
+  <!-- v5.3.0 · 2026-07-16 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -633,7 +633,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v5.2.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v5.3.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1087,7 +1087,7 @@ window.SC_SYSTEM_PROMPT="Sos el asesor estrat\u00e9gico de Super Coating para El
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v5.2.0";
+const APP_VERSION = "v5.3.0";
 const APP_BUILD   = "2026-07-02";
 
 // ── SC Reporte PDF ─────────────────────────────────────────────────
@@ -8386,9 +8386,9 @@ function DespachosView({data,save,showToast}){
           filename:"app.jsx"
         });
         setMsg("Iniciando…");
-        var {useState,useEffect,useRef}=React;
-        var run=new Function("React","useState","useEffect","useRef",result.code+"\nreturn App;");
-        var AppComp=run(React,useState,useEffect,useRef);
+        var {useState,useEffect,useRef,useMemo}=React;
+        var run=new Function("React","useState","useEffect","useRef","useMemo",result.code+"\nreturn App;");
+        var AppComp=run(React,useState,useEffect,useRef,useMemo);
         var root=ReactDOM.createRoot(document.getElementById("root"));
         root.render(React.createElement(AppComp));
         document.getElementById("loading").style.display="none";
