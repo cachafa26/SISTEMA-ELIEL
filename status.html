@@ -137,7 +137,8 @@
     html[data-theme="dark"] .glass,html[data-theme="dark"] .glass-sm,html[data-theme="dark"] .glass-nav{background:rgba(28,28,30,0.72)!important}
     html[data-theme="light"] .glass-nav{background:rgba(255,255,255,0.82)!important}
     html[data-theme="dark"] .glass-nav{background:rgba(18,18,20,0.88)!important}
-  </style>
+  @keyframes slideUp{from{opacity:0;transform:translateY(60px)}to{opacity:1;transform:translateY(0)}}
+</style>
 </head>
 <body>
   <script>
@@ -323,7 +324,7 @@ function App(){
         </div>
       </div>
       <div style={{padding:"1rem",maxWidth:900,margin:"0 auto",paddingBottom:20}}>
-        {view==="dashboard"&&<ViewDashboard data={data} stockUni={stockUni} setView={setView} lastUpdate={lastUpdate}/>}
+        {view==="dashboard"&&<ViewDashboard data={data} stockUni={stockUni} setView={setView} lastUpdate={lastUpdate} blue={blue}/>}
         {view==="stock"&&<ViewStock stockUni={stockUni} data={data}/>}
         {view==="ventas"&&<ViewVentas data={data}/>}
         {view==="costos"&&<ViewCostos data={data} blue={blue} tcActual={tcActual}/>}
@@ -354,7 +355,147 @@ function BarraProgreso({pct,enGanancia}){
 }
 
 // ── DASHBOARD: contenedores ordenados más nuevo → más viejo ───────────────
-function ViewDashboard({data,stockUni,lastUpdate,setView}){
+function ContenedorModal({c,data,onClose}){
+  const fmtU=v=>"USD "+Number(v||0).toLocaleString("es-AR",{maximumFractionDigits:0});
+  const fmtP=v=>"$"+Number(v||0).toLocaleString("es-AR",{maximumFractionDigits:0});
+  const fmtPct=v=>v.toFixed(1)+"%";
+
+  const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id)
+    .sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  const costo=Number(c.costoTotal||0);
+  const cobUSD=ventasCont.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+  const enG=costo>0&&cobUSD>=costo;
+  const ganancia=cobUSD-costo; // puede ser negativo (pérdida)
+  const pctGanancia=costo>0?(ganancia/costo)*100:0;
+
+  // Stock por artículo
+  const stockItems=(c.articulos||[]).map(art=>{
+    const disp=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
+    const pctS=Number(art.cantidad)>0?disp/Number(art.cantidad):0;
+    return{nombre:art.nombre,cantidad:art.cantidad,disp,pctS};
+  }).filter(a=>a.cantidad>0);
+
+  const colStock=pctS=>pctS>0.5?"var(--text-success)":pctS>0.2?"var(--text-warning)":"var(--text-danger)";
+
+  return(
+    <div onClick={e=>{if(e.target===e.currentTarget)onClose();}} style={{
+      position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",
+      backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+      zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",
+      overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"
+    }}>
+      <div style={{
+        background:"var(--bg-card)",
+        backdropFilter:"blur(40px) saturate(2)",WebkitBackdropFilter:"blur(40px) saturate(2)",
+        borderRadius:"16px 16px 0 0",
+        padding:"20px 20px calc(20px + env(safe-area-inset-bottom,0px))",
+        width:"100%",maxWidth:540,
+        border:"0.5px solid var(--glass-border)",borderBottom:"none",
+        boxShadow:"0 -8px 40px rgba(0,0,0,.3)",
+        animation:"slideUp .25s cubic-bezier(.34,1.2,.64,1)",
+        maxHeight:"90vh",overflowY:"auto"
+      }}>
+        {/* Handle */}
+        <div style={{width:36,height:4,background:"rgba(120,120,128,0.3)",borderRadius:2,margin:"0 auto 16px"}}/>
+
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+          <div>
+            <div style={{fontSize:17,fontWeight:700,color:"var(--text-primary)",marginBottom:4}}>{c.nombre}</div>
+            <span style={{fontSize:11,padding:"2px 10px",borderRadius:20,fontWeight:600,
+              background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-red,rgba(192,57,43,0.12))",
+              color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-danger)"}}>
+              {costo===0?"Activo":enG?"✓ En ganancia":"En pérdida"}
+            </span>
+          </div>
+          <button onClick={onClose} style={{width:28,height:28,borderRadius:"50%",
+            border:"0.5px solid var(--glass-border)",background:"rgba(120,120,128,0.1)",
+            cursor:"pointer",fontSize:13,color:"var(--text-secondary)",
+            display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+        </div>
+
+        {/* Barra */}
+        {costo>0&&<BarraProgreso pct={Math.min(100,(cobUSD/costo)*100)} enGanancia={enG}/>}
+
+        {/* KPIs */}
+        {costo>0&&(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,margin:"14px 0"}}>
+            {[
+              {l:"Inversión total",v:fmtU(costo)},
+              {l:"Total cobrado",v:fmtU(cobUSD),c:"var(--text-info)"},
+              {l:enG?"Ganancia USD":"Pérdida USD",v:(ganancia>=0?"+ ":"− ")+fmtU(Math.abs(ganancia)),
+               c:ganancia>=0?"var(--text-success)":"var(--text-danger)"},
+              {l:enG?"% Ganancia":"% Pérdida",v:(pctGanancia>=0?"+ ":"− ")+fmtPct(Math.abs(pctGanancia)),
+               c:pctGanancia>=0?"var(--text-success)":"var(--text-danger)"},
+            ].map(k=>(
+              <div key={k.l} style={{background:"rgba(120,120,128,0.08)",border:"0.5px solid var(--glass-border)",borderRadius:10,padding:"11px 13px"}}>
+                <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:4}}>{k.l}</div>
+                <div style={{fontSize:15,fontWeight:700,color:k.c||"var(--text-primary)"}}>{k.v}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Stock */}
+        {stockItems.length>0&&(
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Stock disponible</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {stockItems.map(art=>(
+                <div key={art.nombre} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",
+                  background:"rgba(120,120,128,0.06)",border:"0.5px solid var(--glass-border)",borderRadius:10}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:600,color:"var(--text-primary)",marginBottom:3}}>{art.nombre}</div>
+                    <div style={{height:3,background:"rgba(120,120,128,0.15)",borderRadius:2,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:(art.pctS*100)+"%",background:colStock(art.pctS),borderRadius:2}}/>
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <span style={{fontSize:15,fontWeight:700,color:colStock(art.pctS)}}>{art.disp}</span>
+                    <span style={{fontSize:10,color:"var(--text-secondary)"}}> / {art.cantidad}u</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Ventas del contenedor */}
+        {ventasCont.length>0&&(
+          <div>
+            <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>
+              Ventas · {ventasCont.length} operaciones
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
+              {ventasCont.map(v=>(
+                <div key={v.id} style={{display:"grid",gridTemplateColumns:"auto 1fr auto",gap:8,alignItems:"center",
+                  padding:"8px 12px",background:"rgba(120,120,128,0.06)",
+                  border:"0.5px solid var(--glass-border)",borderRadius:8,fontSize:12}}>
+                  <div style={{fontSize:10,color:"var(--text-secondary)",whiteSpace:"nowrap"}}>{v.fecha||"—"}</div>
+                  <div>
+                    <div style={{fontWeight:600,color:"var(--text-primary)"}}>{v.cliente||"—"}</div>
+                    <div style={{fontSize:10,color:"var(--text-secondary)"}}>{v.articulo} × {v.cantidad}</div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontWeight:600,color:"var(--text-primary)"}}>{fmtP(v.total)}</div>
+                    {v.usd>0&&<div style={{fontSize:10,color:"var(--text-secondary)"}}>{fmtU(v.usd)}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {ventasCont.length===0&&(
+          <div style={{padding:"1.5rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin ventas registradas.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+function ViewDashboard({data,stockUni,lastUpdate,setView,blue}){
+  const [modalCont,setModalCont]=React.useState(null);
   const conts=sortConts(data.contenedores||[],data.contenedoresOrden);
   const stockTotal=Object.values(stockUni).reduce((a,v)=>a+v,0);
   const resumen=conts.map(c=>{
@@ -391,7 +532,7 @@ function ViewDashboard({data,stockUni,lastUpdate,setView}){
       <div style={{fontSize:10,fontWeight:600,color:"var(--text-secondary)",marginBottom:10,textTransform:"uppercase",letterSpacing:".06em"}}>Estado por contenedor</div>
       <div style={{display:"grid",gap:8}}>
         {resumen.map(({c,cobUSD,costo,pct,enG,stockCont})=>(
-          <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",cursor:"pointer"}} onClick={()=>setView("stock")}>
+          <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",cursor:"pointer",transition:"transform .12s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseLeave={e=>e.currentTarget.style.transform=""} onClick={()=>setModalCont(c)}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
               <span style={{fontWeight:500,fontSize:14,color:"var(--text-primary)"}}>{c.nombre}</span>
               <div style={{textAlign:"right"}}>
@@ -419,7 +560,7 @@ function ViewDashboard({data,stockUni,lastUpdate,setView}){
         ))}
         {resumen.length===0&&<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin contenedores.</div>}
       </div>
-
+      {modalCont&&<ContenedorModal c={modalCont} data={data} blue={blue} onClose={()=>setModalCont(null)}/>}
     </div>
   );
 }
