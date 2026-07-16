@@ -3451,6 +3451,195 @@ function GestorDeudas({data,save,showToast,blue}){
 }
 
 
+// ── Gráfico de Ingresos Personales ───────────────────────────────
+function GraficoIngresosPersonales({data,blue}){
+  const tc=blue||1450;
+  const [modo,setModo]=useState("mensual");
+  const [tooltip,setTooltip]=useState(null);
+  const MODOS=[{id:"semanal",l:"Semanal"},{id:"mensual",l:"Mensual"},{id:"anual",l:"Anual"}];
+
+  // Recolectar todos los movimientos de ingresos con fecha, montoARS y montoUSD
+  const movimientos=useMemo(()=>{
+    const movs=[];
+    // Retiros SC en ARS
+    for(const r of data.retiros||[]){
+      if(!r.fecha)continue;
+      if(r.moneda==="USD"){
+        movs.push({fecha:r.fecha,ars:Number(r.montoUSD||0)*tc,usd:Number(r.montoUSD||0)});
+      } else {
+        movs.push({fecha:r.fecha,ars:Number(r.montoPesos||r.montoUSD*tc||0),usd:0});
+      }
+    }
+    // BH cobros
+    for(const c2 of data.bh?.cobros||[]){
+      if(!c2.fecha)continue;
+      if(c2.moneda==="USD"){
+        movs.push({fecha:c2.fecha,ars:Number(c2.monto||0)*tc,usd:Number(c2.monto||0)});
+      } else {
+        movs.push({fecha:c2.fecha,ars:Number(c2.monto||0),usd:0});
+      }
+    }
+    // DJ pagos
+    for(const e of data.dj?.eventos||[]){
+      for(const p of e.pagos||[]){
+        if(!p.fecha)continue;
+        if(p.moneda==="USD"){
+          movs.push({fecha:p.fecha,ars:Number(p.montoUSD||0)*tc,usd:Number(p.montoUSD||0)});
+        } else {
+          movs.push({fecha:p.fecha,ars:Number(p.monto||0),usd:0});
+        }
+      }
+    }
+    // Ingresos extra (FX)
+    for(const f of data.fin?.fx||[]){
+      if(f.tipo!=="ingreso_extra"||!f.fecha)continue;
+      if(f.moneda==="USD"){
+        movs.push({fecha:f.fecha,ars:Number(f.monto||0)*tc,usd:Number(f.monto||0)});
+      } else {
+        movs.push({fecha:f.fecha,ars:Number(f.monto||0),usd:0});
+      }
+    }
+    return movs;
+  },[data,tc]);
+
+  const puntos=useMemo(()=>{
+    const hoy=new Date();
+    const ms=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    const agregar=(s1,s2,lbl)=>{
+      const sub=movimientos.filter(m=>m.fecha>=s1&&m.fecha<=s2);
+      const totARS=sub.reduce((a,m)=>a+m.ars,0);
+      const totUSD=sub.reduce((a,m)=>a+m.usd,0);
+      return{lbl,totARS,totUSD,total:totARS};
+    };
+    if(modo==="semanal"){
+      const pts=[];
+      for(let i=11;i>=0;i--){
+        const d1=new Date(hoy);d1.setDate(d1.getDate()-i*7-6);
+        const d2=new Date(hoy);d2.setDate(d2.getDate()-i*7);
+        const s1=d1.toISOString().split("T")[0],s2=d2.toISOString().split("T")[0];
+        pts.push(agregar(s1,s2,`${d1.getDate()}/${d1.getMonth()+1}`));
+      }
+      return pts;
+    }
+    if(modo==="mensual"){
+      const pts=[];
+      for(let i=11;i>=0;i--){
+        const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);
+        const y=d.getFullYear(),m=d.getMonth();
+        const s1=`${y}-${String(m+1).padStart(2,"0")}-01`;
+        const last=new Date(y,m+1,0);
+        const s2=`${y}-${String(m+1).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}`;
+        pts.push(agregar(s1,s2,`${ms[m]} ${String(y).slice(2)}`));
+      }
+      return pts;
+    }
+    if(modo==="anual"){
+      const años=[...new Set(movimientos.map(m=>m.fecha.slice(0,4)))].sort();
+      return años.map(y=>agregar(`${y}-01-01`,`${y}-12-31`,y));
+    }
+    return[];
+  },[modo,movimientos]);
+
+  const fmtM=v=>{
+    if(v>=1000000)return "$"+(v/1000000).toFixed(1)+"M";
+    if(v>=1000)return "$"+(v/1000).toFixed(0)+"K";
+    return "$"+v;
+  };
+  const fmtFull=v=>"$"+Number(v).toLocaleString("es-AR",{maximumFractionDigits:0});
+  const fmtUSD=v=>"USD "+Number(v).toLocaleString("es-AR",{maximumFractionDigits:0});
+
+  const W=600,H=200,PAD={t:20,r:20,b:36,l:52};
+  const gW=W-PAD.l-PAD.r,gH=H-PAD.t-PAD.b;
+  const maxV=Math.max(...puntos.map(p=>p.total),1);
+  const pts=puntos.map((p,i)=>({
+    x:PAD.l+i/(Math.max(puntos.length-1,1))*gW,
+    y:PAD.t+gH-(p.total/maxV)*gH,
+    ...p
+  }));
+  const pathD=pts.length<2?"":pts.map((p,i)=>`${i===0?"M":"L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const areaD=pts.length<2?"":
+    `M${pts[0].x.toFixed(1)},${(PAD.t+gH).toFixed(1)} `+
+    pts.map(p=>`L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")+
+    ` L${pts[pts.length-1].x.toFixed(1)},${(PAD.t+gH).toFixed(1)} Z`;
+
+  const handleMove=(e,svgEl)=>{
+    const rect=svgEl.getBoundingClientRect();
+    const scaleX=W/rect.width;
+    const cx=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+    const cxS=cx*scaleX;
+    let best=null,bestD=Infinity;
+    pts.forEach(p=>{const d=Math.abs(p.x-cxS);if(d<bestD){bestD=d;best=p;}});
+    if(best)setTooltip(best);
+  };
+
+  return(
+    <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(20px) saturate(1.8)",WebkitBackdropFilter:"blur(20px) saturate(1.8)",border:"0.5px solid rgba(255,255,255,0.12)",borderRadius:"var(--r-xl)",padding:"18px 16px 12px",marginBottom:"1.5rem",boxShadow:"0 4px 24px rgba(0,0,0,.15)"}}>
+      {/* Title + pills */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,flexWrap:"wrap",gap:8}}>
+        <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)"}}>Ingresos personales</div>
+        <div style={{display:"flex",gap:4,background:"rgba(120,120,128,0.12)",borderRadius:20,padding:3,overflowX:"auto",WebkitOverflowScrolling:"touch",flexShrink:0}}>
+          {MODOS.map(m=>(
+            <button key={m.id} onClick={()=>{setModo(m.id);setTooltip(null);}} style={{
+              fontSize:10,padding:"4px 10px",borderRadius:16,border:"none",cursor:"pointer",fontWeight:600,whiteSpace:"nowrap",
+              background:modo===m.id?"rgba(255,255,255,0.18)":"transparent",
+              color:modo===m.id?"var(--text-primary)":"var(--text-secondary)",
+              backdropFilter:modo===m.id?"blur(8px)":"none",WebkitBackdropFilter:modo===m.id?"blur(8px)":"none",
+              boxShadow:modo===m.id?"0 1px 4px rgba(0,0,0,.2)":"none",transition:"all .15s"
+            }}>{m.l}</button>
+          ))}
+        </div>
+      </div>
+      {/* Tooltip — muestra ARS y USD por separado */}
+      {tooltip
+        ?<div style={{background:"rgba(30,30,40,0.92)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"9px 13px",marginBottom:10,display:"inline-block"}}>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginBottom:4}}>{tooltip.lbl}</div>
+          <div style={{fontSize:15,fontWeight:700,color:"#fff",marginBottom:2}}>{fmtFull(tooltip.total)}</div>
+          <div style={{display:"flex",gap:12,fontSize:11}}>
+            <span style={{color:"#4a9eff"}}>$ {fmtFull(tooltip.totARS)}</span>
+            {tooltip.totUSD>0&&<span style={{color:"#10b981"}}>USD {fmtUSD(tooltip.totUSD).replace("USD ","")}</span>}
+          </div>
+        </div>
+        :<div style={{fontSize:10,color:"rgba(255,255,255,0.25)",marginBottom:10}}>Tocá o pasá el cursor para ver el detalle</div>
+      }
+      {/* SVG */}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",display:"block",overflow:"visible",touchAction:"none"}}
+        onMouseMove={e=>handleMove(e,e.currentTarget)} onMouseLeave={()=>setTooltip(null)}
+        onTouchMove={e=>{e.preventDefault();handleMove(e,e.currentTarget);}} onTouchEnd={()=>setTooltip(null)}>
+        <defs>
+          <linearGradient id="gip" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity="0.35"/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {[0.25,0.5,0.75,1].map(f=>{
+          const y=PAD.t+gH*(1-f);
+          return(<g key={f}>
+            <line x1={PAD.l} y1={y} x2={PAD.l+gW} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1"/>
+            <text x={PAD.l-6} y={y+4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="9">{fmtM(maxV*f)}</text>
+          </g>);
+        })}
+        {areaD&&<path d={areaD} fill="url(#gip)"/>}
+        {pathD&&<path d={pathD} fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>}
+        {pts.map((p,i)=>{
+          const step=Math.ceil(pts.length/6);
+          if(i%step!==0&&i!==pts.length-1)return null;
+          return <text key={i} x={p.x} y={H-6} textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="9">{p.lbl}</text>;
+        })}
+        {pts.map((p,i)=>{
+          const active=tooltip&&tooltip.lbl===p.lbl;
+          return(<g key={i}>
+            {active&&<line x1={p.x} y1={PAD.t} x2={p.x} y2={PAD.t+gH} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3,3"/>}
+            <circle cx={p.x} cy={p.y} r={active?5:3}
+              fill={active?"#fff":"#10b981"} stroke={active?"#10b981":"rgba(30,40,60,0.8)"}
+              strokeWidth={active?2:1} style={{transition:"r .1s,fill .1s"}}/>
+          </g>);
+        })}
+      </svg>
+    </div>
+  );
+}
+
+
 function DashboardCentral({data,save,showToast,blue,onOpenDeudas,mi30Total,pendienteRetiro,totalRetirado,bhTotalAnio,bhSueldo,bhCobradoTotal,djGanancia,djCobrado,djEventos,djGananciaUSD,djCobradoUSD,djRealizados,totalGastos,totalGastosARS,totalGastosUSD,totalIngresos,totalRetSCPesos,totalVentaUSD,totalCobUSD,stockUni,goModulo}){
   const [verTodo,setVerTodo]=useState(false);
   const [fDesde,setFDesde]=useState("");
@@ -5495,6 +5684,9 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
         </div>
       )}
 
+      {/* ── GRÁFICO INGRESOS PERSONALES ── */}
+      <GraficoIngresosPersonales data={data} blue={blue}/>
+
       {/* ── PRESUPUESTO MENSUAL ── */}
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"16px 18px",marginBottom:"1.5rem",boxShadow:"var(--glass-shadow-sm)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -6950,7 +7142,7 @@ function GraficoFacturacion({ventas,ventasHistoricas}){
 function StockView({stockUni,data}){
   const stockPapel={}, stockTinta={};
   let totalPapel=0, totalTinta=0;
-  Object.entries(stockUni).filter(([,v])=>v>0).forEach(([nombre,cant])=>{
+  Object.entries(stockUni).forEach(([nombre,cant])=>{
     if(nombre.includes("TINTA")){stockTinta[nombre]=cant;totalTinta+=cant;}
     else{stockPapel[nombre]=cant;totalPapel+=cant;}
   });
@@ -6958,18 +7150,17 @@ function StockView({stockUni,data}){
     const conts=(data.contenedores||[]).filter(c=>{
       const art2=(c.articulos||[]).find(a=>a.nombre===art);
       if(!art2) return false;
-      // Solo mostrar si hay stock disponible en ese contenedor
       const vendido=(data.ventas||[]).filter(v=>v.contId===c.id&&v.articulo===art).reduce((a,v)=>a+Number(v.cantidad),0);
-      return Math.max(0, Number(art2.cantidad)-vendido) > 0;
+      return Number(art2.cantidad)>0; // mostrar contenedor aunque esté agotado
     }).map(c=>c.nombre).join(", ");
     return(
-      <div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",boxShadow:"var(--glass-shadow-sm)"}}>
+      <div key={art} style={{background:cant===0?"rgba(192,57,43,0.04)":"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:cant===0?"0.5px solid rgba(192,57,43,0.25)":"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",boxShadow:"var(--glass-shadow-sm)",opacity:cant===0?0.7:1}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art}</div>
           <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis"}}>{conts}</div>
           <div style={{marginTop:4}}><ProyTag art={art} ventas={data.ventas} disp={cant}/></div>
         </div>
-        <div style={{fontSize:20,fontWeight:700,color:esTinta?"var(--text-info)":"var(--text-primary)",marginLeft:8,flexShrink:0}}>{fmt(cant)}</div>
+        <div style={{fontSize:20,fontWeight:700,color:cant===0?"var(--text-danger)":esTinta?"var(--text-info)":"var(--text-primary)",marginLeft:8,flexShrink:0}}>{cant===0?"✕":fmt(cant)}</div>
       </div>
     );
   };
