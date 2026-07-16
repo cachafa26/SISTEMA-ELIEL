@@ -393,7 +393,7 @@ function ContenedorModal({c,data,onClose}){
         border:"0.5px solid var(--glass-border)",borderBottom:"none",
         boxShadow:"0 -8px 40px rgba(0,0,0,.3)",
         animation:"slideUp .25s cubic-bezier(.34,1.2,.64,1)",
-        maxHeight:"90vh",overflowY:"auto"
+        maxHeight:"85dvh",overflowY:"auto"
       }}>
         {/* Handle */}
         <div style={{width:36,height:4,background:"rgba(120,120,128,0.3)",borderRadius:2,margin:"0 auto 16px"}}/>
@@ -512,7 +512,11 @@ function proyeccionAgot(artNombre,ventasAll,dispActual){
 }
 function ProyTag({art,ventas,disp}){
   const p=proyeccionAgot(art,ventas,disp);
-  if(p.tipo==="agotado")return <span style={{fontSize:10,color:"var(--text-danger)",fontWeight:600}}>Agotado</span>;
+  if(p.tipo==="agotado"){
+    const ventas_art=(ventas||[]).filter(v=>v.articulo===art&&Number(v.cantidad||0)>0);
+    const ultima=ventas_art.length>0?[...ventas_art].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""))[0].fecha:"";
+    return <span style={{fontSize:10,color:"var(--text-danger)",fontWeight:600}}>Sin stock{ultima?" desde "+ultima:""}</span>;
+  }
   if(p.tipo==="sin_mov")return <span style={{fontSize:10,color:"var(--text-secondary)"}}>Sin movimiento reciente</span>;
   const color=p.dias<30?"var(--text-danger)":p.dias<90?"var(--text-warning)":"var(--text-success)";
   return(
@@ -525,7 +529,7 @@ function ProyTag({art,ventas,disp}){
 
 // ── Gráfico de Facturación ────────────────────────────────────────
 function GraficoFacturacion({ventas,ventasHistoricas}){
-  const [modo,setModo]=React.useState("mensual");
+  const [modo,setModo]=React.useState("semanal");
   const [tooltip,setTooltip]=React.useState(null);
   const MODOS=[
     {id:"semanal",l:"Semanal"},
@@ -645,9 +649,9 @@ function GraficoFacturacion({ventas,ventasHistoricas}){
   return(
     <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(20px) saturate(1.8)",WebkitBackdropFilter:"blur(20px) saturate(1.8)",border:"0.5px solid rgba(255,255,255,0.12)",borderRadius:"var(--r-xl,16px)",padding:"18px 16px 12px",marginBottom:"1.5rem",boxShadow:"0 4px 24px rgba(0,0,0,.15)"}}>
       {/* Title + pills */}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,flexWrap:"wrap",gap:8}}>
         <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary,#e8eaf0)"}}>Evolución de facturación</div>
-        <div style={{display:"flex",gap:4,background:"rgba(120,120,128,0.12)",borderRadius:20,padding:3}}>
+        <div style={{display:"flex",gap:4,background:"rgba(120,120,128,0.12)",borderRadius:20,padding:3,overflowX:"auto",WebkitOverflowScrolling:"touch",flexShrink:0}}>
           {MODOS.map(m=>(
             <button key={m.id} onClick={()=>{setModo(m.id);setTooltip(null);}} style={{
               fontSize:10,padding:"4px 10px",borderRadius:16,border:"none",cursor:"pointer",fontWeight:600,
@@ -672,7 +676,7 @@ function GraficoFacturacion({ventas,ventasHistoricas}){
       <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",display:"block",overflow:"visible"}}
         onMouseMove={e=>handleMove(e,e.currentTarget)}
         onMouseLeave={()=>setTooltip(null)}
-        onTouchMove={e=>{e.preventDefault();handleMove(e,e.currentTarget);}}
+        onTouchMove={e=>{e.preventDefault();handleMove(e,e.currentTarget);}} style={{touchAction:"none"}}
         onTouchEnd={()=>setTooltip(null)}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
