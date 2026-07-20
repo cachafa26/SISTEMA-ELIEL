@@ -4544,31 +4544,7 @@ function DeudoresDJ({eventos,data,save,showToast,blue}){
               </button>
             </div>
           );
-          };
-          return(
-            <>
-              <div style={{display:"grid",gap:8,marginBottom:_cerr2.length>0?16:0}}>
-                {_act2.map((c,i)=>renderCard2(c,i))}
-              </div>
-              {_cerr2.length>0&&(
-                <div>
-                  <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-secondary)",margin:"8px 0",display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{width:16,height:1,background:"var(--glass-border)",display:"inline-block"}}/>
-                    Cerrados · {_cerr2.length}
-                    <span style={{flex:1,height:1,background:"var(--glass-border)",display:"inline-block"}}/>
-                  </div>
-                  <div style={{display:"grid",gap:8}}>
-                    {_cerr2.map((c,i)=>(
-                      <div key={c.id} style={{opacity:0.6,filter:"saturate(0.4)"}}>
-                        {renderCard2(c,i)}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          );
-        })()}
+        })}
       </div>
     </div>
   );
@@ -6337,7 +6313,31 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
               )}
             </div>
           );
-        })}
+          };
+          return(
+            <>
+              <div style={{display:"grid",gap:8,marginBottom:_cerr2.length>0?16:0}}>
+                {_act2.map((x,i)=>renderCard2(x,i))}
+              </div>
+              {_cerr2.length>0&&(
+                <div>
+                  <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-secondary)",margin:"8px 0",display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{width:16,height:1,background:"var(--glass-border)",display:"inline-block"}}/>
+                    Cerrados · {_cerr2.length}
+                    <span style={{flex:1,height:1,background:"var(--glass-border)",display:"inline-block"}}/>
+                  </div>
+                  <div style={{display:"grid",gap:8}}>
+                    {_cerr2.map((x,i)=>(
+                      <div key={x.id} style={{opacity:0.6,filter:"saturate(0.4)"}}>
+                        {renderCard2(x,i)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
