@@ -3237,7 +3237,7 @@ function GestorDeudas({data,save,showToast,blue}){
   const [showForm,setShowForm]=useState(false);
   const [editando,setEditando]=useState(null); // deuda en edición
   const [modalPago,setModalPago]=useState(null);
-  const [formPago,setFormPago]=useState({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc))});
+  const [formPago,setFormPago]=useState({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:"USD"});
   const [form,setForm]=useState({desc:"",monto:"",moneda:"ARS",fecha:new Date().toISOString().split("T")[0],nota:""});
 
   const resetForm=()=>setForm({desc:"",monto:"",moneda:"ARS",fecha:new Date().toISOString().split("T")[0],nota:""});
@@ -3293,9 +3293,14 @@ function GestorDeudas({data,save,showToast,blue}){
     if(montoN<=0){showToast("Monto inválido");return;}
     const pagadoHist=(d.historialPagos||[]).reduce((a,p)=>a+Number(p.monto||0),0);
     const saldoActual=Math.max(0,Number(d.monto||0)-pagadoHist);
-    const aplicar=Math.min(montoN,saldoActual);
+    // Si la deuda es en USD y el pago es en ARS, convertir al TC indicado
+    const tcUsado=Number(formPago.tcPago||tc);
+    const montoEnMonedaDeuda=d.moneda==="USD"&&formPago.modoPago==="ARS"
+      ?montoN/tcUsado  // ARS → USD
+      :montoN;
+    const aplicar=Math.min(montoEnMonedaDeuda,saldoActual);
     const gastoId=Date.now().toString()+"g";
-    const nuevoGasto={id:gastoId,desc:"Pago deuda: "+d.desc+(formPago.nota?" ("+formPago.nota+")":""),moneda:d.moneda,montoOriginal:aplicar,cotiz:d.moneda==="USD"?Number(formPago.tcPago||tc):null,monto:d.moneda==="USD"?Math.round(aplicar*Number(formPago.tcPago||tc)):aplicar,cat:"Deudas",fecha:formPago.fecha,fuente:"Otros",deudaId:d.id};
+    const nuevoGasto={id:gastoId,desc:"Pago deuda: "+d.desc+(formPago.nota?" ("+formPago.nota+")":""),moneda:d.moneda,montoOriginal:aplicar,cotiz:d.moneda==="USD"?Number(formPago.tcPago||tc):null,monto:d.moneda==="USD"?(formPago.modoPago==="ARS"?Math.round(montoN):Math.round(aplicar*tcUsado)):aplicar,cat:"Deudas",fecha:formPago.fecha,fuente:"Otros",deudaId:d.id};
     const pagoConLink={id:Date.now().toString(),monto:aplicar,fecha:formPago.fecha,nota:formPago.nota,gastoId};
     const histConLink=[...(d.historialPagos||[]),pagoConLink];
     const saldoNuevo=saldoActual-aplicar;
@@ -3315,8 +3320,8 @@ function GestorDeudas({data,save,showToast,blue}){
     <div>
       {/* Modal pago */}
       {modalPago&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
-          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl) var(--r-xl) 0 0",padding:"24px 24px calc(24px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:480,border:"0.5px solid var(--glass-border)",borderBottom:"none",boxShadow:"var(--glass-shadow-lg)",animation:"slideUp .25s cubic-bezier(.34,1.2,.64,1)"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",>
+          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:480,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"slideUp .25s cubic-bezier(.34,1.2,.64,1)"}}>
             <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 3px",color:"var(--text-primary)"}}>Pagar deuda</h3>
             <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 14px"}}>{modalPago.desc}</p>
             {(()=>{
@@ -3329,31 +3334,49 @@ function GestorDeudas({data,save,showToast,blue}){
                 </div>
               );
             })()}
+            {/* Modo de pago para deudas USD */}
+            {modalPago.moneda==="USD"&&(
+              <div style={{display:"flex",gap:6,marginBottom:12}}>
+                {["USD","ARS"].map(m=>(
+                  <button key={m} onClick={()=>setFormPago(f=>({...f,modoPago:m,monto:""}))} style={{
+                    flex:1,padding:"7px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",
+                    cursor:"pointer",fontSize:12,fontWeight:600,
+                    background:formPago.modoPago===m?"var(--sc-orange)":"none",
+                    color:formPago.modoPago===m?"#fff":"var(--text-secondary)"
+                  }}>Pago en {m}</button>
+                ))}
+              </div>
+            )}
             <div style={{marginBottom:10}}>
-              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto a pagar ({modalPago.moneda})</label>
+              <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>
+                {modalPago.moneda==="USD"&&formPago.modoPago==="ARS"?"Monto recibido en ARS":"Monto a pagar ("+modalPago.moneda+")"}
+              </label>
               <input type="number" value={formPago.monto} onChange={e=>setFormPago(f=>({...f,monto:e.target.value}))} placeholder="0" autoFocus inputMode="decimal"/>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8,marginBottom:12}}>
-              <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label><input type="date" value={formPago.fecha} onChange={e=>setFormPago(f=>({...f,fecha:e.target.value}))}/></div>
-              <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota</label><input value={formPago.nota} onChange={e=>setFormPago(f=>({...f,nota:e.target.value}))} placeholder="Opcional"/></div>
-            </div>
-            {modalPago.moneda==="USD"&&(
+            {modalPago.moneda==="USD"&&formPago.modoPago==="ARS"&&(
               <div style={{marginBottom:12}}>
                 <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>
-                  Tipo de cambio (USD → ARS)
+                  Tipo de cambio
                   <span style={{fontSize:10,color:"var(--text-secondary)",fontWeight:400,marginLeft:6}}>Blue: ${tc.toLocaleString("es-AR")}</span>
                 </label>
                 <input type="number" value={formPago.tcPago} onChange={e=>setFormPago(f=>({...f,tcPago:e.target.value}))} placeholder={String(Math.round(tc))} inputMode="decimal" style={{width:"100%"}}/>
               </div>
             )}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8,marginBottom:12}}>
+              <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label><input type="date" value={formPago.fecha} onChange={e=>setFormPago(f=>({...f,fecha:e.target.value}))}/></div>
+              <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota</label><input value={formPago.nota} onChange={e=>setFormPago(f=>({...f,nota:e.target.value}))} placeholder="Opcional"/></div>
+            </div>
             {formPago.monto&&Number(formPago.monto)>0&&modalPago.moneda==="USD"&&(
               <div style={{fontSize:12,color:"var(--text-info)",marginBottom:12,padding:"8px 12px",background:"var(--bg-tint-blue)",borderRadius:"var(--r-md)",fontWeight:500}}>
-                = ${Math.round(Number(formPago.monto)*Number(formPago.tcPago||tc)).toLocaleString("es-AR")} ARS
+                {formPago.modoPago==="ARS"
+                  ?<>Saldás USD {(Number(formPago.monto)/Number(formPago.tcPago||tc)).toFixed(2)} · Ingresás ${Number(formPago.monto).toLocaleString("es-AR")} ARS</>
+                  :<>= ${Math.round(Number(formPago.monto)*Number(formPago.tcPago||tc)).toLocaleString("es-AR")} ARS</>
+                }
               </div>
             )}
             <div style={{display:"flex",gap:8}}>
               <button onClick={pagarDeuda} style={{flex:1,fontSize:13,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>✓ Registrar pago</button>
-              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc))});}} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:"USD"});}} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
             </div>
           </div>
         </div>
@@ -3451,7 +3474,7 @@ function GestorDeudas({data,save,showToast,blue}){
                   </div>
                 )}
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  <button onClick={()=>{setModalPago(d);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc))}); }} style={{fontSize:12,padding:"6px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>💳 Pagar</button>
+                  <button onClick={()=>{setModalPago(d);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:"USD"}); }} style={{fontSize:12,padding:"6px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>💳 Pagar</button>
                   <button onClick={()=>abrirEditar(d)} style={{fontSize:12,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer",fontWeight:500}}>✏️ Editar</button>
                   <button onClick={()=>eliminarDeuda(d.id)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>✕ Eliminar</button>
                 </div>
@@ -4461,7 +4484,7 @@ function DeudoresDJ({eventos,data,save,showToast,blue}){
 
       {/* Modal pago */}
       {modalPago&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",>
           <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"22px",width:"100%",maxWidth:360,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
             <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Registrar pago</h3>
             <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{modalPago.nombre} · Saldo: {fmtUSD(modalPago.saldoUSD)}</p>
@@ -4823,7 +4846,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 
       {/* Pago modal */}
       {modalPago&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",>
           <div style={{background:"var(--bg-modal,#13132A)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:360,boxShadow:"0 24px 60px rgba(0,0,0,0.5)"}}>
             <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Registrar pago</h3>
             <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 14px"}}>{modalPago.nombre}</p>
@@ -4888,8 +4911,8 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 
       {/* Confirm presupuesto modal */}
       {modalConfirmar&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
-          <div style={{background:"var(--bg-modal,#13132A)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl) var(--r-xl) 0 0",padding:"24px 24px calc(24px + env(safe-area-inset-bottom,0px))",width:"100%",maxWidth:400,boxShadow:"0 24px 60px rgba(0,0,0,0.5)",maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",>
+          <div style={{background:"var(--bg-modal,#13132A)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:400,boxShadow:"0 24px 60px rgba(0,0,0,0.5)",maxHeight:"90vh",overflowY:"auto"}}>
             <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 2px",color:"var(--text-primary)"}}>Confirmar evento</h3>
             <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 14px"}}>{modalConfirmar.cliente} — {modalConfirmar.tipoEvento}{modalConfirmar.salon?" · "+modalConfirmar.salon:""}<br/><span style={{color:"var(--text-secondary)"}}>{modalConfirmar.fecha}</span></p>
 
@@ -7358,7 +7381,7 @@ function VentasView({data,save,showToast}){
       {/* Modal edición de pedido */}
       {editPedido&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",overflowY:"auto"}}>
-          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl) var(--r-xl) 0 0",padding:"24px 24px calc(24px + env(safe-area-inset-bottom,0px))",width:"100%",maxWidth:480,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",maxHeight:"90vh",overflowY:"auto"}}>
+          <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"24px",width:"100%",maxWidth:480,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",maxHeight:"90vh",overflowY:"auto"}}>
             <h3 style={{fontSize:15,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Editar pedido</h3>
             <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{editPedido.cliente} · {editPedido.fecha}</p>
             {editLineas.map((l,i)=>(
@@ -7612,7 +7635,7 @@ function CuentasView({data,save,showToast}){
 
         {/* Payment modal */}
         {modal&&(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"0",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",>
             <div style={{background:"var(--bg-modal)",backdropFilter:"blur(40px)",WebkitBackdropFilter:"blur(40px)",borderRadius:"var(--r-xl)",padding:"22px",width:"100%",maxWidth:360,border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-lg)",animation:"modalIn .25s cubic-bezier(.34,1.2,.64,1)"}}>
               <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px",color:"var(--text-primary)"}}>Registrar pago</h3>
               <p style={{fontSize:12,color:"var(--text-secondary)",margin:"0 0 16px"}}>{modal.cliente}{modal.saldoTotal?" · Saldo total: $"+fmt(modal.saldoTotal):""}</p>
