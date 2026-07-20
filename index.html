@@ -1462,6 +1462,11 @@ function cobradoUSD(v,pagos){
 function stockDisp(contId,artNombre,ventas){
   return(ventas||[]).filter(v=>v.contId===contId&&v.articulo===artNombre).reduce((a,v)=>a+Number(v.cantidad),0);
 }
+function isContAgotado(cont,ventas){
+  const arts=cont.articulos||[];
+  if(arts.length===0)return false;
+  return arts.every(a=>Math.max(0,Number(a.cantidad)-stockDisp(cont.id,a.nombre,ventas))===0);
+}
 // USD value of a venta with fallback chain (handles bad/missing usd field)
 function ventaUSD(v, tcBlue){
   const u=Number(v.usd||0);
@@ -3232,7 +3237,7 @@ function GestorDeudas({data,save,showToast,blue}){
   const [showForm,setShowForm]=useState(false);
   const [editando,setEditando]=useState(null); // deuda en edición
   const [modalPago,setModalPago]=useState(null);
-  const [formPago,setFormPago]=useState({monto:"",fecha:new Date().toISOString().split("T")[0],nota:""});
+  const [formPago,setFormPago]=useState({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc))});
   const [form,setForm]=useState({desc:"",monto:"",moneda:"ARS",fecha:new Date().toISOString().split("T")[0],nota:""});
 
   const resetForm=()=>setForm({desc:"",monto:"",moneda:"ARS",fecha:new Date().toISOString().split("T")[0],nota:""});
@@ -3290,7 +3295,7 @@ function GestorDeudas({data,save,showToast,blue}){
     const saldoActual=Math.max(0,Number(d.monto||0)-pagadoHist);
     const aplicar=Math.min(montoN,saldoActual);
     const gastoId=Date.now().toString()+"g";
-    const nuevoGasto={id:gastoId,desc:"Pago deuda: "+d.desc+(formPago.nota?" ("+formPago.nota+")":""),moneda:d.moneda,montoOriginal:aplicar,cotiz:d.moneda==="USD"?tc:null,monto:d.moneda==="USD"?Math.round(aplicar*tc):aplicar,cat:"Deudas",fecha:formPago.fecha,fuente:"Otros",deudaId:d.id};
+    const nuevoGasto={id:gastoId,desc:"Pago deuda: "+d.desc+(formPago.nota?" ("+formPago.nota+")":""),moneda:d.moneda,montoOriginal:aplicar,cotiz:d.moneda==="USD"?Number(formPago.tcPago||tc):null,monto:d.moneda==="USD"?Math.round(aplicar*Number(formPago.tcPago||tc)):aplicar,cat:"Deudas",fecha:formPago.fecha,fuente:"Otros",deudaId:d.id};
     const pagoConLink={id:Date.now().toString(),monto:aplicar,fecha:formPago.fecha,nota:formPago.nota,gastoId};
     const histConLink=[...(d.historialPagos||[]),pagoConLink];
     const saldoNuevo=saldoActual-aplicar;
@@ -3328,18 +3333,27 @@ function GestorDeudas({data,save,showToast,blue}){
               <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Monto a pagar ({modalPago.moneda})</label>
               <input type="number" value={formPago.monto} onChange={e=>setFormPago(f=>({...f,monto:e.target.value}))} placeholder="0" autoFocus inputMode="decimal"/>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8,marginBottom:16}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8,marginBottom:12}}>
               <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha</label><input type="date" value={formPago.fecha} onChange={e=>setFormPago(f=>({...f,fecha:e.target.value}))}/></div>
               <div><label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Nota</label><input value={formPago.nota} onChange={e=>setFormPago(f=>({...f,nota:e.target.value}))} placeholder="Opcional"/></div>
             </div>
+            {modalPago.moneda==="USD"&&(
+              <div style={{marginBottom:12}}>
+                <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>
+                  Tipo de cambio (USD → ARS)
+                  <span style={{fontSize:10,color:"var(--text-secondary)",fontWeight:400,marginLeft:6}}>Blue: ${tc.toLocaleString("es-AR")}</span>
+                </label>
+                <input type="number" value={formPago.tcPago} onChange={e=>setFormPago(f=>({...f,tcPago:e.target.value}))} placeholder={String(Math.round(tc))} inputMode="decimal" style={{width:"100%"}}/>
+              </div>
+            )}
             {formPago.monto&&Number(formPago.monto)>0&&modalPago.moneda==="USD"&&(
-              <div style={{fontSize:11,color:"var(--text-info)",marginBottom:12,padding:"7px 10px",background:"var(--bg-tint-blue)",borderRadius:"var(--r-md)"}}>
-                = ${Math.round(Number(formPago.monto)*tc).toLocaleString("es-AR")} ARS al TC ${tc.toLocaleString("es-AR")}
+              <div style={{fontSize:12,color:"var(--text-info)",marginBottom:12,padding:"8px 12px",background:"var(--bg-tint-blue)",borderRadius:"var(--r-md)",fontWeight:500}}>
+                = ${Math.round(Number(formPago.monto)*Number(formPago.tcPago||tc)).toLocaleString("es-AR")} ARS
               </div>
             )}
             <div style={{display:"flex",gap:8}}>
               <button onClick={pagarDeuda} style={{flex:1,fontSize:13,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>✓ Registrar pago</button>
-              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:""});}} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc))});}} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
             </div>
           </div>
         </div>
@@ -3437,7 +3451,7 @@ function GestorDeudas({data,save,showToast,blue}){
                   </div>
                 )}
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  <button onClick={()=>{setModalPago(d);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:""}); }} style={{fontSize:12,padding:"6px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>💳 Pagar</button>
+                  <button onClick={()=>{setModalPago(d);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc))}); }} style={{fontSize:12,padding:"6px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>💳 Pagar</button>
                   <button onClick={()=>abrirEditar(d)} style={{fontSize:12,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer",fontWeight:500}}>✏️ Editar</button>
                   <button onClick={()=>eliminarDeuda(d.id)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>✕ Eliminar</button>
                 </div>
@@ -4530,7 +4544,31 @@ function DeudoresDJ({eventos,data,save,showToast,blue}){
               </button>
             </div>
           );
-        })}
+          };
+          return(
+            <>
+              <div style={{display:"grid",gap:8,marginBottom:_cerr2.length>0?16:0}}>
+                {_act2.map((c,i)=>renderCard2(c,i))}
+              </div>
+              {_cerr2.length>0&&(
+                <div>
+                  <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-secondary)",margin:"8px 0",display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{width:16,height:1,background:"var(--glass-border)",display:"inline-block"}}/>
+                    Cerrados · {_cerr2.length}
+                    <span style={{flex:1,height:1,background:"var(--glass-border)",display:"inline-block"}}/>
+                  </div>
+                  <div style={{display:"grid",gap:8}}>
+                    {_cerr2.map((c,i)=>(
+                      <div key={c.id} style={{opacity:0.6,filter:"saturate(0.4)"}}>
+                        {renderCard2(c,i)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
@@ -6019,7 +6057,11 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
           <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"2rem",textAlign:"center"}}>
             <p style={{color:"var(--text-secondary)",fontSize:14,margin:0}}>Creá tu primer contenedor.</p>
           </div>
-        ):sortConts(data.contenedores||[],data.contenedoresOrden).map(c=>{
+        ):(()=>{
+          const _sorted=sortConts(data.contenedores||[],data.contenedoresOrden);
+          const _act=_sorted.filter(x=>!isContAgotado(x,data.ventas));
+          const _cerr=_sorted.filter(x=>isContAgotado(x,data.ventas));
+          const renderC=c=>{
           const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
           const ventasContFiltered=(data.ventas||[]).filter(v=>v.contId===c.id);
           const totalVCont=ventasContFiltered.reduce((a,v)=>a+Number(v.usd||0),0);
@@ -6063,7 +6105,32 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
               )}
             </div>
           );
-        })}
+          };
+          return(
+            <>
+              <div style={{display:"grid",gap:8,marginBottom:_cerr.length>0?16:0}}>
+                {_act.length===0&&<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin contenedores activos.</div>}
+                {_act.map(c=>renderC(c))}
+              </div>
+              {_cerr.length>0&&(
+                <div>
+                  <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-secondary)",margin:"8px 0",display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{width:16,height:1,background:"var(--glass-border)",display:"inline-block"}}/>
+                    Cerrados · {_cerr.length}
+                    <span style={{flex:1,height:1,background:"var(--glass-border)",display:"inline-block"}}/>
+                  </div>
+                  <div style={{display:"grid",gap:8}}>
+                    {_cerr.map(c=>(
+                      <div key={c.id} style={{opacity:0.55,filter:"saturate(0.4)"}}>
+                        {renderC(c)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
     </div>
@@ -6185,7 +6252,10 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
           <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"2rem",textAlign:"center"}}>
             <p style={{color:"var(--text-secondary)",fontSize:14,margin:0}}>Creá tu primer contenedor.</p>
           </div>
-        ):contsOrdenados.map((c,i)=>{
+        ):(()=>{
+          const _act2=contsOrdenados.filter(x=>!isContAgotado(x,data.ventas));
+          const _cerr2=contsOrdenados.filter(x=>isContAgotado(x,data.ventas));
+          const renderCard2=(c,i)=>{
           const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
           const costo=c.costoTotal||0;
           const pct=costo>0?Math.min(100,(cobUSD/costo)*100):0;
