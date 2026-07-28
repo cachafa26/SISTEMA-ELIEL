@@ -1463,6 +1463,7 @@ function stockDisp(contId,artNombre,ventas){
   return(ventas||[]).filter(v=>v.contId===contId&&v.articulo===artNombre).reduce((a,v)=>a+Number(v.cantidad),0);
 }
 function isContAgotado(cont,ventas){
+  if(cont.estado==="pedido")return false; // pedidos nunca son "cerrados"
   const arts=cont.articulos||[];
   if(arts.length===0)return false;
   return arts.every(a=>Math.max(0,Number(a.cantidad)-stockDisp(cont.id,a.nombre,ventas))===0);
@@ -1740,6 +1741,7 @@ function App(){
   // Calculos SC globales
   const stockUni={};
   for(const c of data.contenedores){
+    if(c.estado==="pedido")continue; // pedidos no van al stock
     for(const art of(c.articulos||[])){
       if(!stockUni[art.nombre])stockUni[art.nombre]=0;
       stockUni[art.nombre]+=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
@@ -6068,8 +6070,10 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
           </div>
         ):(()=>{
           const _sorted=sortConts(data.contenedores||[],data.contenedoresOrden);
-          const _act=_sorted.filter(x=>!isContAgotado(x,data.ventas));
-          const _cerr=_sorted.filter(x=>isContAgotado(x,data.ventas));
+          const _ped=_sorted.filter(x=>x.estado==="pedido");
+          const _noP=_sorted.filter(x=>x.estado!=="pedido");
+          const _act=_noP.filter(x=>!isContAgotado(x,data.ventas));
+          const _cerr=_noP.filter(x=>isContAgotado(x,data.ventas));
           const renderC=c=>{
           const ventasCont=(data.ventas||[]).filter(v=>v.contId===c.id);
           const ventasContFiltered=(data.ventas||[]).filter(v=>v.contId===c.id);
@@ -6112,13 +6116,29 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
                   </div>
                 </>
               )}
+              {/* Action buttons */}
+              <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}} onClick={e=>e.stopPropagation()}>
+                {c.estado==="pedido"&&<button onClick={()=>marcarArribado(c.id)} style={{fontSize:11,padding:"5px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",boxShadow:"0 2px 8px rgba(91,173,65,0.25)"}}>✓ Arribado</button>}
+                <button onClick={()=>{setContSel(c);setContTab("stock");}} style={{fontSize:11,padding:"5px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Ver detalle →</button>
+                {c.estado==="pedido"&&<button onClick={e=>{e.stopPropagation();const nuevos=(data.contenedores||[]).map(x=>x.id===c.id?{...x,estado:"activo",fechaArribo:undefined}:x);save({...data,contenedores:nuevos});showToast("✓ Contenedor arribado");}} style={{fontSize:11,padding:"5px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer"}}>✓ Arribado</button>}
+              </div>
             </div>
           );
           };
           return(
             <>
+              {_ped.length>0&&(
+                <div style={{marginBottom:14}}>
+                  <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-info)",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+                    <span>🚢</span> En camino · {_ped.length}
+                  </div>
+                  <div style={{display:"grid",gap:8,padding:"10px",background:"rgba(46,134,193,0.06)",border:"0.5px solid rgba(46,134,193,0.2)",borderRadius:"var(--r-lg)"}}>
+                    {_ped.map(c=>renderC(c))}
+                  </div>
+                </div>
+              )}
               <div style={{display:"grid",gap:8,marginBottom:_cerr.length>0?16:0}}>
-                {_act.length===0&&<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin contenedores activos.</div>}
+                {_act.length===0&&!_ped.length&&<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin contenedores activos.</div>}
                 {_act.map(c=>renderC(c))}
               </div>
               {_cerr.length>0&&(
@@ -6149,6 +6169,8 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
 function ContenedoresList({data,save,setContSel,setContTab,showToast}){
   const [nuevo,setNuevo]=useState(false);
   const [nombre,setNombre]=useState("");
+  const [enCamino,setEnCamino]=useState(false);
+  const [fechaArribo,setFechaArribo]=useState("");
   const [editOrden,setEditOrden]=useState(false);
   const [ordenLocal,setOrdenLocal]=useState([]);
   const dragIdx=useRef(null);
@@ -6158,9 +6180,16 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
 
   const crear=()=>{
     if(!nombre.trim())return;
-    const c={id:Date.now().toString(),nombre:nombre.trim(),estado:"activo",articulos:[],costos:{},costoTotal:0,pesoTotal:0};
+    const estado=enCamino?"pedido":"activo";
+    const c={id:Date.now().toString(),nombre:nombre.trim(),estado,articulos:[],costos:{},costoTotal:0,pesoTotal:0,...(enCamino&&fechaArribo?{fechaArribo}:{})};
     save({...data,contenedores:[...(data.contenedores||[]),c]});
-    setNuevo(false);setNombre("");showToast("Contenedor creado");
+    setNuevo(false);setNombre("");setEnCamino(false);setFechaArribo("");
+    showToast(enCamino?"📦 Contenedor en camino registrado":"Contenedor creado");
+  };
+  const marcarArribado=(contId)=>{
+    const nuevos=(data.contenedores||[]).map(x=>x.id===contId?{...x,estado:"activo",fechaArribo:undefined}:x);
+    save({...data,contenedores:nuevos});
+    showToast("✓ Contenedor marcado como arribado");
   };
 
   const iniciarEdicion=()=>{
@@ -6249,9 +6278,22 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
         <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",marginBottom:"1rem",boxShadow:"var(--glass-shadow-sm)"}}>
           <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:6}}>Nombre del contenedor</label>
           <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej: 15VO CONT PAPEL" onKeyDown={e=>e.key==="Enter"&&crear()} autoFocus/>
-          <div style={{display:"flex",gap:8,marginTop:10}}>
-            <button onClick={crear} style={{fontSize:13,padding:"8px 18px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer"}}>Crear</button>
-            <button onClick={()=>{setNuevo(false);setNombre("");}} style={{fontSize:13,padding:"8px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+          <div style={{display:"flex",gap:6,marginTop:10,marginBottom:10}}>
+            {["activo","pedido"].map(op=>(
+              <button key={op} onClick={()=>setEnCamino(op==="pedido")} style={{flex:1,padding:"7px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",cursor:"pointer",fontSize:11,fontWeight:600,background:(!enCamino&&op==="activo")||(enCamino&&op==="pedido")?"linear-gradient(135deg,#185FA5,#2E86C1)":"none",color:(!enCamino&&op==="activo")||(enCamino&&op==="pedido")?"#fff":"var(--text-secondary)"}}>
+                {op==="activo"?"✓ Ya llegó":"🚢 En camino"}
+              </button>
+            ))}
+          </div>
+          {enCamino&&(
+            <div style={{marginBottom:10}}>
+              <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:4}}>Fecha estimada de arribo</label>
+              <input type="date" value={fechaArribo} onChange={e=>setFechaArribo(e.target.value)}/>
+            </div>
+          )}
+          <div style={{display:"flex",gap:8,marginTop:4}}>
+            <button onClick={crear} style={{fontSize:13,padding:"8px 18px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontWeight:600,cursor:"pointer"}}>{enCamino?"Registrar pedido":"Crear"}</button>
+            <button onClick={()=>{setNuevo(false);setNombre("");setEnCamino(false);setFechaArribo("");}} style={{fontSize:13,padding:"8px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
           </div>
         </div>
       )}
@@ -6262,8 +6304,10 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
             <p style={{color:"var(--text-secondary)",fontSize:14,margin:0}}>Creá tu primer contenedor.</p>
           </div>
         ):(()=>{
-          const _act2=contsOrdenados.filter(x=>!isContAgotado(x,data.ventas));
-          const _cerr2=contsOrdenados.filter(x=>isContAgotado(x,data.ventas));
+          const _ped2=contsOrdenados.filter(x=>x.estado==="pedido");
+          const _noP=contsOrdenados.filter(x=>x.estado!=="pedido");
+          const _act2=_noP.filter(x=>!isContAgotado(x,data.ventas));
+          const _cerr2=_noP.filter(x=>isContAgotado(x,data.ventas));
           const renderCard2=(c,i)=>{
           const cobUSD=(data.ventas||[]).filter(v=>v.contId===c.id).reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
           const costo=c.costoTotal||0;
@@ -6298,7 +6342,11 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
                 }}>
                 <div style={{color:"var(--text-tertiary)",fontSize:18,flexShrink:0,cursor:"grab"}}>⠿</div>
                 <div style={{flex:1}}>
-                  <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</span>
+                    {c.estado==="pedido"&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:10,background:"rgba(46,134,193,0.15)",color:"var(--text-info)",flexShrink:0}}>EN CAMINO</span>}
+                  </div>
+                  {c.estado==="pedido"&&c.fechaArribo&&<div style={{fontSize:10,color:"var(--text-secondary)",marginTop:1}}>🗓 Arribo est.: {c.fechaArribo}</div>}
                   <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>
                     {costo>0?(enG?"✓ En ganancia":fmtPct(pct)+" recuperado"):"Sin costo"}
                   </div>
@@ -6349,6 +6397,16 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
           };
           return(
             <>
+              {_ped2.length>0&&(
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-info)",margin:"0 0 10px 0",display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:14}}>🚢</span> En camino · {_ped2.length}
+                  </div>
+                  <div style={{display:"grid",gap:8,padding:"12px",background:"rgba(46,134,193,0.06)",border:"0.5px solid rgba(46,134,193,0.2)",borderRadius:"var(--r-lg)"}}>
+                    {_ped2.map((x,i)=>renderCard2(x,i))}
+                  </div>
+                </div>
+              )}
               <div style={{display:"grid",gap:8,marginBottom:_cerr2.length>0?16:0}}>
                 {_act2.map((x,i)=>renderCard2(x,i))}
               </div>
