@@ -738,6 +738,56 @@ function isContAgotado(cont,ventas){
   return arts.every(a=>Math.max(0,Number(a.cantidad)-stockDisp(cont.id,a.nombre,ventas))===0);
 }
 
+function AccionesContStatus({cont,data,saveData}){
+  const [editFecha,setEditFecha]=React.useState(false);
+  const [nuevaFecha,setNuevaFecha]=React.useState(cont.fechaArribo||"");
+  const esPedido=cont.estado==="pedido";
+
+  const setEstado=(nuevoEstado,extra={})=>{
+    const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,estado:nuevoEstado,...extra}:x);
+    saveData({...data,contenedores:nuevos});
+  };
+  const guardarFecha=()=>{
+    const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,fechaArribo:nuevaFecha||null}:x);
+    saveData({...data,contenedores:nuevos});
+    setEditFecha(false);
+  };
+  const eliminar=()=>{
+    const nV=(data.ventas||[]).filter(v=>v.contId===cont.id).length;
+    const msg=nV>0
+      ?"⚠️ \""+cont.nombre+"\" tiene "+nV+" venta/s registradas.\n\nSi lo eliminás, esas ventas quedarán huérfanas.\n\n¿Eliminar igualmente?"
+      :"¿Eliminar el contenedor \""+cont.nombre+"\"?";
+    if(!window.confirm(msg))return;
+    saveData({...data,contenedores:(data.contenedores||[]).filter(x=>x.id!==cont.id)});
+  };
+  const btn=(label,onClick,bg,color,border)=>(
+    <button onClick={e=>{e.stopPropagation();onClick();}} style={{
+      fontSize:10,padding:"4px 10px",borderRadius:"var(--r-pill)",cursor:"pointer",
+      fontWeight:600,whiteSpace:"nowrap",border:border||"none",background:bg,color:color
+    }}>{label}</button>
+  );
+
+  return(
+    <div onClick={e=>e.stopPropagation()}>
+      {editFecha
+        ?<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:8}}>
+          <input type="date" value={nuevaFecha} onChange={e=>setNuevaFecha(e.target.value)}
+            style={{fontSize:11,padding:"4px 8px",width:"auto",flex:"1 1 130px",minWidth:0}}/>
+          {btn("Guardar",guardarFecha,"linear-gradient(135deg,#5BAD41,#3D8B2A)","#fff")}
+          {btn("✕",()=>{setEditFecha(false);setNuevaFecha(cont.fechaArribo||"");},"none","var(--text-secondary)","0.5px solid var(--glass-border)")}
+        </div>
+        :<div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+          {esPedido&&btn("✓ Arribado",()=>setEstado("activo",{fechaArribo:null}),"linear-gradient(135deg,#5BAD41,#3D8B2A)","#fff")}
+          {esPedido&&btn("🗓 Fecha",()=>setEditFecha(true),"var(--bg-tint-blue)","var(--text-info)","0.5px solid var(--border-info)")}
+          {!esPedido&&btn("↩ En camino",()=>setEstado("pedido"),"var(--bg-tint-amber)","var(--text-warning)","0.5px solid rgba(178,80,0,0.3)")}
+          {btn("🗑",eliminar,"var(--bg-tint-red)","var(--text-danger)","0.5px solid var(--border-danger)")}
+        </div>
+      }
+    </div>
+  );
+}
+
+
 function ViewDashboard({data,saveData,stockUni,lastUpdate,setView,blue}){
   const [modalCont,setModalCont]=React.useState(null);
   const conts=sortConts(data.contenedores||[],data.contenedoresOrden);
@@ -780,10 +830,6 @@ function ViewDashboard({data,saveData,stockUni,lastUpdate,setView,blue}){
         const _rPed=resumen.filter(r=>r.c.estado==="pedido");
         const _rAct=resumen.filter(r=>r.c.estado!=="pedido"&&!r.agotado);
         const _rCerr=resumen.filter(r=>r.c.estado!=="pedido"&&r.agotado);
-        const marcarArribado=(contId)=>{
-          const nuevos=(data.contenedores||[]).map(x=>x.id===contId?{...x,estado:"activo",fechaArribo:undefined}:x);
-          saveData({...data,contenedores:nuevos});
-        };
         const CardCont=({c,cobUSD,costo,pct,enG,stockCont})=>(
           <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",cursor:"pointer",transition:"transform .12s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseLeave={e=>e.currentTarget.style.transform=""} onClick={()=>setModalCont(c)}>
             
@@ -812,7 +858,7 @@ function ViewDashboard({data,saveData,stockUni,lastUpdate,setView,blue}){
                 <span>Inversión: <strong>{fmtUSD(costo)}</strong></span>
               </div>
             )}
-            {c.estado==="pedido"&&<div style={{marginTop:10,display:"flex",justifyContent:"flex-start"}} onClick={e=>e.stopPropagation()}><button onClick={()=>marcarArribado(c.id)} style={{fontSize:11,padding:"5px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",boxShadow:"0 2px 8px rgba(91,173,65,0.25)"}}>✓ Arribado</button></div>}
+            <AccionesContStatus cont={c} data={data} saveData={saveData}/>
           </div>
         );
         return(
