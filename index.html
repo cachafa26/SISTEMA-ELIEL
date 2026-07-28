@@ -8500,7 +8500,12 @@ function ReportesView({data,save,showToast,blue}){
           // Si no, la ganancia es lo que exceda el faltante para cubrir el costo.
           const faltante=Math.max(0,costo-cobUSD);
           const ganUSD=enG?factUSD:Math.max(0,factUSD-faltante);
-          return{cont,lineas,factARS,factUSD,factPapelARS,factTintaARS,uPapel,uTinta,ganUSD,mi30:ganUSD*0.3,enG,costo,cobUSD,faltante,
+          const mi30=ganUSD*0.3;
+          // Prorratear el 30% entre papel y tinta según su peso en la facturación
+          const propPapel=factARS>0?factPapelARS/factARS:0;
+          const propTinta=factARS>0?factTintaARS/factARS:0;
+          return{cont,lineas,factARS,factUSD,factPapelARS,factTintaARS,uPapel,uTinta,ganUSD,mi30,
+            mi30Papel:mi30*propPapel,mi30Tinta:mi30*propTinta,enG,costo,cobUSD,faltante,
             tienePrecios:lineas.some(l=>!l.sinPrecio)};
         };
         const todos=(data.contenedores||[]).map(calcCont);
@@ -8511,8 +8516,8 @@ function ReportesView({data,save,showToast,blue}){
         const sum=(arr,k)=>arr.reduce((a,x)=>a+x[k],0);
         const T={factARS:sum(activos,"factARS"),factUSD:sum(activos,"factUSD"),ganUSD:sum(activos,"ganUSD"),
           mi30:sum(activos,"mi30"),uPapel:sum(activos,"uPapel"),uTinta:sum(activos,"uTinta"),
-          factPapelARS:sum(activos,"factPapelARS"),factTintaARS:sum(activos,"factTintaARS")};
-        const margen=T.factUSD>0?(T.ganUSD/T.factUSD*100):0;
+          factPapelARS:sum(activos,"factPapelARS"),factTintaARS:sum(activos,"factTintaARS"),
+          mi30Papel:sum(activos,"mi30Papel"),mi30Tinta:sum(activos,"mi30Tinta")};
 
         const Big=({l,v,sub,color,accent})=>(
           <div style={{background:accent||"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",
@@ -8546,7 +8551,7 @@ function ReportesView({data,save,showToast,blue}){
             </div>
             <div style={{display:"flex",gap:14,fontSize:11.5,flexWrap:"wrap",paddingTop:9,borderTop:"0.5px solid var(--glass-border)"}}>
               <span style={{color:"var(--text-secondary)"}}>Ganancia <strong style={{color:"var(--text-success)"}}>{fmtUSD(x.ganUSD)}</strong></span>
-              <span style={{color:"var(--text-secondary)"}}>Mi 30% <strong style={{color:"var(--text-info)"}}>{fmtUSD(x.mi30)}</strong></span>
+              <span style={{color:"var(--text-secondary)"}}>Mi 30% <strong style={{color:"var(--text-info)"}}>{fmtUSD(x.mi30)}</strong> <span style={{color:"var(--text-tertiary)",fontSize:10.5}}>· ${fmt(x.mi30*tcE)}</span></span>
             </div>
             {x.lineas.filter(l=>!l.sinPrecio).length>0&&(
               <details style={{marginTop:9}}>
@@ -8591,7 +8596,6 @@ function ReportesView({data,save,showToast,blue}){
                   <Big l="Facturación proyectada" v={"$"+fmt(T.factARS)} sub={fmtUSD(T.factUSD)}/>
                   <Big l="Ganancia proyectada" v={fmtUSD(T.ganUSD)} color="var(--text-success)" sub={"$"+fmt(T.ganUSD*tcE)+" ARS"} accent="var(--bg-tint-green)"/>
                   <Big l="Mi 30% proyectado" v={fmtUSD(T.mi30)} color="var(--text-info)" sub={"$"+fmt(T.mi30*tcE)+" ARS"}/>
-                  <Big l="Margen promedio" v={margen.toFixed(1)+"%"} color={margen>=30?"var(--text-success)":"var(--text-warning)"} sub="sobre facturación"/>
                 </div>
 
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
@@ -8601,6 +8605,11 @@ function ReportesView({data,save,showToast,blue}){
                     <div style={{fontSize:20,fontWeight:700,color:"var(--text-primary)",letterSpacing:"-.02em"}}>{fmt(T.uPapel)}<span style={{fontSize:12,fontWeight:400,color:"var(--text-secondary)"}}> rollos</span></div>
                     <div style={{fontSize:12,color:"var(--text-secondary)",marginTop:5}}>${fmt(T.factPapelARS)}</div>
                     <div style={{fontSize:10.5,color:"var(--text-tertiary)"}}>{fmtUSD(T.factPapelARS/tcE)}</div>
+                    <div style={{marginTop:9,paddingTop:8,borderTop:"0.5px solid var(--glass-border)"}}>
+                      <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text-secondary)",marginBottom:3}}>Mi 30% pendiente</div>
+                      <div style={{fontSize:14,fontWeight:700,color:"var(--text-info)"}}>${fmt(T.mi30Papel*tcE)}</div>
+                      <div style={{fontSize:10,color:"var(--text-tertiary)"}}>{fmtUSD(T.mi30Papel)}</div>
+                    </div>
                   </div>
                   <div style={{background:"var(--bg-tint-blue)",backdropFilter:"blur(14px)",border:"0.5px solid var(--border-info)",
                     borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
@@ -8608,6 +8617,11 @@ function ReportesView({data,save,showToast,blue}){
                     <div style={{fontSize:20,fontWeight:700,color:"var(--text-info)",letterSpacing:"-.02em"}}>{fmt(T.uTinta)}<span style={{fontSize:12,fontWeight:400,opacity:.7}}> u</span></div>
                     <div style={{fontSize:12,color:"var(--text-info)",marginTop:5,opacity:.9}}>${fmt(T.factTintaARS)}</div>
                     <div style={{fontSize:10.5,color:"var(--text-info)",opacity:.65}}>{fmtUSD(T.factTintaARS/tcE)}</div>
+                    <div style={{marginTop:9,paddingTop:8,borderTop:"0.5px solid rgba(46,134,193,0.25)"}}>
+                      <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text-info)",opacity:.75,marginBottom:3}}>Mi 30% pendiente</div>
+                      <div style={{fontSize:14,fontWeight:700,color:"var(--text-info)"}}>${fmt(T.mi30Tinta*tcE)}</div>
+                      <div style={{fontSize:10,color:"var(--text-info)",opacity:.6}}>{fmtUSD(T.mi30Tinta)}</div>
+                    </div>
                   </div>
                 </div>
 
@@ -8634,7 +8648,7 @@ function ReportesView({data,save,showToast,blue}){
                       <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:12,paddingBottom:11,borderBottom:"0.5px solid rgba(46,134,193,0.2)",fontSize:11.5}}>
                         <span style={{color:"var(--text-secondary)"}}>Facturación <strong style={{color:"var(--text-primary)"}}>${fmt(P.factARS)}</strong></span>
                         <span style={{color:"var(--text-secondary)"}}>Ganancia <strong style={{color:"var(--text-success)"}}>{fmtUSD(P.ganUSD)}</strong></span>
-                        <span style={{color:"var(--text-secondary)"}}>Mi 30% <strong style={{color:"var(--text-info)"}}>{fmtUSD(P.mi30)}</strong></span>
+                        <span style={{color:"var(--text-secondary)"}}>Mi 30% <strong style={{color:"var(--text-info)"}}>{fmtUSD(P.mi30)}</strong> <span style={{color:"var(--text-tertiary)",fontSize:10.5}}>· ${fmt(P.mi30*tcE)}</span></span>
                       </div>
                     );
                   })()}
