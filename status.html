@@ -246,12 +246,6 @@ function App(){
   const [syncStatus,setSyncStatus]=useState("conectando");
   const [lastUpdate,setLastUpdate]=useState(null);
 
-  const saveData=(newData)=>{
-    const db=window._fbDB;
-    if(!db)return;
-    db.doc("eliel/datos").set({payload:newData}).catch(e=>console.error("Save error:",e));
-    setData(newData);
-  };
   const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("sc_status_theme",n);document.documentElement.setAttribute("data-theme",n);return n;});
   const logout=()=>{localStorage.removeItem("eliel_session");localStorage.removeItem("eliel_status_session");window.location.replace("login.html");};
 
@@ -331,7 +325,7 @@ function App(){
         </div>
       </div>
       <div style={{padding:"1rem",maxWidth:900,margin:"0 auto",paddingBottom:20}}>
-        {view==="dashboard"&&<ViewDashboard data={data} saveData={saveData} stockUni={stockUni} setView={setView} lastUpdate={lastUpdate} blue={blue}/>}
+        {view==="dashboard"&&<ViewDashboard data={data} stockUni={stockUni} setView={setView} lastUpdate={lastUpdate} blue={blue}/>}
         {view==="stock"&&<ViewStock stockUni={stockUni} data={data}/>}
         {view==="ventas"&&<ViewVentas data={data}/>}
         {view==="costos"&&<ViewCostos data={data} blue={blue} tcActual={tcActual}/>}
@@ -738,57 +732,8 @@ function isContAgotado(cont,ventas){
   return arts.every(a=>Math.max(0,Number(a.cantidad)-stockDisp(cont.id,a.nombre,ventas))===0);
 }
 
-function AccionesContStatus({cont,data,saveData}){
-  const [editFecha,setEditFecha]=React.useState(false);
-  const [nuevaFecha,setNuevaFecha]=React.useState(cont.fechaArribo||"");
-  const esPedido=cont.estado==="pedido";
 
-  const setEstado=(nuevoEstado,extra={})=>{
-    const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,estado:nuevoEstado,...extra}:x);
-    saveData({...data,contenedores:nuevos});
-  };
-  const guardarFecha=()=>{
-    const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,fechaArribo:nuevaFecha||null}:x);
-    saveData({...data,contenedores:nuevos});
-    setEditFecha(false);
-  };
-  const eliminar=()=>{
-    const nV=(data.ventas||[]).filter(v=>v.contId===cont.id).length;
-    const msg=nV>0
-      ?"⚠️ \""+cont.nombre+"\" tiene "+nV+" venta/s registradas.\n\nSi lo eliminás, esas ventas quedarán huérfanas.\n\n¿Eliminar igualmente?"
-      :"¿Eliminar el contenedor \""+cont.nombre+"\"?";
-    if(!window.confirm(msg))return;
-    saveData({...data,contenedores:(data.contenedores||[]).filter(x=>x.id!==cont.id)});
-  };
-  const btn=(label,onClick,bg,color,border)=>(
-    <button onClick={e=>{e.stopPropagation();onClick();}} style={{
-      fontSize:10,padding:"4px 10px",borderRadius:"var(--r-pill)",cursor:"pointer",
-      fontWeight:600,whiteSpace:"nowrap",border:border||"none",background:bg,color:color
-    }}>{label}</button>
-  );
-
-  return(
-    <div onClick={e=>e.stopPropagation()}>
-      {editFecha
-        ?<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:8}}>
-          <input type="date" value={nuevaFecha} onChange={e=>setNuevaFecha(e.target.value)}
-            style={{fontSize:11,padding:"4px 8px",width:"auto",flex:"1 1 130px",minWidth:0}}/>
-          {btn("Guardar",guardarFecha,"linear-gradient(135deg,#5BAD41,#3D8B2A)","#fff")}
-          {btn("✕",()=>{setEditFecha(false);setNuevaFecha(cont.fechaArribo||"");},"none","var(--text-secondary)","0.5px solid var(--glass-border)")}
-        </div>
-        :<div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
-          {esPedido&&btn("✓ Arribado",()=>setEstado("activo",{fechaArribo:null}),"linear-gradient(135deg,#5BAD41,#3D8B2A)","#fff")}
-          {esPedido&&btn("🗓 Fecha",()=>setEditFecha(true),"var(--bg-tint-blue)","var(--text-info)","0.5px solid var(--border-info)")}
-          {!esPedido&&btn("↩ En camino",()=>setEstado("pedido"),"var(--bg-tint-amber)","var(--text-warning)","0.5px solid rgba(178,80,0,0.3)")}
-          {btn("🗑",eliminar,"var(--bg-tint-red)","var(--text-danger)","0.5px solid var(--border-danger)")}
-        </div>
-      }
-    </div>
-  );
-}
-
-
-function ViewDashboard({data,saveData,stockUni,lastUpdate,setView,blue}){
+function ViewDashboard({data,stockUni,lastUpdate,setView,blue}){
   const [modalCont,setModalCont]=React.useState(null);
   const conts=sortConts(data.contenedores||[],data.contenedoresOrden);
   const stockTotal=Object.values(stockUni).reduce((a,v)=>a+v,0);
@@ -836,7 +781,7 @@ function ViewDashboard({data,saveData,stockUni,lastUpdate,setView,blue}){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
               <span style={{fontWeight:500,fontSize:14,color:"var(--text-primary)"}}>{c.nombre}</span>
                 {c.estado==="pedido"&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:10,background:"rgba(46,134,193,0.15)",color:"var(--text-info)",marginLeft:6}}>EN CAMINO</span>}
-                {c.estado==="pedido"&&c.fechaArribo&&<div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>🗓 {c.fechaArribo}</div>}
+                {c.estado==="pedido"&&c.fechaArribo&&<div style={{fontSize:10.5,color:"var(--text-info)",marginTop:3,opacity:.85}}>Arribo estimado · {new Date(c.fechaArribo+"T12:00:00").toLocaleDateString("es-AR",{day:"numeric",month:"short",year:"numeric"})}</div>}
               <div style={{textAlign:"right"}}>
                 <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"flex-end",marginBottom:4}}>
                   <span style={{fontSize:12,fontWeight:500,color:"var(--text-secondary)"}}>{fmt(stockCont)} u</span>
@@ -858,7 +803,6 @@ function ViewDashboard({data,saveData,stockUni,lastUpdate,setView,blue}){
                 <span>Inversión: <strong>{fmtUSD(costo)}</strong></span>
               </div>
             )}
-            <AccionesContStatus cont={c} data={data} saveData={saveData}/>
           </div>
         );
         return(
