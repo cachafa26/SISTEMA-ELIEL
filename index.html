@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v5.3.0 · 2026-07-16 -->
+  <!-- v5.4.0 · 2026-07-28 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -633,7 +633,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v5.3.1</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v5.4.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1087,7 +1087,7 @@ window.SC_SYSTEM_PROMPT="Sos el asesor estrat\u00e9gico de Super Coating para El
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v5.3.1";
+const APP_VERSION = "v5.4.0";
 const APP_BUILD   = "2026-07-02";
 
 // ── SC Reporte PDF ─────────────────────────────────────────────────
@@ -2141,7 +2141,7 @@ function App(){
         {/* SUPER COATING */}
         {modulo==="supercoating"&&(
           <>
-            {view==="dashboard"&&<Dashboard data={data} stockUni={stockUni} blue={blue} mi30Total={mi30Total} pendienteRetiro={pendienteRetiro} setView={setView} setContSel={setContSel} setContTab={setContTab}/>}
+            {view==="dashboard"&&<Dashboard data={data} save={save} showToast={showToast} stockUni={stockUni} blue={blue} mi30Total={mi30Total} pendienteRetiro={pendienteRetiro} setView={setView} setContSel={setContSel} setContTab={setContTab}/>}
             {view==="contenedores"&&!contSel&&<ContenedoresList data={data} save={save} setContSel={setContSel} setContTab={setContTab} showToast={showToast}/>}
             {view==="contenedores"&&contSel&&<ContenedorDetail cont={contSel} data={data} save={save} tab={contTab} setTab={setContTab} onBack={()=>setContSel(null)} showToast={showToast} blue={blue}/>}
             {view==="stock"&&<StockView stockUni={stockUni} data={data}/>}
@@ -6023,7 +6023,63 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
 // ══════════════════════════════════════════════════════════════════════════
 // SC — DASHBOARD INTERNO
 // ══════════════════════════════════════════════════════════════════════════
-function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setContSel,setContTab}){
+// ── Acciones sobre contenedor: arribar, revertir, editar fecha, eliminar ──
+function AccionesContenedor({cont,data,save,showToast,compact}){
+  const [editFecha,setEditFecha]=useState(false);
+  const [nuevaFecha,setNuevaFecha]=useState(cont.fechaArribo||"");
+  const esPedido=cont.estado==="pedido";
+
+  const setEstado=(nuevoEstado,extra={})=>{
+    const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,estado:nuevoEstado,...extra}:x);
+    save({...data,contenedores:nuevos});
+    if(showToast)showToast(nuevoEstado==="pedido"?"↩ Vuelto a en camino":"✓ Contenedor arribado");
+  };
+  const guardarFecha=()=>{
+    const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,fechaArribo:nuevaFecha||null}:x);
+    save({...data,contenedores:nuevos});
+    setEditFecha(false);
+    if(showToast)showToast("✓ Fecha actualizada");
+  };
+  const eliminar=()=>{
+    const nVentas=(data.ventas||[]).filter(v=>v.contId===cont.id).length;
+    const msg=nVentas>0
+      ?`⚠️ "${cont.nombre}" tiene ${nVentas} venta/s registradas.\n\nSi lo eliminás, esas ventas quedarán huérfanas.\n\n¿Eliminar igualmente?`
+      :`¿Eliminar el contenedor "${cont.nombre}"?`;
+    if(!window.confirm(msg))return;
+    save({...data,contenedores:(data.contenedores||[]).filter(x=>x.id!==cont.id)});
+    if(showToast)showToast("Contenedor eliminado");
+  };
+
+  const btn=(label,onClick,bg,color,border)=>(
+    <button onClick={e=>{e.stopPropagation();onClick();}} style={{
+      fontSize:compact?10:11,padding:compact?"4px 10px":"5px 13px",
+      borderRadius:"var(--r-pill)",cursor:"pointer",fontWeight:600,whiteSpace:"nowrap",
+      border:border||"none",background:bg,color:color
+    }}>{label}</button>
+  );
+
+  return(
+    <div onClick={e=>e.stopPropagation()}>
+      {editFecha
+        ?<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:8}}>
+          <input type="date" value={nuevaFecha} onChange={e=>setNuevaFecha(e.target.value)}
+            style={{fontSize:11,padding:"4px 8px",width:"auto",flex:"1 1 130px",minWidth:0}}/>
+          {btn("Guardar",guardarFecha,"linear-gradient(135deg,#5BAD41,#3D8B2A)","#fff")}
+          {btn("✕",()=>{setEditFecha(false);setNuevaFecha(cont.fechaArribo||"");},"none","var(--text-secondary)","0.5px solid var(--glass-border)")}
+        </div>
+        :<div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+          {esPedido&&btn("✓ Arribado",()=>setEstado("activo",{fechaArribo:null}),"linear-gradient(135deg,#5BAD41,#3D8B2A)","#fff")}
+          {esPedido&&btn("🗓 Fecha",()=>setEditFecha(true),"var(--bg-tint-blue)","var(--text-info)","0.5px solid var(--border-info)")}
+          {!esPedido&&btn("↩ En camino",()=>setEstado("pedido"),"var(--bg-tint-amber)","var(--text-warning)","0.5px solid rgba(178,80,0,0.3)")}
+          {btn("🗑",eliminar,"var(--bg-tint-red)","var(--text-danger)","0.5px solid var(--border-danger)")}
+        </div>
+      }
+    </div>
+  );
+}
+
+
+function Dashboard({data,save,showToast,stockUni,blue,mi30Total,pendienteRetiro,setView,setContSel,setContTab}){
   const tc=blue||1450;
   const hace30=new Date();hace30.setDate(hace30.getDate()-30);const hace30str=hace30.toISOString().split("T")[0];
   const ventas30d=(data.ventas||[]).filter(v=>(v.fecha||"")>=hace30str);
@@ -6117,11 +6173,7 @@ function Dashboard({data,stockUni,blue,mi30Total,pendienteRetiro,setView,setCont
                 </>
               )}
               {/* Action buttons */}
-              <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}} onClick={e=>e.stopPropagation()}>
-                {c.estado==="pedido"&&<button onClick={()=>marcarArribado(c.id)} style={{fontSize:11,padding:"5px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",boxShadow:"0 2px 8px rgba(91,173,65,0.25)"}}>✓ Arribado</button>}
-                <button onClick={()=>{setContSel(c);setContTab("stock");}} style={{fontSize:11,padding:"5px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Ver detalle →</button>
-                {c.estado==="pedido"&&<button onClick={e=>{e.stopPropagation();const nuevos=(data.contenedores||[]).map(x=>x.id===c.id?{...x,estado:"activo",fechaArribo:undefined}:x);save({...data,contenedores:nuevos});showToast("✓ Contenedor arribado");}} style={{fontSize:11,padding:"5px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer"}}>✓ Arribado</button>}
-              </div>
+              <AccionesContenedor cont={c} data={data} save={save} showToast={showToast} compact/>
             </div>
           );
           };
@@ -6186,11 +6238,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
     setNuevo(false);setNombre("");setEnCamino(false);setFechaArribo("");
     showToast(enCamino?"📦 Contenedor en camino registrado":"Contenedor creado");
   };
-  const marcarArribado=(contId)=>{
-    const nuevos=(data.contenedores||[]).map(x=>x.id===contId?{...x,estado:"activo",fechaArribo:undefined}:x);
-    save({...data,contenedores:nuevos});
-    showToast("✓ Contenedor marcado como arribado");
-  };
+
 
   const iniciarEdicion=()=>{
     setOrdenLocal(conts.map(c=>c.id));
@@ -6392,6 +6440,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
                   </div>
                 </>
               )}
+              <AccionesContenedor cont={c} data={data} save={save} showToast={showToast}/>
             </div>
           );
           };
