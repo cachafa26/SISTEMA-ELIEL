@@ -6023,31 +6023,115 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
 // ══════════════════════════════════════════════════════════════════════════
 // SC — DASHBOARD INTERNO
 // ══════════════════════════════════════════════════════════════════════════
-// ── Acciones sobre contenedor (solo en pestaña Contenedores) ──
+// ── Modal de gestión de contenedor (revertir / eliminar) ──
+function ModalGestionCont({cont,data,save,showToast,onClose}){
+  const [confirm,setConfirm]=useState(null); // "revertir" | "eliminar"
+  const nVentas=(data.ventas||[]).filter(v=>v.contId===cont.id).length;
+
+  const revertir=()=>{
+    const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,estado:"pedido"}:x);
+    save({...data,contenedores:nuevos});
+    if(showToast)showToast("↩ Contenedor vuelto a en camino");
+    onClose();
+  };
+  const eliminar=()=>{
+    save({...data,contenedores:(data.contenedores||[]).filter(x=>x.id!==cont.id)});
+    if(showToast)showToast("Contenedor eliminado");
+    onClose();
+  };
+
+  const Fila=({icon,titulo,desc,color,onClick})=>(
+    <button onClick={onClick} style={{
+      width:"100%",display:"flex",alignItems:"center",gap:14,padding:"14px 16px",
+      background:"rgba(120,120,128,0.06)",border:"0.5px solid var(--glass-border)",
+      borderRadius:"var(--r-lg)",cursor:"pointer",textAlign:"left",
+      transition:"background .15s,transform .12s",marginBottom:8
+    }}
+    onMouseEnter={e=>{e.currentTarget.style.background="rgba(120,120,128,0.12)";e.currentTarget.style.transform="translateY(-1px)";}}
+    onMouseLeave={e=>{e.currentTarget.style.background="rgba(120,120,128,0.06)";e.currentTarget.style.transform="";}}>
+      <span style={{fontSize:20,flexShrink:0,lineHeight:1}}>{icon}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:14,fontWeight:600,color,marginBottom:2}}>{titulo}</div>
+        <div style={{fontSize:11.5,color:"var(--text-secondary)",lineHeight:1.4}}>{desc}</div>
+      </div>
+      <span style={{fontSize:16,color:"var(--text-tertiary)",flexShrink:0}}>›</span>
+    </button>
+  );
+
+  return(
+    <div onClick={e=>{if(e.target===e.currentTarget)onClose();}} style={{
+      position:"fixed",inset:0,zIndex:3000,
+      background:"rgba(0,0,0,0.45)",backdropFilter:"blur(20px) saturate(1.4)",
+      WebkitBackdropFilter:"blur(20px) saturate(1.4)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"
+    }}>
+      <div style={{
+        background:"var(--bg-modal)",
+        backdropFilter:"blur(48px) saturate(2.2)",WebkitBackdropFilter:"blur(48px) saturate(2.2)",
+        border:"0.5px solid rgba(255,255,255,0.18)",borderRadius:"var(--r-xl)",
+        padding:"22px 20px",width:"100%",maxWidth:400,
+        boxShadow:"0 24px 70px rgba(0,0,0,.35),0 1px 0 rgba(255,255,255,.12) inset",
+        animation:"modalIn .28s cubic-bezier(.34,1.2,.64,1)"
+      }}>
+        {!confirm?(
+          <>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18}}>
+              <div style={{minWidth:0,flex:1}}>
+                <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:"var(--text-secondary)",marginBottom:4}}>Gestionar contenedor</div>
+                <div style={{fontSize:17,fontWeight:700,color:"var(--text-primary)",letterSpacing:"-.02em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cont.nombre}</div>
+              </div>
+              <button onClick={onClose} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"rgba(120,120,128,0.1)",cursor:"pointer",fontSize:14,color:"var(--text-secondary)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginLeft:10}}>✕</button>
+            </div>
+            <Fila icon="↩" titulo="Revertir arribo" desc="Vuelve al estado en camino. Su stock deja de contarse."
+              color="var(--text-warning)" onClick={()=>setConfirm("revertir")}/>
+            <Fila icon="🗑" titulo="Eliminar contenedor" desc={nVentas>0?nVentas+" venta/s asociadas quedarían huérfanas":"Acción irreversible"}
+              color="var(--text-danger)" onClick={()=>setConfirm("eliminar")}/>
+          </>
+        ):(
+          <>
+            <div style={{textAlign:"center",marginBottom:20}}>
+              <div style={{fontSize:36,marginBottom:12,lineHeight:1}}>{confirm==="eliminar"?"🗑":"↩"}</div>
+              <div style={{fontSize:17,fontWeight:700,color:"var(--text-primary)",marginBottom:8,letterSpacing:"-.02em"}}>
+                {confirm==="eliminar"?"¿Eliminar contenedor?":"¿Revertir arribo?"}
+              </div>
+              <div style={{fontSize:13,color:"var(--text-secondary)",lineHeight:1.55,padding:"0 6px"}}>
+                {confirm==="eliminar"
+                  ?<>Vas a eliminar <strong style={{color:"var(--text-primary)"}}>{cont.nombre}</strong> de forma permanente.{nVentas>0&&<><br/><span style={{color:"var(--text-danger)",fontWeight:600}}>{nVentas} venta/s quedarán sin contenedor asociado.</span></>}</>
+                  :<><strong style={{color:"var(--text-primary)"}}>{cont.nombre}</strong> volverá a estado <em>en camino</em> y su stock dejará de aparecer en el inventario.</>
+                }
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setConfirm(null)} style={{flex:1,padding:"12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer",fontSize:14,fontWeight:600}}>Cancelar</button>
+              <button onClick={confirm==="eliminar"?eliminar:revertir} style={{
+                flex:1,padding:"12px",borderRadius:"var(--r-pill)",border:"none",color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700,
+                background:confirm==="eliminar"?"linear-gradient(135deg,#C0392B,#922B21)":"linear-gradient(135deg,#F47920,#d4640f)",
+                boxShadow:confirm==="eliminar"?"0 4px 16px rgba(192,57,43,.35)":"0 4px 16px rgba(244,121,32,.35)"
+              }}>{confirm==="eliminar"?"Eliminar":"Revertir"}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Acciones en tarjeta (solo pedidos: arribar + fecha) ──
 function AccionesContenedor({cont,data,save,showToast}){
   const [editFecha,setEditFecha]=useState(false);
   const [nuevaFecha,setNuevaFecha]=useState(cont.fechaArribo||"");
-  const esPedido=cont.estado==="pedido";
+  if(cont.estado!=="pedido")return null;
 
-  const setEstado=(nuevoEstado,extra={})=>{
-    const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,estado:nuevoEstado,...extra}:x);
+  const arribar=()=>{
+    const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,estado:"activo",fechaArribo:null}:x);
     save({...data,contenedores:nuevos});
-    if(showToast)showToast(nuevoEstado==="pedido"?"↩ Marcado como en camino":"✓ Contenedor arribado");
+    if(showToast)showToast("✓ Contenedor arribado");
   };
   const guardarFecha=()=>{
     const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,fechaArribo:nuevaFecha||null}:x);
     save({...data,contenedores:nuevos});
     setEditFecha(false);
     if(showToast)showToast("✓ Fecha actualizada");
-  };
-  const eliminar=()=>{
-    const nV=(data.ventas||[]).filter(v=>v.contId===cont.id).length;
-    const msg=nV>0
-      ?"⚠️ \""+cont.nombre+"\" tiene "+nV+" venta/s registradas.\n\nSi lo eliminás quedarán huérfanas.\n\n¿Eliminar igualmente?"
-      :"¿Eliminar el contenedor \""+cont.nombre+"\"?";
-    if(!window.confirm(msg))return;
-    save({...data,contenedores:(data.contenedores||[]).filter(x=>x.id!==cont.id)});
-    if(showToast)showToast("Contenedor eliminado");
   };
 
   if(editFecha)return(
@@ -6061,33 +6145,16 @@ function AccionesContenedor({cont,data,save,showToast}){
 
   return(
     <div onClick={e=>e.stopPropagation()} style={{display:"flex",gap:8,marginTop:12,alignItems:"center",flexWrap:"wrap"}}>
-      {esPedido&&(
-        <button onClick={()=>setEstado("activo",{fechaArribo:null})} style={{
-          fontSize:12,padding:"7px 18px",borderRadius:"var(--r-pill)",border:"none",
-          background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,
-          cursor:"pointer",boxShadow:"0 2px 10px rgba(91,173,65,0.3)",letterSpacing:"-.01em"
-        }}>Marcar como arribado</button>
-      )}
-      {esPedido&&(
-        <button onClick={()=>setEditFecha(true)} title="Editar fecha estimada" style={{
-          fontSize:12,padding:"7px 12px",borderRadius:"var(--r-pill)",
-          border:"0.5px solid var(--glass-border)",background:"none",
-          color:"var(--text-secondary)",cursor:"pointer",display:"flex",alignItems:"center",gap:4
-        }}>🗓 Fecha</button>
-      )}
-      {!esPedido&&(
-        <button onClick={()=>setEstado("pedido")} title="Revertir: volver a marcar como en camino" style={{
-          fontSize:11,padding:"6px 12px",borderRadius:"var(--r-pill)",
-          border:"0.5px solid var(--glass-border)",background:"none",
-          color:"var(--text-tertiary)",cursor:"pointer",opacity:.7
-        }}>↩ Revertir arribo</button>
-      )}
-      <div style={{flex:1}}/>
-      <button onClick={eliminar} title="Eliminar contenedor" style={{
-        fontSize:14,padding:"6px 10px",borderRadius:"var(--r-pill)",
-        border:"none",background:"none",color:"var(--text-tertiary)",
-        cursor:"pointer",opacity:.6,lineHeight:1
-      }}>🗑</button>
+      <button onClick={arribar} style={{
+        fontSize:12,padding:"7px 18px",borderRadius:"var(--r-pill)",border:"none",
+        background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,
+        cursor:"pointer",boxShadow:"0 2px 10px rgba(91,173,65,0.3)",letterSpacing:"-.01em"
+      }}>Marcar como arribado</button>
+      <button onClick={()=>setEditFecha(true)} title="Editar fecha estimada" style={{
+        fontSize:12,padding:"7px 12px",borderRadius:"var(--r-pill)",
+        border:"0.5px solid var(--glass-border)",background:"none",
+        color:"var(--text-secondary)",cursor:"pointer"
+      }}>🗓 Fecha</button>
     </div>
   );
 }
@@ -6240,6 +6307,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
   const [nuevo,setNuevo]=useState(false);
   const [nombre,setNombre]=useState("");
   const [enCamino,setEnCamino]=useState(false);
+  const [gestionCont,setGestionCont]=useState(null);
   const [fechaArribo,setFechaArribo]=useState("");
   const [editOrden,setEditOrden]=useState(false);
   const [ordenLocal,setOrdenLocal]=useState([]);
@@ -6437,11 +6505,23 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
                   <span style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{c.nombre}</span>
                   <span style={{fontSize:11,color:"var(--text-secondary)"}}>→</span>
                 </div>
-                <span style={{fontSize:11,padding:"2px 9px",borderRadius:"var(--r-pill)",fontWeight:600,
-                  background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",
-                  color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)"}}>
-                  {costo===0?"Sin costo":enG?"✓ En ganancia":fmtPct(pct)+" recuperado"}
-                </span>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                  <span style={{fontSize:11,padding:"2px 9px",borderRadius:"var(--r-pill)",fontWeight:600,
+                    background:enG?"var(--bg-tint-green)":costo===0?"rgba(120,120,128,0.1)":"var(--bg-tint-amber)",
+                    color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)"}}>
+                    {costo===0?"Sin costo":enG?"✓ En ganancia":fmtPct(pct)+" recuperado"}
+                  </span>
+                  {c.estado!=="pedido"&&(
+                    <button onClick={e=>{e.stopPropagation();setGestionCont(c);}} title="Gestionar contenedor" style={{
+                      width:26,height:26,borderRadius:"50%",border:"none",background:"none",
+                      cursor:"pointer",fontSize:13,color:"var(--text-tertiary)",opacity:.45,
+                      display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                      transition:"opacity .15s,background .15s"
+                    }}
+                    onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.background="rgba(120,120,128,0.12)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.opacity=".45";e.currentTarget.style.background="none";}}>✎</button>
+                  )}
+                </div>
               </div>
               {costo>0&&(
                 <>
@@ -6497,6 +6577,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
           );
         })()}
       </div>
+      {gestionCont&&<ModalGestionCont cont={gestionCont} data={data} save={save} showToast={showToast} onClose={()=>setGestionCont(null)}/>}
     </div>
   );
 }
@@ -8185,7 +8266,7 @@ function Mi30View({data,save,showToast,mi30Total,totalRetirado,pendienteRetiro,b
 // combina con ventas actuales + stock, genera PDF con análisis IA
 // ═══════════════════════════════════════════════════════════════════
 
-function ReportesView({data,save,showToast}){
+function ReportesView({data,save,showToast,blue}){
   const {useState,useEffect}=React;
   const [tab,setTab]=useState("generar");
   const [loading,setLoading]=useState(false);
@@ -8316,6 +8397,7 @@ function ReportesView({data,save,showToast}){
 
       <div style={{display:"flex",gap:0,borderBottom:"0.5px solid var(--glass-border)",marginBottom:20}}>
         <TabBtn id="generar" label="Generar" count={0}/>
+        <TabBtn id="estimaciones" label="Estimaciones" count={0}/>
         <TabBtn id="historial" label="Historial" count={reportes.length}/>
       </div>
 
@@ -8389,6 +8471,191 @@ function ReportesView({data,save,showToast}){
           )}
         </div>
       )}
+
+      {tab==="estimaciones"&&(()=>{
+        const tcE=blue||1450;
+        const esTinta=n=>String(n||"").toUpperCase().includes("TINTA");
+        // Calcular proyección por contenedor
+        const calcCont=(cont)=>{
+          const precios=cont.preciosVentaSim||{};
+          const ventasC=(data.ventas||[]).filter(v=>v.contId===cont.id);
+          const costo=Number(cont.costoTotal||0);
+          const cobUSD=ventasC.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
+          const enG=costo>0&&cobUSD>=costo;
+          let factARS=0,uPapel=0,uTinta=0,factPapelARS=0,factTintaARS=0;
+          const lineas=[];
+          (cont.articulos||[]).forEach(art=>{
+            const vend=(data.ventas||[]).filter(v=>v.contId===cont.id&&v.articulo===art.nombre).reduce((a,v)=>a+Number(v.cantidad||0),0);
+            const disp=Math.max(0,Number(art.cantidad||0)-vend);
+            const pv=Number(precios[art.nombre]||0);
+            if(disp<=0)return;
+            const sub=pv*disp;
+            factARS+=sub;
+            if(esTinta(art.nombre)){uTinta+=disp;factTintaARS+=sub;}
+            else{uPapel+=disp;factPapelARS+=sub;}
+            lineas.push({nombre:art.nombre,disp,pv,sub,sinPrecio:pv<=0});
+          });
+          const factUSD=factARS/tcE;
+          // Ganancia: si ya está en ganancia, todo lo restante es ganancia.
+          // Si no, la ganancia es lo que exceda el faltante para cubrir el costo.
+          const faltante=Math.max(0,costo-cobUSD);
+          const ganUSD=enG?factUSD:Math.max(0,factUSD-faltante);
+          return{cont,lineas,factARS,factUSD,factPapelARS,factTintaARS,uPapel,uTinta,ganUSD,mi30:ganUSD*0.3,enG,costo,cobUSD,faltante,
+            tienePrecios:lineas.some(l=>!l.sinPrecio)};
+        };
+        const todos=(data.contenedores||[]).map(calcCont);
+        const activos=todos.filter(x=>x.cont.estado!=="pedido"&&x.lineas.length>0);
+        const enCamino=todos.filter(x=>x.cont.estado==="pedido"&&x.lineas.length>0);
+        const sinPrecios=todos.filter(x=>x.lineas.length>0&&!x.tienePrecios);
+
+        const sum=(arr,k)=>arr.reduce((a,x)=>a+x[k],0);
+        const T={factARS:sum(activos,"factARS"),factUSD:sum(activos,"factUSD"),ganUSD:sum(activos,"ganUSD"),
+          mi30:sum(activos,"mi30"),uPapel:sum(activos,"uPapel"),uTinta:sum(activos,"uTinta"),
+          factPapelARS:sum(activos,"factPapelARS"),factTintaARS:sum(activos,"factTintaARS")};
+        const margen=T.factUSD>0?(T.ganUSD/T.factUSD*100):0;
+
+        const Big=({l,v,sub,color,accent})=>(
+          <div style={{background:accent||"var(--bg-card)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",
+            border:"0.5px solid "+(accent?"rgba(91,173,65,.3)":"var(--glass-border)"),borderRadius:"var(--r-xl)",
+            padding:"16px 18px",boxShadow:"var(--glass-shadow-sm)"}}>
+            <div style={{fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-secondary)",marginBottom:7}}>{l}</div>
+            <div style={{fontSize:21,fontWeight:700,letterSpacing:"-.025em",color:color||"var(--text-primary)",lineHeight:1.1}}>{v}</div>
+            {sub&&<div style={{fontSize:11,color:"var(--text-secondary)",marginTop:4}}>{sub}</div>}
+          </div>
+        );
+
+        const CardCont=({x,pedido})=>(
+          <div style={{background:"var(--bg-card)",backdropFilter:"blur(14px)",WebkitBackdropFilter:"blur(14px)",
+            border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",marginBottom:8,
+            boxShadow:"var(--glass-shadow-sm)",opacity:pedido?.85:1}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:10}}>
+              <div style={{minWidth:0,flex:1}}>
+                <div style={{fontSize:13.5,fontWeight:700,color:"var(--text-primary)",marginBottom:3}}>{x.cont.nombre}</div>
+                <div style={{fontSize:10.5,color:"var(--text-secondary)"}}>
+                  {x.uPapel>0&&<span>{fmt(x.uPapel)} rollos</span>}
+                  {x.uPapel>0&&x.uTinta>0&&<span> · </span>}
+                  {x.uTinta>0&&<span>{fmt(x.uTinta)}u tinta</span>}
+                  {x.enG&&<span style={{color:"var(--text-success)",fontWeight:600}}> · en ganancia</span>}
+                  {!x.enG&&x.costo>0&&<span style={{color:"var(--text-warning)"}}> · faltan {fmtUSD(x.faltante)}</span>}
+                </div>
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:"var(--text-primary)"}}>${fmt(x.factARS)}</div>
+                <div style={{fontSize:10.5,color:"var(--text-secondary)"}}>{fmtUSD(x.factUSD)}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:14,fontSize:11.5,flexWrap:"wrap",paddingTop:9,borderTop:"0.5px solid var(--glass-border)"}}>
+              <span style={{color:"var(--text-secondary)"}}>Ganancia <strong style={{color:"var(--text-success)"}}>{fmtUSD(x.ganUSD)}</strong></span>
+              <span style={{color:"var(--text-secondary)"}}>Mi 30% <strong style={{color:"var(--text-info)"}}>{fmtUSD(x.mi30)}</strong></span>
+            </div>
+            {x.lineas.filter(l=>!l.sinPrecio).length>0&&(
+              <details style={{marginTop:9}}>
+                <summary style={{fontSize:10.5,color:"var(--text-secondary)",cursor:"pointer",listStyle:"none",userSelect:"none"}}>▸ Ver desglose</summary>
+                <div style={{marginTop:7,display:"flex",flexDirection:"column",gap:4}}>
+                  {x.lineas.map(l=>(
+                    <div key={l.nombre} style={{display:"flex",justifyContent:"space-between",fontSize:11,padding:"4px 9px",
+                      background:"rgba(120,120,128,.05)",borderRadius:7,gap:8}}>
+                      <span style={{color:"var(--text-primary)",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.nombre} · {fmt(l.disp)}u</span>
+                      <span style={{color:l.sinPrecio?"var(--text-warning)":"var(--text-secondary)",flexShrink:0,whiteSpace:"nowrap"}}>
+                        {l.sinPrecio?"sin precio":"$"+fmt(l.pv)+" → $"+fmt(l.sub)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        );
+
+        return(
+          <div>
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12.5,color:"var(--text-secondary)",lineHeight:1.5}}>
+                Proyección si se vendiera <strong style={{color:"var(--text-primary)"}}>todo el stock disponible</strong> a los precios de venta cargados en cada contenedor.
+                <span style={{color:"var(--text-tertiary)"}}> Blue ${fmt(tcE)}</span>
+              </div>
+            </div>
+
+            {activos.length===0?(
+              <div style={{padding:"3rem 2rem",textAlign:"center",background:"var(--bg-card)",backdropFilter:"blur(12px)",
+                border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-xl)"}}>
+                <div style={{fontSize:32,marginBottom:10}}>📊</div>
+                <div style={{fontSize:14,fontWeight:600,color:"var(--text-primary)",marginBottom:6}}>Sin estimaciones disponibles</div>
+                <div style={{fontSize:12,color:"var(--text-secondary)",lineHeight:1.5,maxWidth:340,margin:"0 auto"}}>
+                  Cargá precios de venta en la pestaña <strong>Costos</strong> de cada contenedor para ver las proyecciones acá.
+                </div>
+              </div>
+            ):(
+              <>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:12}}>
+                  <Big l="Facturación proyectada" v={"$"+fmt(T.factARS)} sub={fmtUSD(T.factUSD)}/>
+                  <Big l="Ganancia proyectada" v={fmtUSD(T.ganUSD)} color="var(--text-success)" sub={"$"+fmt(T.ganUSD*tcE)+" ARS"} accent="var(--bg-tint-green)"/>
+                  <Big l="Mi 30% proyectado" v={fmtUSD(T.mi30)} color="var(--text-info)" sub={"$"+fmt(T.mi30*tcE)+" ARS"}/>
+                  <Big l="Margen promedio" v={margen.toFixed(1)+"%"} color={margen>=30?"var(--text-success)":"var(--text-warning)"} sub="sobre facturación"/>
+                </div>
+
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
+                  <div style={{background:"var(--bg-card)",backdropFilter:"blur(14px)",border:"0.5px solid var(--glass-border)",
+                    borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
+                    <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>📄 Papel</div>
+                    <div style={{fontSize:20,fontWeight:700,color:"var(--text-primary)",letterSpacing:"-.02em"}}>{fmt(T.uPapel)}<span style={{fontSize:12,fontWeight:400,color:"var(--text-secondary)"}}> rollos</span></div>
+                    <div style={{fontSize:12,color:"var(--text-secondary)",marginTop:5}}>${fmt(T.factPapelARS)}</div>
+                    <div style={{fontSize:10.5,color:"var(--text-tertiary)"}}>{fmtUSD(T.factPapelARS/tcE)}</div>
+                  </div>
+                  <div style={{background:"var(--bg-tint-blue)",backdropFilter:"blur(14px)",border:"0.5px solid var(--border-info)",
+                    borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
+                    <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:8}}>🖨️ Tinta</div>
+                    <div style={{fontSize:20,fontWeight:700,color:"var(--text-info)",letterSpacing:"-.02em"}}>{fmt(T.uTinta)}<span style={{fontSize:12,fontWeight:400,opacity:.7}}> u</span></div>
+                    <div style={{fontSize:12,color:"var(--text-info)",marginTop:5,opacity:.9}}>${fmt(T.factTintaARS)}</div>
+                    <div style={{fontSize:10.5,color:"var(--text-info)",opacity:.65}}>{fmtUSD(T.factTintaARS/tcE)}</div>
+                  </div>
+                </div>
+
+                <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-secondary)",marginBottom:10}}>
+                  Detalle por contenedor
+                </div>
+                {activos.map(x=><CardCont key={x.cont.id} x={x}/>)}
+              </>
+            )}
+
+            {enCamino.length>0&&(
+              <div style={{marginTop:22}}>
+                <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
+                  <span style={{fontSize:14}}>🚢</span>
+                  <span style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-info)"}}>Contenedores en camino · {enCamino.length}</span>
+                </div>
+                <div style={{fontSize:11.5,color:"var(--text-secondary)",marginBottom:11,lineHeight:1.45}}>
+                  Estimaciones de mercadería que todavía no arribó. No se suma a los totales de arriba.
+                </div>
+                <div style={{padding:"12px",background:"rgba(46,134,193,0.05)",border:"0.5px solid rgba(46,134,193,0.18)",borderRadius:"var(--r-lg)"}}>
+                  {(()=>{
+                    const P={factARS:sum(enCamino,"factARS"),factUSD:sum(enCamino,"factUSD"),ganUSD:sum(enCamino,"ganUSD"),mi30:sum(enCamino,"mi30")};
+                    return(
+                      <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:12,paddingBottom:11,borderBottom:"0.5px solid rgba(46,134,193,0.2)",fontSize:11.5}}>
+                        <span style={{color:"var(--text-secondary)"}}>Facturación <strong style={{color:"var(--text-primary)"}}>${fmt(P.factARS)}</strong></span>
+                        <span style={{color:"var(--text-secondary)"}}>Ganancia <strong style={{color:"var(--text-success)"}}>{fmtUSD(P.ganUSD)}</strong></span>
+                        <span style={{color:"var(--text-secondary)"}}>Mi 30% <strong style={{color:"var(--text-info)"}}>{fmtUSD(P.mi30)}</strong></span>
+                      </div>
+                    );
+                  })()}
+                  {enCamino.map(x=><CardCont key={x.cont.id} x={x} pedido/>)}
+                </div>
+              </div>
+            )}
+
+            {sinPrecios.length>0&&(
+              <div style={{marginTop:18,padding:"12px 15px",background:"var(--bg-tint-amber)",
+                border:"0.5px solid rgba(178,80,0,0.25)",borderRadius:"var(--r-lg)"}}>
+                <div style={{fontSize:11.5,fontWeight:600,color:"var(--text-warning)",marginBottom:5}}>⚠ {sinPrecios.length} contenedor/es sin precios de venta</div>
+                <div style={{fontSize:11,color:"var(--text-secondary)",lineHeight:1.45}}>
+                  {sinPrecios.map(x=>x.cont.nombre).join(" · ")}
+                  <br/>Cargá los precios en la pestaña Costos de cada uno para incluirlos en la proyección.
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {tab==="historial"&&(
         <div>
