@@ -780,9 +780,13 @@ function ViewDashboard({data,saveData,stockUni,lastUpdate,setView,blue}){
         const _rPed=resumen.filter(r=>r.c.estado==="pedido");
         const _rAct=resumen.filter(r=>r.c.estado!=="pedido"&&!r.agotado);
         const _rCerr=resumen.filter(r=>r.c.estado!=="pedido"&&r.agotado);
+        const marcarArribado=(contId)=>{
+          const nuevos=(data.contenedores||[]).map(x=>x.id===contId?{...x,estado:"activo",fechaArribo:undefined}:x);
+          saveData({...data,contenedores:nuevos});
+        };
         const CardCont=({c,cobUSD,costo,pct,enG,stockCont})=>(
           <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",cursor:"pointer",transition:"transform .12s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseLeave={e=>e.currentTarget.style.transform=""} onClick={()=>setModalCont(c)}>
-            {c.estado==="pedido"&&<div style={{marginBottom:8,display:"flex",justifyContent:"flex-end"}} onClick={e=>e.stopPropagation()}><button onClick={()=>marcarArribado(c.id)} style={{fontSize:11,padding:"4px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer"}}>✓ Arribado</button></div>}
+            
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
               <span style={{fontWeight:500,fontSize:14,color:"var(--text-primary)"}}>{c.nombre}</span>
                 {c.estado==="pedido"&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:10,background:"rgba(46,134,193,0.15)",color:"var(--text-info)",marginLeft:6}}>EN CAMINO</span>}
@@ -808,12 +812,9 @@ function ViewDashboard({data,saveData,stockUni,lastUpdate,setView,blue}){
                 <span>Inversión: <strong>{fmtUSD(costo)}</strong></span>
               </div>
             )}
+            {c.estado==="pedido"&&<div style={{marginTop:10,display:"flex",justifyContent:"flex-start"}} onClick={e=>e.stopPropagation()}><button onClick={()=>marcarArribado(c.id)} style={{fontSize:11,padding:"5px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",boxShadow:"0 2px 8px rgba(91,173,65,0.25)"}}>✓ Arribado</button></div>}
           </div>
         );
-        const marcarArribado=(contId)=>{
-          const nuevos=(data.contenedores||[]).map(x=>x.id===contId?{...x,estado:"activo",fechaArribo:undefined}:x);
-          saveData({...data,contenedores:nuevos});
-        };
         return(
           <>
             {_rPed.length>0&&(
