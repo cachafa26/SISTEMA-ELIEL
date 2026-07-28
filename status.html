@@ -246,6 +246,12 @@ function App(){
   const [syncStatus,setSyncStatus]=useState("conectando");
   const [lastUpdate,setLastUpdate]=useState(null);
 
+  const saveData=(newData)=>{
+    const db=window._fbDB;
+    if(!db)return;
+    db.doc("eliel/datos").set({payload:newData}).catch(e=>console.error("Save error:",e));
+    setData(newData);
+  };
   const toggleTheme=()=>setTheme(t=>{const n=t==="dark"?"light":"dark";localStorage.setItem("sc_status_theme",n);document.documentElement.setAttribute("data-theme",n);return n;});
   const logout=()=>{localStorage.removeItem("eliel_session");localStorage.removeItem("eliel_status_session");window.location.replace("login.html");};
 
@@ -285,6 +291,7 @@ function App(){
 
   const stockUni={};
   for(const c of data.contenedores||[]){
+    if(c.estado==="pedido")continue;
     for(const art of(c.articulos||[])){
       if(!stockUni[art.nombre])stockUni[art.nombre]=0;
       stockUni[art.nombre]+=Math.max(0,Number(art.cantidad)-stockDisp(c.id,art.nombre,data.ventas));
@@ -324,7 +331,7 @@ function App(){
         </div>
       </div>
       <div style={{padding:"1rem",maxWidth:900,margin:"0 auto",paddingBottom:20}}>
-        {view==="dashboard"&&<ViewDashboard data={data} stockUni={stockUni} setView={setView} lastUpdate={lastUpdate} blue={blue}/>}
+        {view==="dashboard"&&<ViewDashboard data={data} saveData={saveData} stockUni={stockUni} setView={setView} lastUpdate={lastUpdate} blue={blue}/>}
         {view==="stock"&&<ViewStock stockUni={stockUni} data={data}/>}
         {view==="ventas"&&<ViewVentas data={data}/>}
         {view==="costos"&&<ViewCostos data={data} blue={blue} tcActual={tcActual}/>}
@@ -724,7 +731,14 @@ function GraficoFacturacion({ventas,ventasHistoricas}){
   );
 }
 
-function ViewDashboard({data,stockUni,lastUpdate,setView,blue}){
+function isContAgotado(cont,ventas){
+  if(cont.estado==="pedido")return false;
+  const arts=cont.articulos||[];
+  if(arts.length===0)return false;
+  return arts.every(a=>Math.max(0,Number(a.cantidad)-stockDisp(cont.id,a.nombre,ventas))===0);
+}
+
+function ViewDashboard({data,saveData,stockUni,lastUpdate,setView,blue}){
   const [modalCont,setModalCont]=React.useState(null);
   const conts=sortConts(data.contenedores||[],data.contenedoresOrden);
   const stockTotal=Object.values(stockUni).reduce((a,v)=>a+v,0);
@@ -739,7 +753,8 @@ function ViewDashboard({data,stockUni,lastUpdate,setView,blue}){
         return acc;
       },{})
     ).reduce((a,v)=>a+v,0);
-    return{c,cobUSD,costo,pct,enG,stockCont};
+    const agotado=isContAgotado(c,data.ventas);
+    return{c,cobUSD,costo,pct,enG,stockCont,agotado};
   });
 
   return(
@@ -761,11 +776,17 @@ function ViewDashboard({data,stockUni,lastUpdate,setView,blue}){
       </div>
       <GraficoFacturacion ventas={data.ventas} ventasHistoricas={[]}/>
       <div style={{fontSize:10,fontWeight:600,color:"var(--text-secondary)",marginBottom:10,textTransform:"uppercase",letterSpacing:".06em"}}>Estado por contenedor</div>
-      <div style={{display:"grid",gap:8}}>
-        {resumen.map(({c,cobUSD,costo,pct,enG,stockCont})=>(
+      {(()=>{
+        const _rPed=resumen.filter(r=>r.c.estado==="pedido");
+        const _rAct=resumen.filter(r=>r.c.estado!=="pedido"&&!r.agotado);
+        const _rCerr=resumen.filter(r=>r.c.estado!=="pedido"&&r.agotado);
+        const CardCont=({c,cobUSD,costo,pct,enG,stockCont})=>(
           <div key={c.id} style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"14px 16px",cursor:"pointer",transition:"transform .12s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseLeave={e=>e.currentTarget.style.transform=""} onClick={()=>setModalCont(c)}>
+            {c.estado==="pedido"&&<div style={{marginBottom:8,display:"flex",justifyContent:"flex-end"}} onClick={e=>e.stopPropagation()}><button onClick={()=>marcarArribado(c.id)} style={{fontSize:11,padding:"4px 14px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer"}}>✓ Arribado</button></div>}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
               <span style={{fontWeight:500,fontSize:14,color:"var(--text-primary)"}}>{c.nombre}</span>
+                {c.estado==="pedido"&&<span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:10,background:"rgba(46,134,193,0.15)",color:"var(--text-info)",marginLeft:6}}>EN CAMINO</span>}
+                {c.estado==="pedido"&&c.fechaArribo&&<div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>🗓 {c.fechaArribo}</div>}
               <div style={{textAlign:"right"}}>
                 <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"flex-end",marginBottom:4}}>
                   <span style={{fontSize:12,fontWeight:500,color:"var(--text-secondary)"}}>{fmt(stockCont)} u</span>
@@ -788,9 +809,46 @@ function ViewDashboard({data,stockUni,lastUpdate,setView,blue}){
               </div>
             )}
           </div>
-        ))}
-        {resumen.length===0&&<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin contenedores.</div>}
-      </div>
+        );
+        const marcarArribado=(contId)=>{
+          const nuevos=(data.contenedores||[]).map(x=>x.id===contId?{...x,estado:"activo",fechaArribo:undefined}:x);
+          saveData({...data,contenedores:nuevos});
+        };
+        return(
+          <>
+            {_rPed.length>0&&(
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-info)",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+                  🚢 En camino · {_rPed.length}
+                </div>
+                <div style={{display:"grid",gap:8,padding:"10px",background:"rgba(46,134,193,0.06)",border:"0.5px solid rgba(46,134,193,0.2)",borderRadius:"var(--r-lg)"}}>
+                  {_rPed.map(r=><CardCont key={r.c.id} {...r}/>)}
+                </div>
+              </div>
+            )}
+            <div style={{display:"grid",gap:8,marginBottom:_rCerr.length>0?16:0}}>
+              {_rAct.length===0&&!_rCerr.length&&!_rPed.length&&<div style={{padding:"2rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin contenedores.</div>}
+              {_rAct.map(r=><CardCont key={r.c.id} {...r}/>)}
+            </div>
+            {_rCerr.length>0&&(
+              <div>
+                <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-secondary)",margin:"8px 0",display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{width:16,height:1,background:"var(--glass-border)",display:"inline-block"}}/>
+                  Cerrados · {_rCerr.length}
+                  <span style={{flex:1,height:1,background:"var(--glass-border)",display:"inline-block"}}/>
+                </div>
+                <div style={{display:"grid",gap:8}}>
+                  {_rCerr.map(r=>(
+                    <div key={r.c.id} style={{opacity:0.55,filter:"saturate(0.4)"}}>
+                      <CardCont {...r}/>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
       {modalCont&&<ContenedorModal c={modalCont} data={data} blue={blue} onClose={()=>setModalCont(null)}/>}
     </div>
   );
@@ -800,7 +858,7 @@ function ViewDashboard({data,stockUni,lastUpdate,setView,blue}){
 function ViewStock({stockUni,data}){
   const stockPapel={}, stockTinta={};
   let totalPapel=0, totalTinta=0;
-  Object.entries(stockUni).filter(([,v])=>v>0).forEach(([nombre,cant])=>{
+  Object.entries(stockUni).forEach(([nombre,cant])=>{
     if(nombre.includes("TINTA")){stockTinta[nombre]=cant;totalTinta+=cant;}
     else{stockPapel[nombre]=cant;totalPapel+=cant;}
   });
@@ -809,16 +867,16 @@ function ViewStock({stockUni,data}){
     const detalle=conts.map(c=>{
       const enCont=(c.articulos||[]).find(a=>a.nombre===art);
       const disp=enCont?Math.max(0,Number(enCont.cantidad)-stockDisp(c.id,art,data.ventas)):0;
-      return disp>0?c.nombre+" ("+fmt(disp)+")":null;
+      return enCont?c.nombre+(disp>0?" ("+fmt(disp)+")":""):null;
     }).filter(Boolean).join(" · ");
     return(
-      <div key={art} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",boxShadow:"var(--glass-shadow-sm)"}}>
+      <div key={art} style={{background:cant===0?"rgba(192,57,43,0.04)":"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:cant===0?"0.5px solid rgba(192,57,43,0.25)":"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",boxShadow:"var(--glass-shadow-sm)",opacity:cant===0?0.7:1}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art}</div>
           <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>{detalle}</div>
           <div style={{marginTop:4}}><ProyTag art={art} ventas={data.ventas} disp={cant}/></div>
         </div>
-        <div style={{fontSize:22,fontWeight:700,color:esTinta?"var(--text-info)":"var(--text-success)",marginLeft:12,flexShrink:0}}>{fmt(cant)}</div>
+        <div style={{fontSize:22,fontWeight:700,color:cant===0?"var(--text-danger)":esTinta?"var(--text-info)":"var(--text-success)",marginLeft:12,flexShrink:0}}>{cant===0?"✕":fmt(cant)}</div>
       </div>
     );
   };
