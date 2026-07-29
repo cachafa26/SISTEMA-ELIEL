@@ -6747,11 +6747,7 @@ function ComboInput({value,onChange,options,placeholder,type,storageKey}){
 }
 
 function TabArmado({cont,updateCont,showToast,data,save}){
-  const [form,setForm]=useState(()=>{
-    const _n=ARTS[0];
-    const _m=_n.match(/^(\d+)GR[\s]+([\d,.]+)[xX](\d+)$/);
-    return {nombre:_n,gramaje:_m?_m[1]:"",ancho:_m?_m[2].replace(",","."):"",largo:_m?_m[3]:"",cantidad:"",precio:"",moneda:"RMB"};
-  });
+  const [form,setForm]=useState({nombre:"",gramaje:"",ancho:"1.6",largo:"600",cantidad:"",precio:"",moneda:"RMB"});
   const [editId,setEditId]=useState(null);
   const [nuevoArt,setNuevoArt]=useState(false);
   const [nombreNuevo,setNombreNuevo]=useState("");
@@ -6759,9 +6755,10 @@ function TabArmado({cont,updateCont,showToast,data,save}){
   const esTinta=n=>String(n||"").toUpperCase().includes("TINTA");
   const ARTS_ALL=getArts(data);
   const submit=()=>{
+    if(!form.nombre||!String(form.nombre).trim()){showToast("Elegí o creá un artículo");return;}
     if(!form.cantidad||!form.precio){showToast("Completá cantidad y precio");return;}
     const isT=esTinta(form.nombre);
-    // Tintas: peso fijo 1kg por unidad
+    if(!isT&&(!form.gramaje||!form.ancho||!form.largo)){showToast("Completá gramaje, ancho y largo");return;}
     const artData={...form,id:editId||Date.now().toString(),cantidad:Number(form.cantidad),precio:Number(form.precio),
       gramaje:isT?1000:Number(form.gramaje),
       ancho:isT?1:Number(form.ancho),
@@ -6770,15 +6767,21 @@ function TabArmado({cont,updateCont,showToast,data,save}){
     const arts=editId?(cont.articulos||[]).map(a=>a.id===editId?artData:a):[...(cont.articulos||[]),artData];
     const pt=arts.reduce((a,x)=>a+pesoRollo(x)*Number(x.cantidad),0);
     if(pt>LIMITE){showToast("⚠️ Excede 25.500 kg");return;}
-    updateCont({...cont,articulos:arts,pesoTotal:pt});
-    // Guardar las características del artículo para futuros contenedores
+    // UN SOLO guardado: contenedor + artículo custom juntos
     if(save&&data){
+      const contActualizado={...cont,articulos:arts,pesoTotal:pt};
       const customs=[...(data.articulosCustom||[])].filter(a=>(typeof a==="object"?a.nombre:a)!==form.nombre);
       customs.push({nombre:form.nombre,gramaje:artData.gramaje,ancho:artData.ancho,largo:artData.largo,pesoUnitarioOverride:artData.pesoUnitarioOverride});
-      save({...data,articulosCustom:customs});
+      save({...data,
+        contenedores:(data.contenedores||[]).map(x=>x.id===cont.id?contActualizado:x),
+        articulosCustom:customs
+      });
+    } else {
+      updateCont({...cont,articulos:arts,pesoTotal:pt});
     }
-    setEditId(null);setForm({nombre:ARTS_ALL[0],gramaje:"",ancho:"1.6",largo:"600",cantidad:"",precio:"",moneda:"RMB"});
-    showToast(editId?"Actualizado":"Artículo agregado");
+    setEditId(null);
+    setForm({nombre:"",gramaje:"",ancho:"1.6",largo:"600",cantidad:"",precio:"",moneda:"RMB"});
+    showToast(editId?"✓ Actualizado":"✓ Artículo agregado");
   };
   const startEdit=art=>{setEditId(art.id);setForm({nombre:art.nombre,gramaje:art.gramaje||"",ancho:art.ancho||"1.6",largo:art.largo||"600",cantidad:art.cantidad,precio:art.precio||"",moneda:art.moneda||"RMB"});};
   const removeArt=id=>{const arts=(cont.articulos||[]).filter(x=>x.id!==id);updateCont({...cont,articulos:arts,pesoTotal:arts.reduce((a,x)=>a+pesoRollo(x)*x.cantidad,0)});};
@@ -6804,41 +6807,65 @@ function TabArmado({cont,updateCont,showToast,data,save}){
         <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>{editId?"Editar artículo":"Agregar artículo"}</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:8}}>
           <div style={{gridColumn:"1/-1"}}>
-            <label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label>
+            <label style={{fontSize:11,color:"var(--color-text-secondary)",display:"block",marginBottom:2}}>Artículo</label>
             {!nuevoArt?(
-              <select value={form.nombre} onChange={e=>{
-                if(e.target.value==="__NUEVO__"){setNuevoArt(true);setNombreNuevo("");return;}
-                const nombre=e.target.value;
-                // Buscar características guardadas de ese artículo
-                const specs=getArtSpecs(nombre,data);
-                if(specs){
-                  setForm(f=>({...f,nombre,gramaje:specs.gramaje||"",ancho:specs.ancho||"",largo:specs.largo||""}));
-                } else {
-                  // Auto-parse del nombre: "33GR 1,60x500"
-                  const m=nombre.match(/^(\d+)GR[\s]+([\d,\.]+)[xX](\d+)$/);
-                  if(m)setForm(f=>({...f,nombre,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]}));
-                  else setForm(f=>({...f,nombre}));
-                }
-              }} style={{width:"100%",marginTop:2}}>
-                {ARTS_ALL.map(a=><option key={a} value={a}>{a}</option>)}
-                <option value="__NUEVO__">➕ Nuevo artículo…</option>
-              </select>
+              <div style={{display:"flex",gap:6}}>
+                <select value={ARTS_ALL.includes(form.nombre)?form.nombre:""} onChange={e=>{
+                  const nombre=e.target.value;
+                  if(!nombre)return;
+                  const specs=getArtSpecs(nombre,data);
+                  if(specs&&(specs.gramaje||specs.ancho||specs.largo)){
+                    setForm(f=>({...f,nombre,gramaje:specs.gramaje||"",ancho:specs.ancho||"",largo:specs.largo||""}));
+                  } else {
+                    const m=nombre.match(/^(\d+)GR[\s]+([\d,\.]+)[xX](\d+)$/);
+                    if(m)setForm(f=>({...f,nombre,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]}));
+                    else setForm(f=>({...f,nombre}));
+                  }
+                }} style={{flex:1,minWidth:0}}>
+                  {!ARTS_ALL.includes(form.nombre)&&<option value="">{form.nombre||"Elegir artículo…"}</option>}
+                  {ARTS_ALL.map(a=><option key={a} value={a}>{a}</option>)}
+                </select>
+                <button onClick={()=>{setNuevoArt(true);setNombreNuevo("");}} title="Crear artículo nuevo" style={{
+                  padding:"0 13px",borderRadius:"var(--r-sm)",border:"0.5px solid var(--border-info)",
+                  background:"var(--bg-tint-blue)",color:"var(--text-info)",fontSize:16,fontWeight:600,
+                  cursor:"pointer",flexShrink:0,lineHeight:1
+                }}>＋</button>
+              </div>
             ):(
-              <div style={{display:"flex",gap:6,marginTop:2}}>
-                <input value={nombreNuevo} onChange={e=>setNombreNuevo(e.target.value)} autoFocus
-                  placeholder="Ej: 45GR 1,60x500 o TINTA VIOLETA" style={{flex:1,minWidth:0}}/>
-                <button onClick={()=>{
-                  const n=nombreNuevo.trim().toUpperCase();
-                  if(!n){showToast("Escribí el nombre del artículo");return;}
-                  const m=n.match(/^(\d+)GR[\s]+([\d,\.]+)[xX](\d+)$/);
-                  if(m)setForm(f=>({...f,nombre:n,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]}));
-                  else setForm(f=>({...f,nombre:n,gramaje:"",ancho:"",largo:""}));
-                  setNuevoArt(false);
-                }} style={{padding:"0 14px",borderRadius:"var(--r-sm)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>Usar</button>
-                <button onClick={()=>{setNuevoArt(false);setNombreNuevo("");}} style={{padding:"0 11px",borderRadius:"var(--r-sm)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",fontSize:12,cursor:"pointer"}}>✕</button>
+              <div style={{background:"var(--bg-tint-blue)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-md)",padding:"11px 12px"}}>
+                <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".05em",color:"var(--text-info)",marginBottom:7}}>Nuevo artículo</div>
+                <input value={nombreNuevo} onChange={e=>setNombreNuevo(e.target.value.toUpperCase())} autoFocus
+                  onKeyDown={e=>{
+                    if(e.key!=="Enter")return;
+                    const n=nombreNuevo.trim().toUpperCase();
+                    if(!n)return;
+                    const m=n.match(/^(\d+)GR[\s]+([\d,\.]+)[xX](\d+)$/);
+                    if(m)setForm(f=>({...f,nombre:n,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]}));
+                    else setForm(f=>({...f,nombre:n,gramaje:"",ancho:"",largo:""}));
+                    setNuevoArt(false);
+                  }}
+                  placeholder="45GR 1,60x500  ·  TINTA VIOLETA" style={{width:"100%",marginBottom:8}}/>
+                <div style={{fontSize:10.5,color:"var(--text-info)",opacity:.8,marginBottom:9,lineHeight:1.4}}>
+                  Con el formato <strong>45GR 1,60x500</strong> se autocompletan gramaje, ancho y largo.
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>{
+                    const n=nombreNuevo.trim().toUpperCase();
+                    if(!n){showToast("Escribí el nombre del artículo");return;}
+                    const m=n.match(/^(\d+)GR[\s]+([\d,\.]+)[xX](\d+)$/);
+                    if(m)setForm(f=>({...f,nombre:n,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]}));
+                    else setForm(f=>({...f,nombre:n,gramaje:"",ancho:"",largo:""}));
+                    setNuevoArt(false);
+                  }} style={{flex:1,padding:"8px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontSize:12.5,fontWeight:600,cursor:"pointer"}}>Continuar</button>
+                  <button onClick={()=>{setNuevoArt(false);setNombreNuevo("");}} style={{padding:"8px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",fontSize:12.5,cursor:"pointer"}}>Cancelar</button>
+                </div>
               </div>
             )}
-            {nuevoArt&&<div style={{fontSize:10,color:"var(--text-secondary)",marginTop:4}}>Si el formato es "45GR 1,60x500" se autocompletan gramaje, ancho y largo</div>}
+            {!nuevoArt&&form.nombre&&!ARTS_ALL.includes(form.nombre)&&(
+              <div style={{fontSize:10.5,color:"var(--text-info)",marginTop:5,display:"flex",alignItems:"center",gap:5}}>
+                <span style={{fontSize:11}}>✦</span> Artículo nuevo: <strong>{form.nombre}</strong> — se guardará al agregarlo
+              </div>
+            )}
           </div>
           {!isT&&(<>
             <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Gramaje (g/m²)</label><div style={{marginTop:2}}><ComboInput value={form.gramaje} onChange={v=>setForm({...form,gramaje:v})} options={GRAMAJES_PRESET} placeholder="ej: 45" storageKey="gramaje"/></div></div>
