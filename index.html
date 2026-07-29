@@ -1428,6 +1428,29 @@ window.sc_construirPDF=function(textos,m){
 
 
 const ARTS = ["29GR 1,60x600","30GR 1,60x600","33GR 1,60x500","35GR 1,60x500","42GR 1,60x300","52GR 1,10x100","61GR 1,60x300","80GR 1,60x300","80GR 1,10x100","TINTA NEGRO","TINTA CYAN","TINTA MAGENTA","TINTA AMARILLO","TINTA NEGRO PRO","TINTA CYAN PRO","TINTA MAGENTA PRO","TINTA AMARILLO PRO"];
+// Lista completa: base + artículos personalizados guardados + los que ya existen en contenedores
+function getArts(data){
+  const custom=(data&&data.articulosCustom||[]).map(a=>typeof a==="string"?a:a.nombre).filter(Boolean);
+  const enConts=[];
+  for(const c of (data&&data.contenedores||[])){
+    for(const art of (c.articulos||[])){
+      if(art.nombre&&!enConts.includes(art.nombre))enConts.push(art.nombre);
+    }
+  }
+  const todos=[...ARTS];
+  [...custom,...enConts].forEach(n=>{if(!todos.includes(n))todos.push(n);});
+  return todos;
+}
+// Busca las características guardadas de un artículo (de cualquier contenedor previo o custom)
+function getArtSpecs(nombre,data){
+  const custom=(data&&data.articulosCustom||[]).find(a=>typeof a==="object"&&a.nombre===nombre);
+  if(custom)return custom;
+  for(const c of (data&&data.contenedores||[])){
+    const art=(c.articulos||[]).find(a=>a.nombre===nombre&&(a.gramaje||a.ancho||a.largo));
+    if(art)return{nombre:art.nombre,gramaje:art.gramaje,ancho:art.ancho,largo:art.largo,pesoUnitarioOverride:art.pesoUnitarioOverride};
+  }
+  return null;
+}
 const ESTADOS = ["A despachar","Despachado","A retirar Ezeiza","A retirar Once","Retirado"];
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const CATS_GASTO = ["Vivienda","Alimentación","Transporte","Servicios","Salud","Ocio","Inversión","Otros"];
@@ -1445,6 +1468,7 @@ const EMPTY = {
   bh:{ despachos:[], cobros:[] },
   dj:{ eventos:[], presupuestos:[] },
   fin:{ gastos:[], presupuestos:{}, fx:[], deudas:[] },
+  articulosCustom:[],
   _v:10
 };
 
@@ -5934,7 +5958,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
                 {items.length>1&&<button onClick={()=>remItem(i)} style={{border:"none",background:"none",cursor:"pointer",color:"var(--color-text-danger)",fontSize:12}}>✕</button>}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 70px",gap:6}}>
-                <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={it.nombre} onChange={e=>updArticulo(i,e.target.value)} style={{width:"100%",marginTop:2,fontSize:12}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
+                <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={it.nombre} onChange={e=>updArticulo(i,e.target.value)} style={{width:"100%",marginTop:2,fontSize:12}}>{getArts(data).map(a=><option key={a}>{a}</option>)}</select></div>
                 <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cant.</label><input type="number" value={it.cantidad} onChange={e=>updItem(i,"cantidad",e.target.value)} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
                 <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Precio</label><input type="number" value={it.precioUnitario} onChange={e=>updItem(i,"precioUnitario",e.target.value)} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
                 <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Moneda</label><select value={it.moneda} onChange={e=>updItem(i,"moneda",e.target.value)} style={{width:"100%",marginTop:2,fontSize:12}}><option value="ARS">$ARS</option><option value="USD">USD</option></select></div>
@@ -6023,20 +6047,28 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
 // ══════════════════════════════════════════════════════════════════════════
 // SC — DASHBOARD INTERNO
 // ══════════════════════════════════════════════════════════════════════════
-// ── Modal de gestión de contenedor (revertir / eliminar) ──
+// ── Modal de gestión de contenedor ──
 function ModalGestionCont({cont,data,save,showToast,onClose}){
-  const [confirm,setConfirm]=useState(null); // "revertir" | "eliminar"
+  const [vista,setVista]=useState("menu"); // menu | renombrar | confirmRevertir | confirmEliminar
+  const [nombre,setNombre]=useState(cont.nombre||"");
   const nVentas=(data.ventas||[]).filter(v=>v.contId===cont.id).length;
+  const esPedido=cont.estado==="pedido";
 
+  const guardarNombre=()=>{
+    const n=nombre.trim();
+    if(!n){showToast&&showToast("El nombre no puede estar vacío");return;}
+    save({...data,contenedores:(data.contenedores||[]).map(x=>x.id===cont.id?{...x,nombre:n}:x)});
+    showToast&&showToast("✓ Nombre actualizado");
+    onClose();
+  };
   const revertir=()=>{
-    const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,estado:"pedido"}:x);
-    save({...data,contenedores:nuevos});
-    if(showToast)showToast("↩ Contenedor vuelto a en camino");
+    save({...data,contenedores:(data.contenedores||[]).map(x=>x.id===cont.id?{...x,estado:"pedido"}:x)});
+    showToast&&showToast("↩ Contenedor vuelto a en camino");
     onClose();
   };
   const eliminar=()=>{
     save({...data,contenedores:(data.contenedores||[]).filter(x=>x.id!==cont.id)});
-    if(showToast)showToast("Contenedor eliminado");
+    showToast&&showToast("Contenedor eliminado");
     onClose();
   };
 
@@ -6058,6 +6090,20 @@ function ModalGestionCont({cont,data,save,showToast,onClose}){
     </button>
   );
 
+  const Confirm=({icon,titulo,body,btnLabel,btnBg,btnShadow,onOk})=>(
+    <>
+      <div style={{textAlign:"center",marginBottom:20}}>
+        <div style={{fontSize:36,marginBottom:12,lineHeight:1}}>{icon}</div>
+        <div style={{fontSize:17,fontWeight:700,color:"var(--text-primary)",marginBottom:8,letterSpacing:"-.02em"}}>{titulo}</div>
+        <div style={{fontSize:13,color:"var(--text-secondary)",lineHeight:1.55,padding:"0 6px"}}>{body}</div>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={()=>setVista("menu")} style={{flex:1,padding:"12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer",fontSize:14,fontWeight:600}}>Cancelar</button>
+        <button onClick={onOk} style={{flex:1,padding:"12px",borderRadius:"var(--r-pill)",border:"none",color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700,background:btnBg,boxShadow:btnShadow}}>{btnLabel}</button>
+      </div>
+    </>
+  );
+
   return(
     <div onClick={e=>{if(e.target===e.currentTarget)onClose();}} style={{
       position:"fixed",inset:0,zIndex:3000,
@@ -6073,43 +6119,52 @@ function ModalGestionCont({cont,data,save,showToast,onClose}){
         boxShadow:"0 24px 70px rgba(0,0,0,.35),0 1px 0 rgba(255,255,255,.12) inset",
         animation:"modalIn .28s cubic-bezier(.34,1.2,.64,1)"
       }}>
-        {!confirm?(
+        {vista==="menu"&&(
           <>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18}}>
               <div style={{minWidth:0,flex:1}}>
                 <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:"var(--text-secondary)",marginBottom:4}}>Gestionar contenedor</div>
                 <div style={{fontSize:17,fontWeight:700,color:"var(--text-primary)",letterSpacing:"-.02em",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cont.nombre}</div>
+                {esPedido&&<div style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,background:"rgba(46,134,193,0.15)",color:"var(--text-info)",display:"inline-block",marginTop:6,letterSpacing:".04em"}}>EN CAMINO</div>}
               </div>
               <button onClick={onClose} style={{width:30,height:30,borderRadius:"50%",border:"0.5px solid var(--glass-border)",background:"rgba(120,120,128,0.1)",cursor:"pointer",fontSize:14,color:"var(--text-secondary)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginLeft:10}}>✕</button>
             </div>
-            <Fila icon="↩" titulo="Revertir arribo" desc="Vuelve al estado en camino. Su stock deja de contarse."
-              color="var(--text-warning)" onClick={()=>setConfirm("revertir")}/>
+            <Fila icon="✏️" titulo="Cambiar nombre" desc="Renombrar este contenedor"
+              color="var(--text-primary)" onClick={()=>{setNombre(cont.nombre||"");setVista("renombrar");}}/>
+            {!esPedido&&<Fila icon="↩" titulo="Revertir arribo" desc="Vuelve al estado en camino. Su stock deja de contarse."
+              color="var(--text-warning)" onClick={()=>setVista("confirmRevertir")}/>}
             <Fila icon="🗑" titulo="Eliminar contenedor" desc={nVentas>0?nVentas+" venta/s asociadas quedarían huérfanas":"Acción irreversible"}
-              color="var(--text-danger)" onClick={()=>setConfirm("eliminar")}/>
+              color="var(--text-danger)" onClick={()=>setVista("confirmEliminar")}/>
           </>
-        ):(
+        )}
+
+        {vista==="renombrar"&&(
           <>
-            <div style={{textAlign:"center",marginBottom:20}}>
-              <div style={{fontSize:36,marginBottom:12,lineHeight:1}}>{confirm==="eliminar"?"🗑":"↩"}</div>
-              <div style={{fontSize:17,fontWeight:700,color:"var(--text-primary)",marginBottom:8,letterSpacing:"-.02em"}}>
-                {confirm==="eliminar"?"¿Eliminar contenedor?":"¿Revertir arribo?"}
-              </div>
-              <div style={{fontSize:13,color:"var(--text-secondary)",lineHeight:1.55,padding:"0 6px"}}>
-                {confirm==="eliminar"
-                  ?<>Vas a eliminar <strong style={{color:"var(--text-primary)"}}>{cont.nombre}</strong> de forma permanente.{nVentas>0&&<><br/><span style={{color:"var(--text-danger)",fontWeight:600}}>{nVentas} venta/s quedarán sin contenedor asociado.</span></>}</>
-                  :<><strong style={{color:"var(--text-primary)"}}>{cont.nombre}</strong> volverá a estado <em>en camino</em> y su stock dejará de aparecer en el inventario.</>
-                }
-              </div>
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",color:"var(--text-secondary)",marginBottom:10}}>Cambiar nombre</div>
+              <input value={nombre} onChange={e=>setNombre(e.target.value)} autoFocus
+                onKeyDown={e=>{if(e.key==="Enter")guardarNombre();}}
+                placeholder="Nombre del contenedor" style={{width:"100%",fontSize:15,padding:"11px 13px"}}/>
             </div>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setConfirm(null)} style={{flex:1,padding:"12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer",fontSize:14,fontWeight:600}}>Cancelar</button>
-              <button onClick={confirm==="eliminar"?eliminar:revertir} style={{
-                flex:1,padding:"12px",borderRadius:"var(--r-pill)",border:"none",color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700,
-                background:confirm==="eliminar"?"linear-gradient(135deg,#C0392B,#922B21)":"linear-gradient(135deg,#F47920,#d4640f)",
-                boxShadow:confirm==="eliminar"?"0 4px 16px rgba(192,57,43,.35)":"0 4px 16px rgba(244,121,32,.35)"
-              }}>{confirm==="eliminar"?"Eliminar":"Revertir"}</button>
+              <button onClick={()=>setVista("menu")} style={{flex:1,padding:"12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer",fontSize:14,fontWeight:600}}>Cancelar</button>
+              <button onClick={guardarNombre} style={{flex:1,padding:"12px",borderRadius:"var(--r-pill)",border:"none",color:"#fff",cursor:"pointer",fontSize:14,fontWeight:700,background:"linear-gradient(135deg,#185FA5,#2E86C1)",boxShadow:"0 4px 16px rgba(24,95,165,.35)"}}>Guardar</button>
             </div>
           </>
+        )}
+
+        {vista==="confirmRevertir"&&(
+          <Confirm icon="↩" titulo="¿Revertir arribo?"
+            body={<><strong style={{color:"var(--text-primary)"}}>{cont.nombre}</strong> volverá a estado <em>en camino</em> y su stock dejará de aparecer en el inventario.</>}
+            btnLabel="Revertir" btnBg="linear-gradient(135deg,#F47920,#d4640f)" btnShadow="0 4px 16px rgba(244,121,32,.35)"
+            onOk={revertir}/>
+        )}
+
+        {vista==="confirmEliminar"&&(
+          <Confirm icon="🗑" titulo="¿Eliminar contenedor?"
+            body={<>Vas a eliminar <strong style={{color:"var(--text-primary)"}}>{cont.nombre}</strong> de forma permanente.{nVentas>0&&<><br/><span style={{color:"var(--text-danger)",fontWeight:600}}>{nVentas} venta/s quedarán sin contenedor asociado.</span></>}</>}
+            btnLabel="Eliminar" btnBg="linear-gradient(135deg,#C0392B,#922B21)" btnShadow="0 4px 16px rgba(192,57,43,.35)"
+            onOk={eliminar}/>
         )}
       </div>
     </div>
@@ -6515,8 +6570,7 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
                     color:enG?"var(--text-success)":costo===0?"var(--text-secondary)":"var(--text-warning)"}}>
                     {costo===0?"Sin costo":enG?"✓ En ganancia":fmtPct(pct)+" recuperado"}
                   </span>
-                  {c.estado!=="pedido"&&(
-                    <button onClick={e=>{e.stopPropagation();setGestionCont(c);}} title="Gestionar contenedor" style={{
+                  <button onClick={e=>{e.stopPropagation();setGestionCont(c);}} title="Gestionar contenedor" style={{
                       width:26,height:26,borderRadius:"50%",border:"none",background:"none",
                       cursor:"pointer",fontSize:13,color:"var(--text-tertiary)",opacity:.45,
                       display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
@@ -6524,7 +6578,6 @@ function ContenedoresList({data,save,setContSel,setContTab,showToast}){
                     }}
                     onMouseEnter={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.background="rgba(120,120,128,0.12)";}}
                     onMouseLeave={e=>{e.currentTarget.style.opacity=".45";e.currentTarget.style.background="none";}}>✎</button>
-                  )}
                 </div>
               </div>
               {costo>0&&(
@@ -6603,7 +6656,7 @@ function ContenedorDetail({cont,data,save,tab,setTab,onBack,showToast,blue}){
           </button>
         ))}
       </div>
-      {tab==="armado"&&<TabArmado cont={c} updateCont={updateCont} showToast={showToast}/>}
+      {tab==="armado"&&<TabArmado cont={c} updateCont={updateCont} showToast={showToast} data={data} save={save}/>}
       {tab==="costos"&&<TabCostos cont={c} updateCont={updateCont} showToast={showToast} blue={blue} ventas={data.ventas}/>}
       {tab==="ventas"&&<TabVentasCont cont={c} ventasCont={ventasCont} data={data} save={save} showToast={showToast} blue={blue}/>}
       {tab==="stock"&&(
@@ -6693,15 +6746,18 @@ function ComboInput({value,onChange,options,placeholder,type,storageKey}){
   );
 }
 
-function TabArmado({cont,updateCont,showToast}){
+function TabArmado({cont,updateCont,showToast,data,save}){
   const [form,setForm]=useState(()=>{
     const _n=ARTS[0];
     const _m=_n.match(/^(\d+)GR[\s]+([\d,.]+)[xX](\d+)$/);
     return {nombre:_n,gramaje:_m?_m[1]:"",ancho:_m?_m[2].replace(",","."):"",largo:_m?_m[3]:"",cantidad:"",precio:"",moneda:"RMB"};
   });
   const [editId,setEditId]=useState(null);
+  const [nuevoArt,setNuevoArt]=useState(false);
+  const [nombreNuevo,setNombreNuevo]=useState("");
   const LIMITE=25500;
-  const esTinta=n=>n.includes("TINTA");
+  const esTinta=n=>String(n||"").toUpperCase().includes("TINTA");
+  const ARTS_ALL=getArts(data);
   const submit=()=>{
     if(!form.cantidad||!form.precio){showToast("Completá cantidad y precio");return;}
     const isT=esTinta(form.nombre);
@@ -6715,7 +6771,13 @@ function TabArmado({cont,updateCont,showToast}){
     const pt=arts.reduce((a,x)=>a+pesoRollo(x)*Number(x.cantidad),0);
     if(pt>LIMITE){showToast("⚠️ Excede 25.500 kg");return;}
     updateCont({...cont,articulos:arts,pesoTotal:pt});
-    setEditId(null);setForm({nombre:ARTS[0],gramaje:"",ancho:"1.6",largo:"600",cantidad:"",precio:"",moneda:"RMB"});
+    // Guardar las características del artículo para futuros contenedores
+    if(save&&data){
+      const customs=[...(data.articulosCustom||[])].filter(a=>(typeof a==="object"?a.nombre:a)!==form.nombre);
+      customs.push({nombre:form.nombre,gramaje:artData.gramaje,ancho:artData.ancho,largo:artData.largo,pesoUnitarioOverride:artData.pesoUnitarioOverride});
+      save({...data,articulosCustom:customs});
+    }
+    setEditId(null);setForm({nombre:ARTS_ALL[0],gramaje:"",ancho:"1.6",largo:"600",cantidad:"",precio:"",moneda:"RMB"});
     showToast(editId?"Actualizado":"Artículo agregado");
   };
   const startEdit=art=>{setEditId(art.id);setForm({nombre:art.nombre,gramaje:art.gramaje||"",ancho:art.ancho||"1.6",largo:art.largo||"600",cantidad:art.cantidad,precio:art.precio||"",moneda:art.moneda||"RMB"});};
@@ -6741,16 +6803,43 @@ function TabArmado({cont,updateCont,showToast}){
       <div style={{background:"var(--bg-card)",backdropFilter:"blur(16px) saturate(1.8)",WebkitBackdropFilter:"blur(16px) saturate(1.8)",border:"0.5px solid var(--glass-border)",boxShadow:"var(--glass-shadow-sm)",borderRadius:"var(--r-lg)",padding:"1rem",marginBottom:"1rem"}}>
         <p style={{fontSize:13,fontWeight:500,margin:"0 0 8px"}}>{editId?"Editar artículo":"Agregar artículo"}</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8,marginBottom:8}}>
-          <div style={{gridColumn:"1/-1"}}><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label><select value={form.nombre} onChange={e=>{
-              const nombre=e.target.value;
-              // Auto-parse: "33GR 1,60x500" → gramaje=33, ancho=1.60, largo=500
-              const m=nombre.match(/^(\d+)GR[\s]+([\d,\.]+)[xX](\d+)$/);
-              if(m){
-                setForm(f=>({...f,nombre,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]}));
-              } else {
-                setForm(f=>({...f,nombre}));
-              }
-            }} style={{width:"100%",marginTop:2}}>{ARTS.map(a=><option key={a}>{a}</option>)}</select></div>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Artículo</label>
+            {!nuevoArt?(
+              <select value={form.nombre} onChange={e=>{
+                if(e.target.value==="__NUEVO__"){setNuevoArt(true);setNombreNuevo("");return;}
+                const nombre=e.target.value;
+                // Buscar características guardadas de ese artículo
+                const specs=getArtSpecs(nombre,data);
+                if(specs){
+                  setForm(f=>({...f,nombre,gramaje:specs.gramaje||"",ancho:specs.ancho||"",largo:specs.largo||""}));
+                } else {
+                  // Auto-parse del nombre: "33GR 1,60x500"
+                  const m=nombre.match(/^(\d+)GR[\s]+([\d,\.]+)[xX](\d+)$/);
+                  if(m)setForm(f=>({...f,nombre,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]}));
+                  else setForm(f=>({...f,nombre}));
+                }
+              }} style={{width:"100%",marginTop:2}}>
+                {ARTS_ALL.map(a=><option key={a} value={a}>{a}</option>)}
+                <option value="__NUEVO__">➕ Nuevo artículo…</option>
+              </select>
+            ):(
+              <div style={{display:"flex",gap:6,marginTop:2}}>
+                <input value={nombreNuevo} onChange={e=>setNombreNuevo(e.target.value)} autoFocus
+                  placeholder="Ej: 45GR 1,60x500 o TINTA VIOLETA" style={{flex:1,minWidth:0}}/>
+                <button onClick={()=>{
+                  const n=nombreNuevo.trim().toUpperCase();
+                  if(!n){showToast("Escribí el nombre del artículo");return;}
+                  const m=n.match(/^(\d+)GR[\s]+([\d,\.]+)[xX](\d+)$/);
+                  if(m)setForm(f=>({...f,nombre:n,gramaje:m[1],ancho:m[2].replace(",","."),largo:m[3]}));
+                  else setForm(f=>({...f,nombre:n,gramaje:"",ancho:"",largo:""}));
+                  setNuevoArt(false);
+                }} style={{padding:"0 14px",borderRadius:"var(--r-sm)",border:"none",background:"linear-gradient(135deg,#185FA5,#2E86C1)",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>Usar</button>
+                <button onClick={()=>{setNuevoArt(false);setNombreNuevo("");}} style={{padding:"0 11px",borderRadius:"var(--r-sm)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",fontSize:12,cursor:"pointer"}}>✕</button>
+              </div>
+            )}
+            {nuevoArt&&<div style={{fontSize:10,color:"var(--text-secondary)",marginTop:4}}>Si el formato es "45GR 1,60x500" se autocompletan gramaje, ancho y largo</div>}
+          </div>
           {!isT&&(<>
             <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Gramaje (g/m²)</label><div style={{marginTop:2}}><ComboInput value={form.gramaje} onChange={v=>setForm({...form,gramaje:v})} options={GRAMAJES_PRESET} placeholder="ej: 45" storageKey="gramaje"/></div></div>
             <div><label style={{fontSize:11,color:"var(--text-secondary)"}}>Ancho (m)</label><div style={{marginTop:2}}><ComboInput value={form.ancho} onChange={v=>setForm({...form,ancho:v})} options={ANCHOS_PRESET} placeholder="ej: 1.60" storageKey="ancho"/></div></div>
@@ -7611,7 +7700,7 @@ function VentasView({data,save,showToast}){
                   <div>
                     <label style={{fontSize:10,color:"var(--text-secondary)",display:"block",marginBottom:3}}>Artículo</label>
                     <select value={l.articulo} onChange={e=>setEditLineas(ls=>ls.map((x,j)=>j===i?{...x,articulo:e.target.value}:x))} style={{fontSize:12}}>
-                      {ARTS.map(a=><option key={a}>{a}</option>)}
+                      {getArts(data).map(a=><option key={a}>{a}</option>)}
                     </select>
                   </div>
                   <div>
