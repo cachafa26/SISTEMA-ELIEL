@@ -3263,7 +3263,7 @@ function GestorDeudas({data,save,showToast,blue}){
   const [showForm,setShowForm]=useState(false);
   const [editando,setEditando]=useState(null); // deuda en edición
   const [modalPago,setModalPago]=useState(null);
-  const [formPago,setFormPago]=useState({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:"USD"});
+  const [formPago,setFormPago]=useState({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:"ARS"});
   const [form,setForm]=useState({desc:"",monto:"",moneda:"ARS",fecha:new Date().toISOString().split("T")[0],nota:""});
 
   const resetForm=()=>setForm({desc:"",monto:"",moneda:"ARS",fecha:new Date().toISOString().split("T")[0],nota:""});
@@ -3321,12 +3321,14 @@ function GestorDeudas({data,save,showToast,blue}){
     const saldoActual=Math.max(0,Number(d.monto||0)-pagadoHist);
     // Si la deuda es en USD y el pago es en ARS, convertir al TC indicado
     const tcUsado=Number(formPago.tcPago||tc);
-    const montoEnMonedaDeuda=d.moneda==="USD"&&formPago.modoPago==="ARS"
-      ?montoN/tcUsado  // ARS → USD
-      :montoN;
+    // Convertir el monto recibido a la moneda de la deuda
+    let montoEnMonedaDeuda=montoN;
+    if(formPago.modoPago!==d.moneda){
+      montoEnMonedaDeuda = d.moneda==="USD" ? montoN/tcUsado : montoN*tcUsado;
+    }
     const aplicar=Math.min(montoEnMonedaDeuda,saldoActual);
     const gastoId=Date.now().toString()+"g";
-    const nuevoGasto={id:gastoId,desc:"Pago deuda: "+d.desc+(formPago.nota?" ("+formPago.nota+")":""),moneda:d.moneda,montoOriginal:aplicar,cotiz:d.moneda==="USD"?Number(formPago.tcPago||tc):null,monto:d.moneda==="USD"?(formPago.modoPago==="ARS"?Math.round(montoN):Math.round(aplicar*tcUsado)):aplicar,cat:"Deudas",fecha:formPago.fecha,fuente:"Otros",deudaId:d.id};
+    const nuevoGasto={id:gastoId,desc:"Pago deuda: "+d.desc+(formPago.nota?" ("+formPago.nota+")":""),moneda:formPago.modoPago,montoOriginal:montoN,cotiz:formPago.modoPago==="USD"?tcUsado:null,monto:formPago.modoPago==="USD"?Math.round(montoN*tcUsado):Math.round(montoN),cat:"Deudas",fecha:formPago.fecha,fuente:"Otros",deudaId:d.id};
     const pagoConLink={id:Date.now().toString(),monto:aplicar,fecha:formPago.fecha,nota:formPago.nota,gastoId};
     const histConLink=[...(d.historialPagos||[]),pagoConLink];
     const saldoNuevo=saldoActual-aplicar;
@@ -3360,32 +3362,41 @@ function GestorDeudas({data,save,showToast,blue}){
                 </div>
               );
             })()}
-            {/* Modo de pago para deudas USD */}
-            {modalPago.moneda==="USD"&&(
-              <div style={{display:"flex",gap:6,marginBottom:12}}>
-                {["USD","ARS"].map(m=>(
-                  <button key={m} onClick={()=>setFormPago(f=>({...f,modoPago:m,monto:""}))} style={{
-                    flex:1,padding:"7px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",
-                    cursor:"pointer",fontSize:12,fontWeight:600,
-                    background:formPago.modoPago===m?"var(--sc-orange)":"none",
-                    color:formPago.modoPago===m?"#fff":"var(--text-secondary)"
-                  }}>Pago en {m}</button>
-                ))}
-              </div>
-            )}
+            {/* Moneda del pago — funciona en ambos sentidos */}
+            <div style={{display:"flex",gap:6,marginBottom:12}}>
+              {["ARS","USD"].map(m=>(
+                <button key={m} onClick={()=>setFormPago(f=>({...f,modoPago:m,monto:""}))} style={{
+                  flex:1,padding:"8px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",
+                  cursor:"pointer",fontSize:12,fontWeight:600,transition:"all .15s",
+                  background:formPago.modoPago===m?"var(--sc-orange)":"none",
+                  color:formPago.modoPago===m?"#fff":"var(--text-secondary)"
+                }}>Pago en {m==="ARS"?"pesos":"dólares"}</button>
+              ))}
+            </div>
             <div style={{marginBottom:10}}>
               <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>
-                {modalPago.moneda==="USD"&&formPago.modoPago==="ARS"?"Monto recibido en ARS":"Monto a pagar ("+modalPago.moneda+")"}
+                Monto recibido en {formPago.modoPago==="ARS"?"pesos (ARS)":"dólares (USD)"}
               </label>
               <input type="number" value={formPago.monto} onChange={e=>setFormPago(f=>({...f,monto:e.target.value}))} placeholder="0" autoFocus inputMode="decimal"/>
             </div>
-            {modalPago.moneda==="USD"&&formPago.modoPago==="ARS"&&(
+            {formPago.modoPago!==modalPago.moneda&&(
               <div style={{marginBottom:12}}>
                 <label style={{fontSize:11,fontWeight:500,color:"var(--text-secondary)",display:"block",marginBottom:4}}>
                   Tipo de cambio
-                  <span style={{fontSize:10,color:"var(--text-secondary)",fontWeight:400,marginLeft:6}}>Blue: ${tc.toLocaleString("es-AR")}</span>
+                  <span style={{fontSize:10,color:"var(--text-secondary)",fontWeight:400,marginLeft:6,opacity:.75}}>Blue: ${tc.toLocaleString("es-AR")}</span>
                 </label>
                 <input type="number" value={formPago.tcPago} onChange={e=>setFormPago(f=>({...f,tcPago:e.target.value}))} placeholder={String(Math.round(tc))} inputMode="decimal" style={{width:"100%"}}/>
+              </div>
+            )}
+            {formPago.monto&&Number(formPago.monto)>0&&formPago.modoPago!==modalPago.moneda&&(
+              <div style={{fontSize:12,color:"var(--text-info)",marginBottom:12,padding:"9px 12px",background:"var(--bg-tint-blue)",borderRadius:"var(--r-md)",fontWeight:500,lineHeight:1.5}}>
+                {(()=>{
+                  const tcU=Number(formPago.tcPago||tc);
+                  const m=Number(formPago.monto);
+                  if(modalPago.moneda==="USD")
+                    return <>Saldás <strong>USD {(m/tcU).toFixed(2)}</strong> de la deuda<br/><span style={{fontSize:11,opacity:.8}}>Ingresás ${m.toLocaleString("es-AR")} ARS · TC ${tcU.toLocaleString("es-AR")}</span></>;
+                  return <>Saldás <strong>${Math.round(m*tcU).toLocaleString("es-AR")}</strong> de la deuda<br/><span style={{fontSize:11,opacity:.8}}>Ingresás USD {m.toLocaleString("es-AR")} · TC ${tcU.toLocaleString("es-AR")}</span></>;
+                })()}
               </div>
             )}
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8,marginBottom:12}}>
@@ -3402,7 +3413,7 @@ function GestorDeudas({data,save,showToast,blue}){
             )}
             <div style={{display:"flex",gap:8}}>
               <button onClick={pagarDeuda} style={{flex:1,fontSize:13,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>✓ Registrar pago</button>
-              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:"USD"});}} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:"ARS"});}} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
             </div>
           </div>
         </div>
@@ -3500,7 +3511,7 @@ function GestorDeudas({data,save,showToast,blue}){
                   </div>
                 )}
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  <button onClick={()=>{setModalPago(d);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:"USD"}); }} style={{fontSize:12,padding:"6px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>💳 Pagar</button>
+                  <button onClick={()=>{setModalPago(d);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:d.moneda||"ARS"}); }} style={{fontSize:12,padding:"6px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>💳 Pagar</button>
                   <button onClick={()=>abrirEditar(d)} style={{fontSize:12,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer",fontWeight:500}}>✏️ Editar</button>
                   <button onClick={()=>eliminarDeuda(d.id)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>✕ Eliminar</button>
                 </div>
@@ -4731,7 +4742,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
   // Confirmar desde presupuesto: crea evento confirmado
   const [modalConfirmar,setModalConfirmar]=useState(null);
   const [modalPago,setModalPago]=useState(null);
-  const [formPago,setFormPago]=useState({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:""});
+  const [formPago,setFormPago]=useState({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:"",tcPago:String(Math.round(blue||1450))});
   const [costoConfirmar,setCostoConfirmar]=useState("");
   const [monedaCostoConf,setMonedaCostoConf]=useState("ARS");
   const [formaPagoConf,setFormaPagoConf]=useState("cuotas"); // "cuotas" | "total"
@@ -4795,10 +4806,10 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
 
   const registrarPago=(evento)=>{
     if(!formPago.monto){showToast("Ingresá el monto");return;}
-    const tc2=blue||1450;
+    const tc2=Number(formPago.tcPago)||blue||1450;
     const montoNum=Number(formPago.monto);
     const montoUSD=formPago.moneda==="ARS"?montoNum/tc2:montoNum;
-    const pagos=[...(evento.pagos||[]),{id:Date.now().toString(),fecha:formPago.fecha,concepto:formPago.concepto,monto:montoNum,moneda:formPago.moneda,montoUSD,nota:formPago.nota}];
+    const pagos=[...(evento.pagos||[]),{id:Date.now().toString(),fecha:formPago.fecha,concepto:formPago.concepto,monto:montoNum,moneda:formPago.moneda,montoUSD,tc:tc2,nota:formPago.nota}];
     const totalPagadoUSD=pagos.reduce((a,p)=>a+p.montoUSD,0);
     const nuevoSaldo=Math.max(0,Number(evento.cobroUSD||0)-totalPagadoUSD);
     const nuevoEstado=evento.estado; // estado no cambia al registrar pago - solo cambia a Realizado cuando pasa la fecha
@@ -4806,7 +4817,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
     save({...data,dj:{...data.dj,eventos:nuevosEventos}});
     showToast("✓ Pago registrado");
     setModalPago(null);
-    setFormPago({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:""});
+    setFormPago({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:"",tcPago:String(Math.round(blue||1450))});
   };
 
   const guardarPresupuesto=()=>{
@@ -4929,17 +4940,25 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
                 <input value={formPago.nota} onChange={e=>setFormPago(f=>({...f,nota:e.target.value}))} placeholder="Opcional"/>
               </div>
             </div>
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:11,color:"var(--text-secondary)",display:"block",marginBottom:4}}>
+                Tipo de cambio
+                <span style={{fontSize:10,opacity:.7,marginLeft:6}}>Blue: ${fmt(blue||1450)}</span>
+              </label>
+              <input type="number" value={formPago.tcPago} onChange={e=>setFormPago(f=>({...f,tcPago:e.target.value}))}
+                placeholder={String(Math.round(blue||1450))} inputMode="decimal"/>
+            </div>
             {formPago.monto&&Number(formPago.monto)>0&&(
               <div style={{padding:"8px 12px",background:"var(--bg-tint-green)",border:"0.5px solid var(--border-success)",borderRadius:"var(--r-md)"}}>
                 {formPago.moneda==="ARS"
-                  ?<>= <strong>{fmtUSD(Number(formPago.monto)/(blue||1450))}</strong> al TC ${fmt(blue||1450)}</>
-                  :<>= <strong>${fmt(Number(formPago.monto)*(blue||1450))}</strong> ARS</>
+                  ?<>= <strong>{fmtUSD(Number(formPago.monto)/Number(formPago.tcPago||blue||1450))}</strong> al TC ${fmt(Number(formPago.tcPago||blue||1450))}</>
+                  :<>= <strong>${fmt(Number(formPago.monto)*Number(formPago.tcPago||blue||1450))}</strong> ARS al TC ${fmt(Number(formPago.tcPago||blue||1450))}</>
                 }
               </div>
             )}
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>registrarPago(modalPago)} style={{flex:1,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#5BAD41,#3D8B2A)",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:14}}>Registrar pago</button>
-              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:""});}} style={{padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",moneda:"USD",concepto:"Seña",fecha:hoy(),nota:"",tcPago:String(Math.round(blue||1450))});}} style={{padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
             </div>
           </div>
         </div>
