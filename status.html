@@ -753,8 +753,28 @@ function stockPorDeposito(data){
       add(it.articulo,t.destino,Number(it.cantidad||0));
     }
   }
+  const contsPedido=new Set((data.contenedores||[]).filter(x=>x.estado==="pedido").map(x=>x.id));
   for(const v of (data.ventas||[])){
+    if(contsPedido.has(v.contId))continue;
     add(v.articulo,v.depositoOrigen||dflt,-Number(v.cantidad||0));
+  }
+  return res;
+}
+function pendientesExtraccion(data){
+  const res={};
+  const dflt=depDefault(data);
+  const contsPedido=new Set((data.contenedores||[]).filter(x=>x.estado==="pedido").map(x=>x.id));
+  for(const v of (data.ventas||[])){
+    if(contsPedido.has(v.contId))continue;
+    const est=String(v.estado||"");
+    if(est==="Retirado"||est==="Despachado")continue;
+    const dep=v.depositoOrigen||dflt;
+    if(!res[v.articulo])res[v.articulo]={};
+    if(!res[v.articulo][dep])res[v.articulo][dep]={total:0,retiro:0,expreso:0};
+    const n=Number(v.cantidad||0);
+    res[v.articulo][dep].total+=n;
+    if(String(v.entrega||"")==="Expreso")res[v.articulo][dep].expreso+=n;
+    else res[v.articulo][dep].retiro+=n;
   }
   return res;
 }
@@ -897,6 +917,7 @@ function ViewStock({stockUni,data}){
   const deps=getDepositos(data);
   const spd=stockPorDeposito(data);
   const faltantes=faltantesPorDeposito(data);
+  const pend=pendientesExtraccion(data);
   const esT=n=>String(n||"").toUpperCase().includes("TINTA");
 
   const stockActual=(()=>{
@@ -928,6 +949,22 @@ function ViewStock({stockUni,data}){
           <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art}</div>
           {detalle&&<div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>{detalle}</div>}
           {tab==="general"&&<div style={{marginTop:4}}><ProyTag art={art} ventas={data.ventas} disp={cant}/></div>}
+          {tab!=="general"&&(()=>{
+            const p=((pend[art]||{})[tab])||null;
+            if(!p||p.total<=0)return null;
+            return(
+              <div style={{marginTop:6,padding:"5px 9px",background:"var(--bg-tint-amber)",border:"0.5px solid rgba(178,80,0,0.25)",
+                borderRadius:"var(--r-sm)",display:"inline-flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                <span style={{fontSize:10.5,color:"var(--text-warning)",fontWeight:600}}>📦 {fmt(p.total)}u pendiente{p.total>1?"s":""} de salida</span>
+                <span style={{fontSize:9.5,color:"var(--text-secondary)"}}>
+                  {p.retiro>0&&<span>{fmt(p.retiro)} a retirar</span>}
+                  {p.retiro>0&&p.expreso>0&&<span> · </span>}
+                  {p.expreso>0&&<span>{fmt(p.expreso)} a despachar</span>}
+                </span>
+                <span style={{fontSize:9.5,color:"var(--text-tertiary)"}}>· físico: {fmt(cant+p.total)}</span>
+              </div>
+            );
+          })()}
         </div>
         <div style={{fontSize:22,fontWeight:700,color:neg?"var(--text-danger)":(esTinta?"var(--text-info)":"var(--text-success)"),marginLeft:12,flexShrink:0}}>{fmt(cant)}</div>
       </div>
