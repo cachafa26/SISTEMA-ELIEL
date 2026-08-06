@@ -1522,8 +1522,10 @@ function stockPorDeposito(data){
       add(it.articulo,t.destino,Number(it.cantidad||0));
     }
   }
-  // 3) Ventas: restan del depósito de salida (default si no tiene)
+  // 3) Ventas: restan del depósito de salida — SOLO de contenedores arribados
+  const contsPedido=new Set((data.contenedores||[]).filter(x=>x.estado==="pedido").map(x=>x.id));
   for(const v of (data.ventas||[])){
+    if(contsPedido.has(v.contId))continue; // venta de contenedor en camino: no afecta stock
     const dep=v.depositoOrigen||dflt;
     add(v.articulo,dep,-Number(v.cantidad||0));
   }
