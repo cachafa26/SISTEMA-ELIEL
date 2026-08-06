@@ -725,6 +725,52 @@ function GraficoFacturacion({ventas,ventasHistoricas}){
   );
 }
 
+function getDepositos(data){
+  const d=(data&&data.depositos)||[];
+  if(d.length)return d;
+  return [{id:"ezeiza",nombre:"Ezeiza",esDefault:true},{id:"once",nombre:"Once"}];
+}
+function depDefault(data){
+  const ds=getDepositos(data);
+  return (ds.find(d=>d.esDefault)||ds[0]||{id:"ezeiza"}).id;
+}
+function stockPorDeposito(data){
+  const res={};
+  const dflt=depDefault(data);
+  const add=(art,dep,n)=>{
+    if(!art)return;
+    if(!res[art])res[art]={};
+    res[art][dep]=(res[art][dep]||0)+n;
+  };
+  for(const cont of (data.contenedores||[])){
+    if(cont.estado==="pedido")continue;
+    const dep=cont.deposito||dflt;
+    for(const art of (cont.articulos||[]))add(art.nombre,dep,Number(art.cantidad||0));
+  }
+  for(const t of (data.traslados||[])){
+    for(const it of (t.items||[])){
+      add(it.articulo,t.origen,-Number(it.cantidad||0));
+      add(it.articulo,t.destino,Number(it.cantidad||0));
+    }
+  }
+  for(const v of (data.ventas||[])){
+    add(v.articulo,v.depositoOrigen||dflt,-Number(v.cantidad||0));
+  }
+  return res;
+}
+function faltantesPorDeposito(data){
+  const sp=stockPorDeposito(data);
+  const out=[];
+  Object.entries(sp).forEach(([art,deps])=>{
+    Object.entries(deps).forEach(([dep,cant])=>{
+      if(cant<0){
+        const f=Object.entries(deps).filter(([d2,c2])=>d2!==dep&&c2>0).sort((a,b)=>b[1]-a[1]);
+        out.push({articulo:art,deposito:dep,falta:Math.abs(cant),fuente:f[0]?f[0][0]:null});
+      }
+    });
+  });
+  return out;
+}
 function isContAgotado(cont,ventas){
   if(cont.estado==="pedido")return false;
   const arts=cont.articulos||[];
@@ -847,69 +893,144 @@ function ViewDashboard({data,stockUni,lastUpdate,setView,blue}){
 
 
 function ViewStock({stockUni,data}){
-  const stockPapel={}, stockTinta={};
-  let totalPapel=0, totalTinta=0;
-  Object.entries(stockUni).forEach(([nombre,cant])=>{
-    if(nombre.includes("TINTA")){stockTinta[nombre]=cant;totalTinta+=cant;}
-    else{stockPapel[nombre]=cant;totalPapel+=cant;}
+  const [tab,setTab]=React.useState("general");
+  const deps=getDepositos(data);
+  const spd=stockPorDeposito(data);
+  const faltantes=faltantesPorDeposito(data);
+  const esT=n=>String(n||"").toUpperCase().includes("TINTA");
+
+  const stockActual=(()=>{
+    if(tab==="general")return stockUni;
+    const out={};
+    Object.entries(spd).forEach(([art,dd])=>{
+      const v=dd[tab]||0;
+      if(v!==0)out[art]=v;
+    });
+    return out;
+  })();
+
+  const papel={},tinta={};let tPapel=0,tTinta=0;
+  Object.entries(stockActual).forEach(([n,c2])=>{
+    if(tab==="general"&&c2<=0)return;
+    if(esT(n)){tinta[n]=c2;tTinta+=c2;}else{papel[n]=c2;tPapel+=c2;}
   });
+
   const Row=([art,cant],esTinta)=>{
-    const conts=(data.contenedores||[]).filter(c=>(c.articulos||[]).some(a=>a.nombre===art));
-    const detalle=conts.map(c=>{
-      const enCont=(c.articulos||[]).find(a=>a.nombre===art);
-      const disp=enCont?Math.max(0,Number(enCont.cantidad)-stockDisp(c.id,art,data.ventas)):0;
-      return enCont?c.nombre+(disp>0?" ("+fmt(disp)+")":""):null;
-    }).filter(Boolean).join(" · ");
+    const neg=cant<0;
+    const detalle=tab==="general"
+      ?deps.map(d=>{const v=(spd[art]||{})[d.id]||0;return v!==0?d.nombre+": "+fmt(v):null;}).filter(Boolean).join(" · ")
+      :deps.filter(d=>d.id!==tab).map(d=>{const v=(spd[art]||{})[d.id]||0;return v!==0?d.nombre+": "+fmt(v):null;}).filter(Boolean).join(" · ");
     return(
-      <div key={art} style={{background:cant===0?"rgba(192,57,43,0.04)":"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:cant===0?"0.5px solid rgba(192,57,43,0.25)":"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",boxShadow:"var(--glass-shadow-sm)",opacity:cant===0?0.7:1}}>
+      <div key={art} style={{background:neg?"var(--bg-tint-red)":"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",
+        border:"0.5px solid "+(neg?"var(--border-danger)":"var(--glass-border)"),borderRadius:"var(--r-lg)",padding:"11px 14px",
+        display:"flex",justifyContent:"space-between",alignItems:"flex-start",boxShadow:"var(--glass-shadow-sm)"}}>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontWeight:600,fontSize:13,color:"var(--text-primary)"}}>{art}</div>
-          <div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>{detalle}</div>
-          <div style={{marginTop:4}}><ProyTag art={art} ventas={data.ventas} disp={cant}/></div>
+          {detalle&&<div style={{fontSize:10,color:"var(--text-secondary)",marginTop:2}}>{detalle}</div>}
+          {tab==="general"&&<div style={{marginTop:4}}><ProyTag art={art} ventas={data.ventas} disp={cant}/></div>}
         </div>
-        <div style={{fontSize:22,fontWeight:700,color:cant===0?"var(--text-danger)":esTinta?"var(--text-info)":"var(--text-success)",marginLeft:12,flexShrink:0}}>{cant===0?"✕":fmt(cant)}</div>
+        <div style={{fontSize:22,fontWeight:700,color:neg?"var(--text-danger)":(esTinta?"var(--text-info)":"var(--text-success)"),marginLeft:12,flexShrink:0}}>{fmt(cant)}</div>
       </div>
     );
   };
+
+  const TabB=({id,label})=>(
+    <button onClick={()=>setTab(id)} style={{
+      background:"none",border:"none",padding:"9px 14px",cursor:"pointer",fontSize:12.5,
+      fontWeight:tab===id?700:500,color:tab===id?"var(--text-primary)":"var(--text-secondary)",
+      borderBottom:tab===id?"2px solid var(--sc-orange)":"2px solid transparent",
+      transition:"all .15s",whiteSpace:"nowrap"
+    }}>{label}</button>
+  );
+
   return(
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-        <h2 style={{fontSize:20,fontWeight:700,letterSpacing:"-.02em",margin:0,color:"var(--text-primary)"}}>Stock disponible</h2>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:"1.5rem"}}>
-        <div style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:6}}>📄 Total Papel</div>
-          <div style={{fontSize:28,fontWeight:700,color:"var(--text-primary)"}}>{fmt(totalPapel)}</div>
-          <div style={{fontSize:11,color:"var(--text-secondary)",marginTop:2}}>rollos disponibles</div>
+      {faltantes.length>0&&(
+        <div style={{background:"var(--bg-tint-red)",border:"0.5px solid var(--border-danger)",borderRadius:"var(--r-lg)",padding:"12px 15px",marginBottom:14}}>
+          <div style={{fontSize:11.5,fontWeight:700,color:"var(--text-danger)",marginBottom:7}}>
+            ⚠ Stock negativo · {faltantes.length} artículo{faltantes.length>1?"s":""}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            {faltantes.map((f,i)=>{
+              const dN=(deps.find(d=>d.id===f.deposito)||{}).nombre||f.deposito;
+              const fN=f.fuente?(deps.find(d=>d.id===f.fuente)||{}).nombre||f.fuente:null;
+              return(
+                <div key={i} style={{fontSize:11.5,color:"var(--text-primary)",lineHeight:1.5}}>
+                  {fN
+                    ?<>Traer de <strong>{fN}</strong> a <strong>{dN}</strong>: <strong style={{color:"var(--text-danger)"}}>{fmt(f.falta)}u</strong> de {f.articulo}</>
+                    :<>Faltan <strong style={{color:"var(--text-danger)"}}>{fmt(f.falta)}u</strong> de {f.articulo} en <strong>{dN}</strong></>
+                  }
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div style={{background:"var(--bg-tint-blue)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-lg)",padding:"14px 16px",boxShadow:"var(--glass-shadow-sm)"}}>
-          <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:6}}>🖨️ Total Tinta</div>
-          <div style={{fontSize:28,fontWeight:700,color:"var(--text-info)"}}>{fmt(totalTinta)}</div>
-          <div style={{fontSize:11,color:"var(--text-info)",marginTop:2,opacity:.8}}>unidades disponibles</div>
+      )}
+
+      <div style={{display:"flex",gap:2,borderBottom:"0.5px solid var(--glass-border)",marginBottom:16,overflowX:"auto"}}>
+        <TabB id="general" label="General"/>
+        {deps.map(d=><TabB key={d.id} id={d.id} label={d.nombre}/>)}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+        <div style={{background:"var(--bg-card)",backdropFilter:"blur(14px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)",padding:"13px 15px"}}>
+          <div style={{fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:6}}>📄 Papel</div>
+          <div style={{fontSize:22,fontWeight:700,color:tPapel<0?"var(--text-danger)":"var(--text-primary)",letterSpacing:"-.02em"}}>{fmt(tPapel)}<span style={{fontSize:12,fontWeight:400,color:"var(--text-secondary)"}}> rollos</span></div>
+        </div>
+        <div style={{background:"var(--bg-tint-blue)",backdropFilter:"blur(14px)",border:"0.5px solid var(--border-info)",borderRadius:"var(--r-lg)",padding:"13px 15px"}}>
+          <div style={{fontSize:9.5,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:6}}>🖨️ Tinta</div>
+          <div style={{fontSize:22,fontWeight:700,color:tTinta<0?"var(--text-danger)":"var(--text-info)",letterSpacing:"-.02em"}}>{fmt(tTinta)}<span style={{fontSize:12,fontWeight:400,opacity:.7}}> u</span></div>
         </div>
       </div>
-      {totalPapel===0&&totalTinta===0
-        ?<div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13}}>Sin stock.</div>
-        :<>
-          {Object.keys(stockPapel).length>0&&(
-            <div style={{marginBottom:"1.5rem"}}>
-              <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>📄 Papeles</div>
-              <div style={{display:"grid",gap:6}}>{Object.entries(stockPapel).sort((a,b)=>b[1]-a[1]).map(e=>Row(e,false))}</div>
-            </div>
-          )}
-          {Object.keys(stockTinta).length>0&&(
-            <div>
-              <div style={{fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-info)",marginBottom:8}}>🖨️ Tintas</div>
-              <div style={{display:"grid",gap:6}}>{Object.entries(stockTinta).sort((a,b)=>b[1]-a[1]).map(e=>Row(e,true))}</div>
-            </div>
-          )}
-        </>
-      }
+
+      {Object.keys(papel).length>0&&(
+        <div style={{marginBottom:18}}>
+          <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Papel</div>
+          <div style={{display:"grid",gap:6}}>{Object.entries(papel).sort((a,b)=>b[1]-a[1]).map(e=>Row(e,false))}</div>
+        </div>
+      )}
+      {Object.keys(tinta).length>0&&(
+        <div style={{marginBottom:18}}>
+          <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",color:"var(--text-secondary)",marginBottom:8}}>Tinta</div>
+          <div style={{display:"grid",gap:6}}>{Object.entries(tinta).sort((a,b)=>b[1]-a[1]).map(e=>Row(e,true))}</div>
+        </div>
+      )}
+      {Object.keys(papel).length===0&&Object.keys(tinta).length===0&&(
+        <div style={{padding:"3rem",textAlign:"center",color:"var(--text-secondary)",fontSize:13,background:"var(--bg-card)",
+          backdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",borderRadius:"var(--r-lg)"}}>Sin stock en este depósito.</div>
+      )}
+
+      {(data.traslados||[]).length>0&&(
+        <div style={{marginTop:20}}>
+          <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-secondary)",marginBottom:9}}>
+            Últimos traslados
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {[...(data.traslados||[])].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).slice(0,8).map(t=>{
+              const nom=id=>(deps.find(d=>d.id===id)||{}).nombre||id;
+              return(
+                <div key={t.id} style={{background:"var(--bg-card)",backdropFilter:"blur(12px)",border:"0.5px solid var(--glass-border)",
+                  borderRadius:"var(--r-md)",padding:"10px 13px"}}>
+                  <div style={{fontSize:12.5,fontWeight:600,color:"var(--text-primary)",marginBottom:4}}>
+                    {nom(t.origen)} <span style={{color:"var(--text-info)"}}>→</span> {nom(t.destino)}
+                    <span style={{fontSize:10.5,fontWeight:400,color:"var(--text-secondary)",marginLeft:8}}>{t.fecha}</span>
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                    {(t.items||[]).map((it,i)=>(
+                      <span key={i} style={{fontSize:10.5,padding:"3px 8px",borderRadius:"var(--r-pill)",
+                        background:"rgba(120,120,128,.1)",color:"var(--text-secondary)"}}>{it.articulo} · {fmt(it.cantidad)}u</span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── COSTOS: contenedores ordenados más nuevo → más viejo ──────────────────
 function ViewCostos({data,blue,tcActual}){
   const [tcManual,setTcManual]=useState(String(Math.round(tcActual)));
   const tc=Number(tcManual)||tcActual;
