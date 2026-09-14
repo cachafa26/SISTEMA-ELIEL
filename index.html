@@ -633,7 +633,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v6.0.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v6.0.1</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1087,7 +1087,7 @@ window.SC_SYSTEM_PROMPT="Sos el asesor estrat\u00e9gico de Super Coating para El
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v6.0.0";
+const APP_VERSION = "v6.0.1";
 const APP_BUILD   = "2026-07-02";
 
 // ── SC Reporte PDF ─────────────────────────────────────────────────
@@ -1452,6 +1452,20 @@ function getArtSpecs(nombre,data){
   return null;
 }
 const ESTADOS = ["A despachar","Despachado","A retirar Ezeiza","A retirar Once","Retirado"];
+// Estados según depósitos configurados
+function getEstados(data){
+  const ds=getDepositos(data);
+  return ["A despachar","Despachado",...ds.map(d=>"A retirar "+d.nombre),"Retirado"];
+}
+// Estado inicial de una venta según su tipo de entrega
+function estadoInicial(entrega){
+  return String(entrega||"")==="Expreso" ? "A despachar" : "A retirar "+String(entrega||"").replace(/^Retira\s+/,"");
+}
+// ¿Está pendiente de salir del depósito?
+function estaPendiente(estado){
+  const e=String(estado||"");
+  return e!=="Retirado" && e!=="Despachado";
+}
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const CATS_GASTO = ["Vivienda","Alimentación","Transporte","Servicios","Salud","Ocio","Inversión","Otros"];
 
@@ -1882,9 +1896,13 @@ function App(){
   // BH total devengado = suma de sueldos por mes (despachos + base + aguinaldo si aplica)
   const bhTotalAnio=(()=>{
     const despachos=data.bh?.despachos||[];
-    const meses=[...new Set(despachos.map(d=>d.mes))];
-    // Include current month even if no despachos
-    if(!meses.includes(new Date().getMonth())) meses.push(new Date().getMonth());
+    const mesHoy=new Date().getMonth();
+    // El sueldo base se devenga TODOS los meses, haya o no despachos.
+    // Contar desde el primer mes con actividad hasta el mes actual, sin saltear ninguno.
+    const conDesp=despachos.map(d=>d.mes).filter(m=>typeof m==="number");
+    const desde=conDesp.length?Math.min(...conDesp,mesHoy):mesHoy;
+    const meses=[];
+    for(let m=desde;m<=mesHoy;m++)meses.push(m);
     return meses.reduce((a,mes)=>{
       const dm=despachos.filter(d=>d.mes===mes);
       return a+bhSueldoMes(dm,mes).sueldo;
@@ -2527,11 +2545,13 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
     try {
       if(action.action==="CARGAR_PEDIDO"){
         const pedidoId = Date.now().toString();
-        const entregaTipo = d.entrega||"Retira Ezeiza";
+        const _dsCB = getDepositos(data);
+        const entregaTipo = d.entrega||("Retira "+((_dsCB.find(x=>x.esDefault)||_dsCB[0]||{nombre:"Ezeiza"}).nombre));
         const _et = entregaTipo.toLowerCase();
+        const _depMatch = _dsCB.find(x=>_et.includes(String(x.nombre).toLowerCase()));
         const estadoVenta = _et.includes("expreso") ? "A despachar"
-          : _et.includes("once") ? "A retirar Once"
-          : "A retirar Ezeiza";
+          : "A retirar "+((_depMatch||_dsCB.find(x=>x.esDefault)||_dsCB[0]||{nombre:"Ezeiza"}).nombre);
+        const _depVenta = (_depMatch||{}).id || depDefault(data);
         // Auto-select container using distribuir() priority logic
         const distRes = distribuir(
           [{nombre:d.articulo, cantidad:Number(d.cantidad), precioUnitario:Number(d.precioVenta), precioVenta:Number(d.precioVenta)}],
@@ -2547,7 +2567,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
             usd:subtotal/(d.tipoCambioUsado||tc),
             tipoCambioUsado:d.tipoCambioUsado||tc,
             fecha:new Date().toISOString().split("T")[0],
-            estado:estadoVenta, entrega:entregaTipo, pago:0, pedidoId
+            estado:estadoVenta, entrega:entregaTipo, pago:0, pedidoId, depositoOrigen:_depVenta
           };
         });
         const total = ventasNuevas.reduce((a,v)=>a+v.total,0);
@@ -4297,11 +4317,17 @@ function BHTradeView({data,save,showToast,blue}){
 
   // Total devengado = sum of sueldo por mes (despachos + base $160k + aguinaldo si aplica)
   const mesesConData=[...new Set(despachos.map(d=>d.mes))];
-  const bhTotalAnio=(()=>{
-    const meses=[...new Set([...mesesConData,new Date().getMonth()])];
-    return meses.reduce((a,mes)=>a+bhSueldoMes(despachos.filter(d=>d.mes===mes),mes).sueldo,0);
+  // El sueldo base se devenga todos los meses, haya o no despachos:
+  // se cuenta el rango completo desde el primer mes con actividad hasta el actual.
+  const mesesMostrar=(()=>{
+    const mesHoy=new Date().getMonth();
+    const nums=mesesConData.filter(m=>typeof m==="number");
+    const desde=nums.length?Math.min(...nums,mesHoy):mesHoy;
+    const out=[];
+    for(let m=desde;m<=mesHoy;m++)out.push(m);
+    return out;
   })();
-  const mesesMostrar=[...new Set([...mesesConData,new Date().getMonth()])].sort((a,b)=>a-b);
+  const bhTotalAnio=mesesMostrar.reduce((a,mes)=>a+bhSueldoMes(despachos.filter(d=>d.mes===mes),mes).sueldo,0);
   const despMes=[...despachos.filter(d=>d.mes===mesActivo)].sort((a,b)=>b.id.localeCompare(a.id));
   const s=bhSueldoMes(despMes,mesActivo);
 
@@ -5973,7 +5999,7 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
   const [items,setItems]=useState([{nombre:ARTS[0],cantidad:"",precioUnitario:ultimoPrecioArt(ARTS[0]),moneda:"ARS"}]);
   const [pagoTotal,setPagoTotal]=useState("");
   const [pagoCompleto,setPagoCompleto]=useState(false);
-  const [entrega,setEntrega]=useState("Retira Once");
+  const [entrega,setEntrega]=useState(()=>{const ds=getDepositos(data);return "Retira "+((ds.find(d=>d.esDefault)||ds[0]||{nombre:"Ezeiza"}).nombre);});
   const [depExpreso,setDepExpreso]=useState(depDefault(data));
   const [datosExp,setDatosExp]=useState({nombre:"",dni:"",direccion:"",localidad:"",provincia:"",expreso:""});
   const [preview,setPreview]=useState(null);
@@ -6012,8 +6038,8 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
     const pagoN=Number(pagoTotal||0);const tcN=Number(tc)||1450;const pid=Date.now().toString();
     const nuevasVentas=resultado.map(r=>{
       const prop=Math.round(totalG>0?(r.subtotal/totalG)*pagoN:0);
-      const estado=entrega==="Expreso"?"A despachar":entrega.includes("Ezeiza")?"A retirar Ezeiza":"A retirar Once";
-      return{id:pid+Math.random().toString(36).slice(2,5),contId:r.contId,fecha,articulo:r.artNombre,cantidad:r.cantidad,cliente,precioVenta:r.precioUnitario,total:r.subtotal,usd:r.subtotal/tcN,pago:prop,tipoCambioUsado:tcN,pedidoId:pid,entrega,estado,depositoOrigen:entrega==="Expreso"?depExpreso:(entrega==="Retira Once"?"once":"ezeiza")};
+      const estado=estadoInicial(entrega);
+      return{id:pid+Math.random().toString(36).slice(2,5),contId:r.contId,fecha,articulo:r.artNombre,cantidad:r.cantidad,cliente,precioVenta:r.precioUnitario,total:r.subtotal,usd:r.subtotal/tcN,pago:prop,tipoCambioUsado:tcN,pedidoId:pid,entrega,estado,depositoOrigen:entrega==="Expreso"?depExpreso:((getDepositos(data).find(d=>entrega==="Retira "+d.nombre)||{}).id||depDefault(data))};
     });
     let newData={...data,ventas:[...(data.ventas||[]),...nuevasVentas]};
     if(entrega==="Expreso"){
@@ -6089,9 +6115,9 @@ function PedidoModal({data,save,blue,onClose,showToast,clienteIdx}){
         <div style={{marginBottom:"1rem"}}>
           <label style={{fontSize:12,color:"var(--color-text-secondary)"}}>Tipo de entrega</label>
           <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
-            {["Expreso","Retira Ezeiza","Retira Once"].map(e=>(
-              <button key={e} onClick={()=>setEntrega(e)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"1px solid "+(entrega===e?"var(--color-border-info)":"var(--color-border-tertiary)"),background:entrega===e?"var(--color-background-info)":"var(--color-background-primary)",color:entrega===e?"var(--color-text-info)":"var(--color-text-secondary)",fontWeight:entrega===e?500:400}}>
-                {e==="Expreso"?"🚚 Expreso":e==="Retira Ezeiza"?"📍 Ezeiza":"📍 Once"}
+            {[{v:"Expreso",l:"🚚 Expreso",dep:null},...getDepositos(data).map(d=>({v:"Retira "+d.nombre,l:"📍 "+d.nombre,dep:d.id}))].map(o=>(
+              <button key={o.v} onClick={()=>{setEntrega(o.v);if(o.dep)setDepExpreso(o.dep);}} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"1px solid "+(entrega===o.v?"var(--color-border-info)":"var(--color-border-tertiary)"),background:entrega===o.v?"var(--color-background-info)":"var(--color-background-primary)",color:entrega===o.v?"var(--color-text-info)":"var(--color-text-secondary)",fontWeight:entrega===o.v?500:400}}>
+                {o.l}
               </button>
             ))}
           </div>
@@ -7379,7 +7405,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Cliente</label><input value={form.cliente} onChange={e=>setForm({...form,cliente:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Pago recibido ($)</label><input type="number" value={form.pago} onChange={e=>setForm({...form,pago:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
           <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>{blue?"Cotización · $"+fmt(blue):"Cotización"}</label><input type="number" value={form.tipoCambio} onChange={e=>setForm({...form,tipoCambio:e.target.value})} style={{width:"100%",marginTop:2,boxSizing:"border-box"}}/></div>
-          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Estado</label><select value={form.estado} onChange={e=>setForm({...form,estado:e.target.value})} style={{width:"100%",marginTop:2}}>{ESTADOS.map(s=><option key={s}>{s}</option>)}</select></div>
+          <div><label style={{fontSize:11,color:"var(--color-text-secondary)"}}>Estado</label><select value={form.estado} onChange={e=>setForm({...form,estado:e.target.value})} style={{width:"100%",marginTop:2}}>{getEstados(data).map(s=><option key={s}>{s}</option>)}</select></div>
         </div>
         {form.articulo&&<p style={{fontSize:11,color:"var(--color-text-secondary)",margin:"0 0 6px"}}>Stock disponible: {sdMap[form.articulo]??0}</p>}
         <button onClick={registrar} style={{fontSize:13,padding:"7px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",border:"0.5px solid var(--color-border-secondary)",background:"var(--color-background-primary)",color:"var(--color-text-primary)"}}>Registrar</button>
@@ -7388,7 +7414,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {(()=>{
             // Group by pedidoId, sort newest first
-            const PEND=["A despachar","A retirar Ezeiza","A retirar Once"];
+            const PEND=getEstados(data).filter(e=>e!=="Retirado"&&e!=="Despachado");
             const pMap=new Map();
             ventasCont.forEach(v=>{
               const pid=v.pedidoId||v.id;
@@ -7460,7 +7486,7 @@ function TabVentasCont({cont,ventasCont,data,save,showToast,blue}){
                         style={{fontSize:11,padding:"3px 6px",borderRadius:6,
                           border:"0.5px solid var(--glass-border)",
                           background:"var(--bg-card)",color:"var(--text-primary)"}}>
-                        {ESTADOS.map(s=><option key={s}>{s}</option>)}
+                        {getEstados(data).map(s=><option key={s}>{s}</option>)}
                       </select>
                       <button onClick={()=>{if(window.confirm("¿Eliminar pedido?"))p.lineas.forEach(v=>eliminar(v.id));}}
                         style={{fontSize:10,padding:"2px 7px",borderRadius:6,
@@ -8331,7 +8357,7 @@ function VentasView({data,save,showToast}){
                     value={p.estado}
                     onChange={e=>{actualizarEstado(p.lineas[0]?.id||p.id,e.target.value);}}
                     style={{fontSize:11,padding:"4px 8px",borderRadius:6,border:"0.5px solid var(--glass-border)",background:"var(--bg-card)",color:"var(--text-primary)"}}>
-                    {ESTADOS.map(s=><option key={s}>{s}</option>)}
+                    {getEstados(data).map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
