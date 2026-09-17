@@ -734,9 +734,13 @@ function depDefault(data){
   const ds=getDepositos(data);
   return (ds.find(d=>d.esDefault)||ds[0]||{id:"ezeiza"}).id;
 }
+function depAncla(data){
+  const ds=getDepositos(data);
+  return (ds[0]||{id:"ezeiza"}).id;
+}
 function stockPorDeposito(data){
   const res={};
-  const dflt=depDefault(data);
+  const dflt=depAncla(data);
   const add=(art,dep,n)=>{
     if(!art)return;
     if(!res[art])res[art]={};
@@ -762,7 +766,7 @@ function stockPorDeposito(data){
 }
 function pendientesExtraccion(data){
   const res={};
-  const dflt=depDefault(data);
+  const dflt=depAncla(data);
   const contsPedido=new Set((data.contenedores||[]).filter(x=>x.estado==="pedido").map(x=>x.id));
   for(const v of (data.ventas||[])){
     if(contsPedido.has(v.contId))continue;
@@ -1129,8 +1133,13 @@ function ViewVentas({data}){
 
   const ARTS_UNICOS=[...new Set((data.ventas||[]).map(v=>v.articulo))].filter(Boolean).sort();
   const CONTS_UNICOS=sortConts(data.contenedores||[],data.contenedoresOrden).map(c=>({id:c.id,nombre:c.nombre}));
-  const stBg={"Retirado":"var(--bg-tint-green)","A despachar":"var(--bg-tint-blue)","Despachado":"var(--bg-tint-blue)","A retirar Ezeiza":"var(--bg-tint-amber)","A retirar Once":"var(--bg-tint-amber)"};
-  const stCol={"Retirado":"var(--text-success)","A despachar":"var(--text-info)","Despachado":"var(--text-info)","A retirar Ezeiza":"var(--text-warning)","A retirar Once":"var(--text-warning)"};
+  const colorEstado=(e)=>{
+    const s=String(e||"");
+    if(s==="Retirado")return{bg:"var(--bg-tint-green)",col:"var(--text-success)"};
+    if(s==="Despachado"||s==="A despachar")return{bg:"var(--bg-tint-blue)",col:"var(--text-info)"};
+    if(s.startsWith("A retirar"))return{bg:"var(--bg-tint-amber)",col:"var(--text-warning)"};
+    return{bg:"rgba(120,120,128,0.1)",col:"var(--text-secondary)"};
+  };
 
   const ventas=[...(data.ventas||[])]
     .filter(v=>{
@@ -1207,7 +1216,7 @@ function ViewVentas({data}){
                           <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>${fmt(p.totalARS)}</div>
                           <div style={{fontSize:11,color:"var(--text-info)",fontWeight:500}}>{fmtUSD(p.totalUSD)}</div>
                         </div>
-                        <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:"var(--r-pill)",background:stBg[est]||"rgba(120,120,128,0.1)",color:stCol[est]||"var(--text-secondary)",whiteSpace:"nowrap"}}>{est}</span>
+                        <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:"var(--r-pill)",background:colorEstado(est).bg,color:colorEstado(est).col,whiteSpace:"nowrap"}}>{est}</span>
                       </div>
                     </div>
                     {/* Líneas del pedido */}
