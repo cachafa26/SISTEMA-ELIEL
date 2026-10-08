@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v6.0.0 · 2026-08-06 -->
+  <!-- v6.1.0 · 2026-10-08 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -633,7 +633,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v6.0.2</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v6.1.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1087,7 +1087,7 @@ window.SC_SYSTEM_PROMPT="Sos el asesor estrat\u00e9gico de Super Coating para El
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v6.0.2";
+const APP_VERSION = "v6.1.0";
 const APP_BUILD   = "2026-07-02";
 
 // ── SC Reporte PDF ─────────────────────────────────────────────────
@@ -1497,6 +1497,69 @@ const EMPTY = {
   _v:11
 };
 
+// ── CAPA DE PERSISTENCIA SEGURA ───────────────────────────────────────────
+// Un solo documento de Firestore guarda TODO. Por eso cualquier escritura con
+// datos viejos borra lo que cargo otra pestaña/otro dispositivo. Estas piezas
+// impiden que eso pase.
+const DATA_V = 11;
+
+// Cuenta registros reales: sirve para detectar un payload vacio antes de escribirlo.
+function countRecords(d){
+  if(!d||typeof d!=="object")return 0;
+  let n=0;
+  for(const k of ["contenedores","ventas","pagos","retiros","despachos","articulosCustom","traslados"]) n+=((d[k]||[]).length||0);
+  n+=Object.keys(d.clientes||{}).length;
+  n+=((d.bh&&d.bh.despachos)||[]).length+((d.bh&&d.bh.cobros)||[]).length;
+  n+=((d.dj&&d.dj.eventos)||[]).length+((d.dj&&d.dj.presupuestos)||[]).length;
+  n+=((d.fin&&d.fin.gastos)||[]).length+((d.fin&&d.fin.fx)||[]).length+((d.fin&&d.fin.deudas)||[]).length;
+  return n;
+}
+
+// Normalizador TOLERANTE. Antes el loader exigia _v===9||_v===10 y, si no,
+// cargaba EMPTY (= pantalla en blanco) y la siguiente escritura borraba todo
+// en el servidor. Ahora acepta cualquier payload que sea un objeto y solo
+// completa las claves que falten. Nunca devuelve vacio si el remoto trae datos.
+function normalizePayload(remote){
+  if(!remote||typeof remote!=="object"||Array.isArray(remote))return null;
+  return {
+    ...EMPTY, ...remote,
+    clientes: remote.clientes||{},
+    bh:  {...EMPTY.bh,  ...(remote.bh||{})},
+    dj:  {...EMPTY.dj,  ...(remote.dj||{})},
+    fin: {...EMPTY.fin, ...(remote.fin||{})},
+    depositos: (remote.depositos&&remote.depositos.length)?remote.depositos:EMPTY.depositos,
+    traslados: remote.traslados||[],
+    articulosCustom: remote.articulosCustom||[],
+    _v: DATA_V,
+    _rev: Number(remote._rev||0)
+  };
+}
+
+// Red de seguridad local: ultimo estado bueno + un punto de hace ~1 dia.
+function backupLocal(d){
+  try{
+    if(countRecords(d)===0)return;
+    const js=JSON.stringify(d);
+    const prevTs=Number(localStorage.getItem("eliel_bk_day_ts")||0);
+    if(Date.now()-prevTs>86400000){
+      const last=localStorage.getItem("eliel_bk_last");
+      if(last){localStorage.setItem("eliel_bk_day",last);localStorage.setItem("eliel_bk_day_ts",String(Date.now()));}
+    }
+    localStorage.setItem("eliel_bk_last",js);
+    localStorage.setItem("eliel_bk_last_ts",String(Date.now()));
+  }catch(e){ /* cuota llena: los backups son best-effort */ }
+}
+// Recuperacion manual desde la consola: elielBackups() / elielRestore("last"|"day")
+window.elielBackups=function(){
+  const r={};
+  for(const k of ["last","day"]){
+    const js=localStorage.getItem("eliel_bk_"+k);
+    const ts=Number(localStorage.getItem("eliel_bk_"+k+"_ts")||0);
+    r[k]=js?{registros:countRecords(JSON.parse(js)),fecha:ts?new Date(ts).toLocaleString("es-AR"):"?"}:null;
+  }
+  console.table(r);return r;
+};
+
 // ── HELPERS SC ────────────────────────────────────────────────────────────
 async function fetchBlue(){
   try{const r=await fetch("https://dolarapi.com/v1/dolares/blue");const d=await r.json();return d.venta||d.compra||null;}catch{return null;}
@@ -1815,64 +1878,116 @@ function App(){
   },[]);
 
   const [fbReady, setFbReady] = useState(false);
+  const [syncErr, setSyncErr] = useState(null);   // null = sincronizado
   const dbRef = useRef(null);
+  const loadedRef = useRef(false);     // ¿leimos el remoto al menos una vez?
+  const revRef = useRef(0);            // revision monotona del payload
+  const lastGoodRef = useRef(null);    // ultimo payload con datos
+  const writeQ = useRef(Promise.resolve());  // cola: nunca dos escrituras en paralelo
 
   useEffect(()=>{
-    let unsub = null;
-    (async()=>{
-      setBlue(await fetchBlue());
-      try{
-        const db = window._fbDB;
-        if(!db) throw new Error("Firebase no cargado");
-        const docRef = window.firebase.firestore().doc("eliel/datos");
-        dbRef.current = docRef;
-        const snap = await docRef.get();
-        if(snap.exists){
-          const remote = snap.data().payload;
-          // migrate v9 to v10
-          const migrated = remote && (remote._v===9||remote._v===10) ? {
-            ...EMPTY,...remote,
-            clientes: remote.clientes||{},
-            bh: {...(remote.bh||{}), cobros:(remote.bh?.cobros||[])},
-            dj: {...(remote.dj||{}), eventos:(remote.dj?.eventos||[]), presupuestos:(remote.dj?.presupuestos||[])},
-            fin: {...(remote.fin||{}), presupuestos:(remote.fin?.presupuestos||{})},
-            _v:10
-          } : EMPTY;
-          setData(migrated);
-        } else {
-          setData(EMPTY);
-        }
-        unsub = docRef.onSnapshot(snap=>{
-          if(snap.exists){
-            const remote = snap.data().payload;
-            if(remote&&(remote._v===9||remote._v===10)){
-              const migrated={...EMPTY,...remote,clientes:remote.clientes||{},bh:{...( remote.bh||{}),cobros:(remote.bh?.cobros||[])},fin:{...(remote.fin||{}),presupuestos:(remote.fin?.presupuestos||{})},_v:10};
-              setData(migrated);
-            }
-          }
-        });
-        setFbReady(true);
-      } catch(e){
-        console.error("Firebase error:",e);
-        const raw=localStorage.getItem("eliel_v10")||localStorage.getItem("eliel_v9");
-        setData(raw?JSON.parse(raw):EMPTY);
+    let unsub=null, timer=null;
+    // La cotizacion NO bloquea la carga de datos (antes un dolarapi lento
+    // dejaba la app en "Cargando...").
+    fetchBlue().then(b=>{if(b)setBlue(b);}).catch(()=>{});
+
+    let docRef=null;
+    try{
+      if(!window._fbDB) throw new Error("Firebase no cargado");
+      docRef=window.firebase.firestore().doc("eliel/datos");
+      dbRef.current=docRef;
+    }catch(e){
+      console.error("Firebase error:",e);
+      const raw=localStorage.getItem("eliel_bk_last")||localStorage.getItem("eliel_v10")||localStorage.getItem("eliel_v9");
+      let local=null; try{local=raw?normalizePayload(JSON.parse(raw)):null;}catch{}
+      setData(local||EMPTY);
+      // loadedRef queda en false => esta pestaña NO puede escribir y por lo
+      // tanto no puede borrar lo que haya en el servidor.
+      setSyncErr("Sin conexión a Firebase. Estás viendo una copia local: no se va a guardar nada. Recargá la página.");
+      return;
+    }
+
+    // El listener es la UNICA fuente de verdad y se registra SIEMPRE.
+    // Antes, si el get() inicial fallaba, el listener nunca se enganchaba y la
+    // pestaña quedaba ciega: seguia escribiendo su payload viejo encima del
+    // servidor y borraba lo cargado en otro lado (de ahi "lo de BH se borra").
+    unsub=docRef.onSnapshot(snap=>{
+      if(!snap.exists){
+        loadedRef.current=true; revRef.current=0;
+        setData(EMPTY); setFbReady(true); setSyncErr(null);
+        return;
       }
-    })();
-    return ()=>{ if(unsub) unsub(); };
+      const nd=normalizePayload(snap.data().payload);
+      if(!nd){
+        console.warn("Payload remoto ilegible: se conserva el estado local");
+        setSyncErr("El servidor devolvió datos ilegibles. No se guardará nada hasta recargar.");
+        return;
+      }
+      const rrev=Number(nd._rev||0);
+      // Ignorar ecos atrasados de nuestras propias escrituras.
+      if(loadedRef.current && rrev<revRef.current) return;
+      revRef.current=Math.max(revRef.current,rrev);
+      if(countRecords(nd)>0) lastGoodRef.current=nd;
+      loadedRef.current=true;
+      setData(nd); setFbReady(true); setSyncErr(null);
+      backupLocal(nd);
+    },err=>{
+      console.error("Firebase snapshot error:",err);
+      loadedRef.current=false;   // dejamos de confiar en esta pestaña
+      setSyncErr("Se cortó la sincronización. No se guardará nada hasta recargar la página.");
+    });
+
+    // Si en 8s no llego ningun snapshot, mostramos la copia local SOLO para leer.
+    timer=setTimeout(()=>{
+      if(loadedRef.current)return;
+      const raw=localStorage.getItem("eliel_bk_last")||localStorage.getItem("eliel_v10");
+      let local=null; try{local=raw?normalizePayload(JSON.parse(raw)):null;}catch{}
+      setData(d=>d||local||EMPTY);
+      setSyncErr("No se pudo sincronizar con el servidor. Modo solo lectura: no se guardará nada. Recargá la página.");
+    },8000);
+
+    return ()=>{ if(unsub)unsub(); if(timer)clearTimeout(timer); };
   },[]);
 
-  const save=async nd=>{
-    setData(nd);
-    try{localStorage.setItem("eliel_v10",JSON.stringify(nd));}catch{}
-    if(dbRef.current){
-      try{
-        await dbRef.current.set({payload:nd,ts:Date.now()});
-      }catch(e){console.error("Firebase save error:",e);}
+  // Escritura con tres candados contra la perdida de datos.
+  const save=nd=>{
+    // 1) Nunca escribir sin haber leido antes el remoto.
+    if(!loadedRef.current){
+      setSyncErr("No se guardó: esta pestaña no está sincronizada. Recargá la página y volvé a cargarlo.");
+      try{showToast("⚠️ Sin sincronizar — NO se guardó");}catch{}
+      return Promise.resolve();
     }
+    // 2) Nunca escribir un payload vacio arriba de uno con datos.
+    const prev=lastGoodRef.current;
+    if(prev&&countRecords(nd)===0&&countRecords(prev)>0){
+      console.error("Escritura vacía bloqueada",{nuevo:countRecords(nd),anterior:countRecords(prev)});
+      setSyncErr("Se bloqueó un guardado que habría borrado todo. Recargá la página.");
+      try{showToast("⚠️ Guardado vacío bloqueado");}catch{}
+      return Promise.resolve();
+    }
+    const rev=revRef.current+1;
+    revRef.current=rev;
+    const payload={...nd,_v:DATA_V,_rev:rev};
+    setData(payload);
+    if(countRecords(payload)>0) lastGoodRef.current=payload;
+    backupLocal(payload);
+    try{localStorage.setItem("eliel_v10",JSON.stringify(payload));}catch{}
+    // 3) Cola serie: dos guardados seguidos nunca compiten entre si.
+    writeQ.current=writeQ.current
+      .then(()=>dbRef.current?dbRef.current.set({payload,ts:Date.now(),rev}):null)
+      .then(()=>{setSyncErr(null);})
+      .catch(e=>{console.error("Firebase save error:",e);setSyncErr("Error al guardar en el servidor. Revisá la conexión.");});
+    return writeQ.current;
   };
   const showToast=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(null),2800);};
 
-  if(!data)return <div style={{padding:"2rem",color:"var(--color-text-secondary)"}}>Cargando...</div>;
+  if(!data)return (
+    <div style={{padding:"2rem",color:"var(--color-text-secondary)",textAlign:"center"}}>
+      {syncErr
+        ? <div style={{color:"#C0392B",fontWeight:600,fontSize:14,lineHeight:1.5}}>⚠️ {syncErr}</div>
+        : "Cargando..."}
+    </div>
+  );
 
   // Calculos SC globales
   const stockUni={};
@@ -2006,6 +2121,18 @@ function App(){
 
   return(
     <div style={{fontFamily:'"Inter",-apple-system,sans-serif',minHeight:"100vh"}}>
+
+      {/* BANNER DE SINCRONIZACION: si esta visible, NADA se esta guardando */}
+      {syncErr&&(
+        <div onClick={()=>window.location.reload()} style={{
+          position:"fixed",top:0,left:0,right:0,zIndex:10001,cursor:"pointer",
+          background:"#C0392B",color:"#fff",padding:"10px 16px",
+          fontSize:13,fontWeight:600,textAlign:"center",
+          boxShadow:"0 2px 12px rgba(0,0,0,.25)",
+        }}>
+          ⚠️ {syncErr} <span style={{textDecoration:"underline",marginLeft:6,fontWeight:500}}>Recargar</span>
+        </div>
+      )}
 
       {/* TOAST */}
       {toastMsg&&(
@@ -6334,10 +6461,11 @@ function ModalGestionCont({cont,data,save,showToast,onClose}){
 function AccionesContenedor({cont,data,save,showToast}){
   const [editFecha,setEditFecha]=useState(false);
   const [nuevaFecha,setNuevaFecha]=useState(cont.fechaArribo||"");
-  if(cont.estado!=="pedido")return null;
-
   const [eligiendoDep,setEligiendoDep]=useState(false);
   const [depSel,setDepSel]=useState(depDefault(data));
+  // El return temprano va DESPUES de todos los hooks: si se cortaba antes,
+  // al pasar un contenedor de "pedido" a "activo" cambiaba la cantidad de
+  // hooks y React rompia el estado del componente.
   const arribar=()=>{
     const nuevos=(data.contenedores||[]).map(x=>x.id===cont.id?{...x,estado:"activo",fechaArribo:null,deposito:depSel}:x);
     save({...data,contenedores:nuevos});
@@ -6350,6 +6478,7 @@ function AccionesContenedor({cont,data,save,showToast}){
     setEditFecha(false);
     if(showToast)showToast("✓ Fecha actualizada");
   };
+  if(cont.estado!=="pedido")return null;
 
   if(editFecha)return(
     <div onClick={e=>e.stopPropagation()} style={{display:"flex",gap:6,alignItems:"center",marginTop:10,flexWrap:"wrap"}}>
