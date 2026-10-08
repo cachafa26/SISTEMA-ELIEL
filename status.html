@@ -253,31 +253,26 @@ function App(){
 
   useEffect(()=>{
     let unsub=null;
-    (async()=>{
-      setBlue(await fetchBlue());
-      try{
-        const db=window._fbDB;
-        if(!db)throw new Error("Sin Firebase");
-        const docRef=db.doc("eliel/datos");
-        const snap=await docRef.get();
-        if(snap.exists){
-          const d=snap.data().payload;
-          setData(d||{contenedores:[],ventas:[],pagos:[],retiros:[]});
-        } else {
-          setData({contenedores:[],ventas:[],pagos:[],retiros:[]});
-        }
-        setSyncStatus("ok");
-        unsub=docRef.onSnapshot(snap=>{
-          if(snap.exists){
-            const d=snap.data().payload;
-            if(d){setData(d);setLastUpdate(new Date());setSyncStatus("ok");}
-          }
-        });
-      }catch(e){
-        console.error(e);setSyncStatus("error");
-        setData({contenedores:[],ventas:[],pagos:[],retiros:[]});
-      }
-    })();
+    // La cotizacion no bloquea la carga de datos.
+    fetchBlue().then(b=>{if(b)setBlue(b);}).catch(()=>{});
+    const VACIO={contenedores:[],ventas:[],pagos:[],retiros:[]};
+    try{
+      const db=window._fbDB;
+      if(!db)throw new Error("Sin Firebase");
+      const docRef=db.doc("eliel/datos");
+      // Solo el listener: es la unica fuente de verdad y se registra siempre.
+      unsub=docRef.onSnapshot(snap=>{
+        if(!snap.exists){setData(VACIO);setLastUpdate(new Date());setSyncStatus("ok");return;}
+        const d=snap.data().payload;
+        // Si el payload viene ilegible conservamos lo ultimo bueno en pantalla
+        // en lugar de mostrar todo en cero.
+        if(!d||typeof d!=="object"){setSyncStatus("error");return;}
+        setData(d);setLastUpdate(new Date());setSyncStatus("ok");
+      },err=>{console.error(err);setSyncStatus("error");});
+    }catch(e){
+      console.error(e);setSyncStatus("error");
+      setData(d=>d||VACIO);
+    }
     return()=>{if(unsub)unsub();};
   },[]);
 
