@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="light-content"/>
   <meta name="apple-mobile-web-app-title" content="Eliel"/>
   <title>Sistema Eliel</title>
-  <!-- v6.1.0 · 2026-10-08 -->
+  <!-- v6.3.0 · 2026-10-08 -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
@@ -633,7 +633,7 @@
   <div id="loading">
     <div class="spin"></div>
     <div class="brand">Sistema Eliel</div>
-    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v6.1.0</p>
+    <p style="font-size:10px;color:rgba(255,255,255,0.3);z-index:1;margin-top:-8px">v6.3.0</p>
     <p id="msg">Iniciando…</p>
   </div>
   <div id="err">
@@ -1087,7 +1087,7 @@ window.SC_SYSTEM_PROMPT="Sos el asesor estrat\u00e9gico de Super Coating para El
 
   <script id="src" type="text/raw">
 // ── CONSTANTES ────────────────────────────────────────────────────────────
-const APP_VERSION = "v6.1.0";
+const APP_VERSION = "v6.3.0";
 const APP_BUILD   = "2026-07-02";
 
 // ── SC Reporte PDF ─────────────────────────────────────────────────
@@ -1482,8 +1482,28 @@ const fmt = n => Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:0,ma
 const fmtUSD = n => "USD "+Number(n||0).toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtPct = n => Number(n||0).toFixed(1)+"%";
 const pesoRollo = a => a.pesoUnitarioOverride!=null ? Number(a.pesoUnitarioOverride) : (Number(a.gramaje||0)/1000)*Number(a.ancho||0)*Number(a.largo||0);
-const hoy = () => new Date().toISOString().split("T")[0];
-const haceUnMes = () => { const d=new Date(); d.setMonth(d.getMonth()-1); return d.toISOString().split("T")[0]; };
+// ── FECHAS: SIEMPRE EN HORA LOCAL ────────────────────────────────────────
+// toISOString() convierte a UTC. En Buenos Aires (UTC-3) eso adelanta un dia
+// despues de las 21:00, y new Date("2026-10-01") devuelve el 30/09 21:00 local
+// (o sea: mes = septiembre). Por eso un despacho cargado el 1° de cualquier mes
+// se guardaba en el mes anterior y desaparecia de la pestaña que estabas viendo.
+const fechaLocalStr = d => {
+  const x = d || new Date(), z = n => String(n).padStart(2,"0");
+  return x.getFullYear()+"-"+z(x.getMonth()+1)+"-"+z(x.getDate());
+};
+const hoy = () => fechaLocalStr();
+const haceUnMes = () => { const d=new Date(); d.setMonth(d.getMonth()-1); return fechaLocalStr(d); };
+// Parsea "YYYY-MM-DD" al mediodia LOCAL: nunca se corre de dia ni de mes.
+function parseFecha(s){
+  if(!s)return null;
+  const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3],12,0,0);
+  const d=new Date(s);
+  return isNaN(d.getTime())?null:d;
+}
+// Mes y año leidos del texto de la fecha, sin pasar por Date.
+function mesDeFecha(s){ const m=String(s||"").match(/^\d{4}-(\d{2})/); return m?+m[1]-1:new Date().getMonth(); }
+function anioDeFecha(s){ const m=String(s||"").match(/^(\d{4})/); return m?+m[1]:new Date().getFullYear(); }
 
 const EMPTY = {
   contenedores:[], ventas:[], pagos:[], retiros:[], despachos:[],
@@ -1521,7 +1541,7 @@ function countRecords(d){
 // completa las claves que falten. Nunca devuelve vacio si el remoto trae datos.
 function normalizePayload(remote){
   if(!remote||typeof remote!=="object"||Array.isArray(remote))return null;
-  return {
+  const out = {
     ...EMPTY, ...remote,
     clientes: remote.clientes||{},
     bh:  {...EMPTY.bh,  ...(remote.bh||{})},
@@ -1533,6 +1553,29 @@ function normalizePayload(remote){
     _v: DATA_V,
     _rev: Number(remote._rev||0)
   };
+  // REPARACION: los despachos BH cargados el 1° de un mes quedaron guardados en
+  // el mes anterior. El mes se recalcula del texto de la fecha, que es el dato
+  // real. Solo corrige los que no coinciden; no toca nada mas.
+  const bd=(out.bh&&out.bh.despachos)||[];
+  if(bd.length){
+    let fix=0;
+    const corr=bd.map(d=>{
+      if(!d)return d;
+      const valido=Number.isInteger(d.mes)&&d.mes>=0&&d.mes<=11;
+      // Sin fecha legible no se puede deducir el mes: se deja como esta y la
+      // pantalla de BH lo marca para que lo asignes a mano.
+      if(!d.fecha&&valido)return d;
+      if(!d.fecha)return d;
+      const m=mesDeFecha(d.fecha);
+      if(d.mes===m)return d;
+      fix++; return {...d,mes:m};
+    });
+    if(fix){
+      out.bh={...out.bh,despachos:corr};
+      console.log("[reparado] "+fix+" despacho(s) BH reasignados al mes correcto de su fecha");
+    }
+  }
+  return out;
 }
 
 // Red de seguridad local: ultimo estado bueno + un punto de hace ~1 dia.
@@ -1549,7 +1592,64 @@ function backupLocal(d){
     localStorage.setItem("eliel_bk_last_ts",String(Date.now()));
   }catch(e){ /* cuota llena: los backups son best-effort */ }
 }
-// Recuperacion manual desde la consola: elielBackups() / elielRestore("last"|"day")
+// ── FUSION DE BACKUPS (restaurar sin borrar nada) ─────────────────────────
+// Une dos payloads por id. Si un id esta en los dos, gana el ACTUAL (es mas
+// nuevo). Lo que solo esta en el backup se re-agrega. Nunca se pierde nada.
+const MERGE_PATHS=[["contenedores"],["ventas"],["pagos"],["retiros"],["despachos"],
+  ["traslados"],["depositos"],["bh","despachos"],["bh","cobros"],
+  ["dj","eventos"],["dj","presupuestos"],
+  ["fin","gastos"],["fin","fx"],["fin","deudas"]];
+function _get(o,path){ let c=o; for(const k of path){ c=(c||{})[k]; } return c; }
+function _set(o,path,val){
+  let c=o;
+  for(let i=0;i<path.length-1;i++){ if(!c[path[i]]||typeof c[path[i]]!=="object")c[path[i]]={}; c=c[path[i]]; }
+  c[path[path.length-1]]=val;
+}
+function mergePayloads(actual,backup){
+  const out=JSON.parse(JSON.stringify(actual||{}));
+  const detalle=[];
+  for(const path of MERGE_PATHS){
+    const a=_get(actual,path)||[], b=_get(backup,path)||[];
+    if(!Array.isArray(a)||!Array.isArray(b))continue;
+    const vistos=new Set(a.filter(x=>x&&x.id!=null).map(x=>String(x.id)));
+    const faltantes=b.filter(x=>x&&x.id!=null&&!vistos.has(String(x.id)));
+    if(faltantes.length){
+      _set(out,path,[...a,...faltantes]);
+      detalle.push({modulo:path.join("."),recuperados:faltantes.length});
+    }
+  }
+  // clientes: objeto por nombre
+  const ca=actual&&actual.clientes||{}, cb=backup&&backup.clientes||{};
+  const cliNuevos=Object.keys(cb).filter(k=>!(k in ca));
+  if(cliNuevos.length){
+    out.clientes={...cb,...ca};
+    detalle.push({modulo:"clientes",recuperados:cliNuevos.length});
+  }
+  // ventasHistoricas: sin id, nos quedamos con la lista mas larga
+  const va=(actual&&actual.ventasHistoricas)||[], vb=(backup&&backup.ventasHistoricas)||[];
+  if(vb.length>va.length){ out.ventasHistoricas=vb; detalle.push({modulo:"ventasHistoricas",recuperados:vb.length-va.length}); }
+  // articulosCustom: union de strings/objetos por nombre
+  const key=x=>typeof x==="string"?x:(x&&(x.nombre||x.id)||JSON.stringify(x));
+  const aa=(actual&&actual.articulosCustom)||[], ab=(backup&&backup.articulosCustom)||[];
+  const setA=new Set(aa.map(key));
+  const artNuevos=ab.filter(x=>!setA.has(key(x)));
+  if(artNuevos.length){ out.articulosCustom=[...aa,...artNuevos]; detalle.push({modulo:"articulosCustom",recuperados:artNuevos.length}); }
+  return {payload:out,detalle,total:detalle.reduce((n,d)=>n+d.recuperados,0)};
+}
+
+// Recuperacion manual desde la consola: elielBackups() lista lo guardado,
+// elielDescargarBackup("last"|"day") lo baja como .json para revisarlo o
+// restaurarlo con Cmd/Ctrl+K -> Restaurar backup.
+window.elielDescargarBackup=function(which){
+  const js=localStorage.getItem("eliel_bk_"+(which||"last"));
+  if(!js){console.warn("No hay backup local '"+(which||"last")+"'");return false;}
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([js],{type:"application/json"}));
+  a.download="backup_local_"+(which||"last")+"_"+new Date().toISOString().slice(0,10)+".json";
+  a.click();
+  console.log("Descargado:",countRecords(JSON.parse(js)),"registros");
+  return true;
+};
 window.elielBackups=function(){
   const r={};
   for(const k of ["last","day"]){
@@ -1883,6 +1983,7 @@ function App(){
   const loadedRef = useRef(false);     // ¿leimos el remoto al menos una vez?
   const revRef = useRef(0);            // revision monotona del payload
   const lastGoodRef = useRef(null);    // ultimo payload con datos
+  const dataRef = useRef(null);        // SIEMPRE el data mas reciente (no el del closure)
   const writeQ = useRef(Promise.resolve());  // cola: nunca dos escrituras en paralelo
 
   useEffect(()=>{
@@ -1929,6 +2030,7 @@ function App(){
       revRef.current=Math.max(revRef.current,rrev);
       if(countRecords(nd)>0) lastGoodRef.current=nd;
       loadedRef.current=true;
+      dataRef.current=nd;
       setData(nd); setFbReady(true); setSyncErr(null);
       backupLocal(nd);
     },err=>{
@@ -1949,8 +2051,14 @@ function App(){
     return ()=>{ if(unsub)unsub(); if(timer)clearTimeout(timer); };
   },[]);
 
-  // Escritura con tres candados contra la perdida de datos.
-  const save=nd=>{
+  // Escritura con candados contra la perdida de datos.
+  // save acepta un OBJETO o una FUNCION (prev)=>next. La forma de funcion es la
+  // correcta cuando entre que armaste el cambio y lo guardas pasa tiempo (por
+  // ejemplo despues de un await largo): se aplica sobre los datos actuales y no
+  // sobre la foto vieja que quedo atrapada en el closure.
+  const save=arg=>{
+    const base=dataRef.current||data;
+    const nd=typeof arg==="function"?arg(base):arg;
     // 1) Nunca escribir sin haber leido antes el remoto.
     if(!loadedRef.current){
       setSyncErr("No se guardó: esta pestaña no está sincronizada. Recargá la página y volvé a cargarlo.");
@@ -1965,9 +2073,24 @@ function App(){
       try{showToast("⚠️ Guardado vacío bloqueado");}catch{}
       return Promise.resolve();
     }
+    // 3) Guardia contra escrituras armadas sobre datos viejos.
+    // Todo payload arrastra su _rev. Si el que llega es anterior al que ya
+    // tenemos, se armo antes de algun cambio mas nuevo: en vez de pisarlo, se
+    // fusiona (se conserva lo nuevo y se agrega lo que traia la escritura).
+    let efectivo=nd;
+    const baseRev=Number(nd._rev||0);
+    if(baseRev<revRef.current&&dataRef.current){
+      const f=mergePayloads(nd,dataRef.current);
+      efectivo=f.payload;
+      if(f.total>0){
+        console.warn("[save] escritura armada sobre datos viejos (rev "+baseRev+" < "+revRef.current+"): se conservaron "+f.total+" registro(s) mas nuevos",f.detalle);
+        try{showToast("Se conservaron "+f.total+" registro(s) cargados mientras tanto");}catch{}
+      }
+    }
     const rev=revRef.current+1;
     revRef.current=rev;
-    const payload={...nd,_v:DATA_V,_rev:rev};
+    const payload={...efectivo,_v:DATA_V,_rev:rev};
+    dataRef.current=payload;
     setData(payload);
     if(countRecords(payload)>0) lastGoodRef.current=payload;
     backupLocal(payload);
@@ -2047,7 +2170,7 @@ function App(){
 
   // Calculos DJ globales
   const djEventos=data.dj?.eventos||[];
-  const _hoyISO=new Date().toISOString().split("T")[0];
+  const _hoyISO=hoy();
   const djRealizados=djEventos.filter(e=>{
     if(e.estado==="Realizado"||e.estado==="Señado") return true;
     if(e.estado==="Confirmado"&&e.fecha<_hoyISO){
@@ -2148,7 +2271,7 @@ function App(){
       )}
 
       {showPedido&&<PedidoModal data={data} save={save} blue={blue} onClose={()=>setShowPedido(false)} showToast={showToast} clienteIdx={clienteIdx}/>}
-      {showSearch&&<SearchModal data={data} onClose={()=>setShowSearch(false)} goModulo={goModulo} setView={setView}/>}
+      {showSearch&&<SearchModal data={data} onClose={()=>setShowSearch(false)} goModulo={goModulo} setView={setView} save={save} showToast={showToast}/>}
 
       {/* Floating AI button — desktop only */}
       {chatState==="closed"&&(
@@ -2709,7 +2832,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
             precioVenta:Number(d.precioVenta), total:subtotal,
             usd:subtotal/(d.tipoCambioUsado||tc),
             tipoCambioUsado:d.tipoCambioUsado||tc,
-            fecha:new Date().toISOString().split("T")[0],
+            fecha:hoy(),
             estado:estadoVenta, entrega:entregaTipo, pago:0, pedidoId, depositoOrigen:_depVenta
           };
         });
@@ -2737,7 +2860,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
             localidad: cInfoFull.localidad||d.localidad||"",
             provincia: cInfoFull.provincia||d.provincia||"",
             expreso: cInfoFull.expreso||d.expreso||"",
-            fecha: new Date().toISOString().split("T")[0],
+            fecha: hoy(),
             estado: "Pendiente",
           }];
         }
@@ -2791,7 +2914,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         const tcR = Number(d.tcRetiro||tc);
         const montoUSD = d.moneda==="ARS"?montoN/tcR:montoN;
         const retiro = {
-          id: Date.now().toString(), fecha: d.fecha||new Date().toISOString().split("T")[0],
+          id: Date.now().toString(), fecha: d.fecha||hoy(),
           nota: d.nota||"", montoUSD, montoPesos: d.moneda==="ARS"?montoN:null,
           moneda: d.moneda||"ARS", tcRetiro: tcR
         };
@@ -2804,7 +2927,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         const montoN = Number(d.monto||0);
         const cobro = {
           id: Date.now().toString(),
-          fecha: d.fecha||new Date().toISOString().split("T")[0],
+          fecha: d.fecha||hoy(),
           monto: montoN, moneda: d.moneda||"ARS",
           nota: d.nota||""
         };
@@ -2820,7 +2943,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           const montoUSD = d.monedaSC==="ARS"?Number(d.montoSC)/tcR:Number(d.montoSC);
           const retiro = {
             id: Date.now().toString(),
-            fecha: d.fecha||new Date().toISOString().split("T")[0],
+            fecha: d.fecha||hoy(),
             nota: d.nota||"Retiro combinado", montoUSD,
             montoPesos: d.monedaSC==="ARS"?Number(d.montoSC):null,
             moneda: d.monedaSC||"ARS", tcRetiro: tcR
@@ -2830,7 +2953,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
         if(Number(d.montoBH||0)>0){
           const cobro = {
             id: Date.now().toString(),
-            fecha: d.fecha||new Date().toISOString().split("T")[0],
+            fecha: d.fecha||hoy(),
             monto: Number(d.montoBH), moneda: d.monedaBH||"ARS",
             nota: d.nota||"Retiro combinado"
           };
@@ -2843,7 +2966,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
       else if(action.action==="CARGAR_GASTO"){
         const gasto = {
           id: Date.now().toString(), desc: d.desc, monto: Number(d.monto),
-          cat: d.cat||"Otros", fecha: d.fecha||new Date().toISOString().split("T")[0],
+          cat: d.cat||"Otros", fecha: d.fecha||hoy(),
           moneda: "ARS", montoOriginal: Number(d.monto), cotiz: null, fuente:"Otros"
         };
         save({...data,fin:{...data.fin,gastos:[...(data.fin?.gastos||[]),gasto]}});
@@ -2997,7 +3120,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
           localidad: d.localidad||cInfo.localidad||"",
           provincia: d.provincia||cInfo.provincia||"",
           expreso: d.expreso||cInfo.expreso||"",
-          fecha: d.fecha||new Date().toISOString().split("T")[0],
+          fecha: d.fecha||hoy(),
           estado: "Pendiente"
         };
         save({...data,despachos:[...(data.despachos||[]),desp]});
@@ -3370,7 +3493,7 @@ function ChatBot({data, save, showToast, blue, stockUni, onClose, chatState, ext
 // ══════════════════════════════════════════════════════════════════════════
 // BÚSQUEDA GLOBAL
 // ══════════════════════════════════════════════════════════════════════════
-function SearchModal({data,onClose,goModulo,setView}){
+function SearchModal({data,onClose,goModulo,setView,save,showToast}){
   const [q,setQ]=useState("");
   const inputRef=useRef();
   useEffect(()=>{if(inputRef.current)inputRef.current.focus();},[]);
@@ -3438,8 +3561,31 @@ function SearchModal({data,onClose,goModulo,setView}){
     {icon:"💾",label:"Backup JSON",action:()=>{
       const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
       const a=document.createElement("a");a.href=URL.createObjectURL(blob);
-      a.download="backup_eliel_"+new Date().toISOString().split("T")[0]+".json";
+      a.download="backup_eliel_"+hoy()+".json";
       a.click();onClose();
+    }},
+    {icon:"♻️",label:"Restaurar backup",action:()=>{
+      // Fusion ADITIVA: re-agrega lo que falte sin tocar lo que ya esta.
+      const inp=document.createElement("input");
+      inp.type="file"; inp.accept=".json,application/json";
+      inp.onchange=async e=>{
+        const f=e.target.files&&e.target.files[0]; if(!f)return;
+        try{
+          const txt=await f.text();
+          const raw=JSON.parse(txt);
+          const bk=raw&&raw.payload?raw.payload:raw;
+          if(!bk||typeof bk!=="object")throw new Error("El archivo no tiene el formato del backup");
+          const prev0=mergePayloads(data,bk);
+          if(prev0.total===0){ window.alert("Nada que recuperar: el backup no tiene ningún registro que falte en el sistema."); return; }
+          const resumen=prev0.detalle.map(d=>"  • "+d.modulo+": "+d.recuperados).join("\n");
+          if(!window.confirm("Se van a RE-AGREGAR "+prev0.total+" registro(s) que faltan:\n\n"+resumen+"\n\nNo se borra ni se modifica nada de lo que ya está cargado.\n\n¿Restaurar?"))return;
+          let total=0;
+          save(prev=>{ const r=mergePayloads(prev,bk); total=r.total; return r.payload; });
+          if(showToast)showToast("♻️ "+total+" registro(s) recuperados");
+          onClose();
+        }catch(err){ window.alert("No se pudo leer el backup: "+err.message); }
+      };
+      inp.click();
     }},
   ];
 
@@ -3508,10 +3654,10 @@ function GestorDeudas({data,save,showToast,blue}){
   const [showForm,setShowForm]=useState(false);
   const [editando,setEditando]=useState(null); // deuda en edición
   const [modalPago,setModalPago]=useState(null);
-  const [formPago,setFormPago]=useState({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:"ARS"});
-  const [form,setForm]=useState({desc:"",monto:"",moneda:"ARS",fecha:new Date().toISOString().split("T")[0],nota:""});
+  const [formPago,setFormPago]=useState({monto:"",fecha:hoy(),nota:"",tcPago:String(Math.round(tc)),modoPago:"ARS"});
+  const [form,setForm]=useState({desc:"",monto:"",moneda:"ARS",fecha:hoy(),nota:""});
 
-  const resetForm=()=>setForm({desc:"",monto:"",moneda:"ARS",fecha:new Date().toISOString().split("T")[0],nota:""});
+  const resetForm=()=>setForm({desc:"",monto:"",moneda:"ARS",fecha:hoy(),nota:""});
 
   const abrirNueva=()=>{resetForm();setEditando(null);setShowForm(true);};
   const abrirEditar=(d)=>{
@@ -3581,7 +3727,7 @@ function GestorDeudas({data,save,showToast,blue}){
     const nuevasDeudas=deudas.map(x=>x.id===d.id?deudaActualizada:x);
     save({...data,fin:{...data.fin,deudas:nuevasDeudas,gastos:[...(data.fin?.gastos||[]),nuevoGasto]}});
     setModalPago(null);
-    setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:""});
+    setFormPago({monto:"",fecha:hoy(),nota:""});
     showToast(saldoNuevo<=0?"✓ Deuda saldada":"✓ Pago parcial registrado");
   };
 
@@ -3658,7 +3804,7 @@ function GestorDeudas({data,save,showToast,blue}){
             )}
             <div style={{display:"flex",gap:8}}>
               <button onClick={pagarDeuda} style={{flex:1,fontSize:13,padding:"11px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>✓ Registrar pago</button>
-              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:"ARS"});}} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
+              <button onClick={()=>{setModalPago(null);setFormPago({monto:"",fecha:hoy(),nota:"",tcPago:String(Math.round(tc)),modoPago:"ARS"});}} style={{fontSize:13,padding:"11px 16px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>Cancelar</button>
             </div>
           </div>
         </div>
@@ -3756,7 +3902,7 @@ function GestorDeudas({data,save,showToast,blue}){
                   </div>
                 )}
                 <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  <button onClick={()=>{setModalPago(d);setFormPago({monto:"",fecha:new Date().toISOString().split("T")[0],nota:"",tcPago:String(Math.round(tc)),modoPago:d.moneda||"ARS"}); }} style={{fontSize:12,padding:"6px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>💳 Pagar</button>
+                  <button onClick={()=>{setModalPago(d);setFormPago({monto:"",fecha:hoy(),nota:"",tcPago:String(Math.round(tc)),modoPago:d.moneda||"ARS"}); }} style={{fontSize:12,padding:"6px 16px",borderRadius:"var(--r-pill)",border:"none",background:"linear-gradient(135deg,#C0392B,#922B21)",color:"#fff",fontWeight:600,cursor:"pointer"}}>💳 Pagar</button>
                   <button onClick={()=>abrirEditar(d)} style={{fontSize:12,padding:"6px 14px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer",fontWeight:500}}>✏️ Editar</button>
                   <button onClick={()=>eliminarDeuda(d.id)} style={{fontSize:12,padding:"6px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--glass-border)",background:"none",color:"var(--text-secondary)",cursor:"pointer"}}>✕ Eliminar</button>
                 </div>
@@ -4311,7 +4457,7 @@ function DashboardCentral({data,save,showToast,blue,onOpenDeudas,mi30Total,pendi
                       byDate[d].push(m);
                     });
                     const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
-                    const hoyStr=new Date().toISOString().split("T")[0];
+                    const hoyStr=hoy();
                     const ayerD=new Date();ayerD.setDate(ayerD.getDate()-1);
                     const ayerStr=ayerD.toISOString().split("T")[0];
                     const fmtFecha=d=>{
@@ -4450,7 +4596,8 @@ function BHTradeView({data,save,showToast,blue}){
   const calcTotal=()=>Number(form.cotiz||0)*Number(form.usd||0);
   const guardar=()=>{
     if(!form.exp.trim()||!form.cotiz)return;
-    const mes=new Date(form.fecha).getMonth();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(form.fecha||""))){showToast("Poné una fecha válida");return;}
+    const mes=mesDeFecha(form.fecha);   // NO new Date(...): se corria al mes anterior el dia 1
     const nuevo={id:Date.now().toString(),exp:form.exp.trim(),fecha:form.fecha,cotiz:Number(form.cotiz),usd:Number(form.usd||300),total:Number(form.cotiz)*Number(form.usd||300),mes};
     save({...data,bh:{...data.bh,despachos:[...despachos,nuevo]}});
     setForm({exp:"",fecha:hoy(),cotiz:blue?String(Math.round(blue)):"",usd:"300"});
@@ -4462,16 +4609,32 @@ function BHTradeView({data,save,showToast,blue}){
   const mesesConData=[...new Set(despachos.map(d=>d.mes))];
   // El sueldo base se devenga todos los meses, haya o no despachos:
   // se cuenta el rango completo desde el primer mes con actividad hasta el actual.
+  const mesHoy=new Date().getMonth();
+  // Las pestañas van del primer mes con datos al ULTIMO mes con datos, nunca
+  // cortadas en el mes actual. Antes el rango terminaba en mesHoy, asi que un
+  // despacho fechado en un mes posterior no tenia pestaña donde aparecer: la
+  // tarjeta lo contaba pero era invisible en todo el sistema.
   const mesesMostrar=(()=>{
-    const mesHoy=new Date().getMonth();
-    const nums=mesesConData.filter(m=>typeof m==="number");
+    const nums=mesesConData.filter(m=>Number.isInteger(m)&&m>=0&&m<=11);
     const desde=nums.length?Math.min(...nums,mesHoy):mesHoy;
+    const hasta=nums.length?Math.max(...nums,mesHoy):mesHoy;
     const out=[];
-    for(let m=desde;m<=mesHoy;m++)out.push(m);
+    for(let m=desde;m<=hasta;m++)out.push(m);
     return out;
   })();
-  const bhTotalAnio=mesesMostrar.reduce((a,mes)=>a+bhSueldoMes(despachos.filter(d=>d.mes===mes),mes).sueldo,0);
-  const despMes=[...despachos.filter(d=>d.mes===mesActivo)].sort((a,b)=>b.id.localeCompare(a.id));
+  // Devengado: la base de $160.000 corre solo hasta el mes actual. Un despacho
+  // fechado mas adelante suma su importe, pero no devenga sueldo de un mes que
+  // todavia no paso.
+  const bhTotalAnio=mesesMostrar.reduce((a,mes)=>{
+    const dm=despachos.filter(d=>d.mes===mes);
+    return a + (mes<=mesHoy
+      ? bhSueldoMes(dm,mes).sueldo
+      : dm.reduce((x,d)=>x+Number(d.total||0),0));
+  },0);
+  const despMes=[...despachos.filter(d=>d.mes===mesActivo)].sort((a,b)=>String(b.id||"").localeCompare(String(a.id||"")));
+  // Alarma: si algun despacho no cae en ninguna pestaña, se avisa en pantalla
+  // en lugar de desaparecer sin dejar rastro.
+  const huerfanos=despachos.filter(d=>!mesesMostrar.includes(d.mes));
   const s=bhSueldoMes(despMes,mesActivo);
 
   return(
@@ -4496,6 +4659,29 @@ function BHTradeView({data,save,showToast,blue}){
           </div>
         ))}
       </div>
+
+      {huerfanos.length>0&&(
+        <div style={{background:"var(--color-background-danger)",border:"0.5px solid var(--color-border-danger)",borderRadius:"var(--border-radius-md)",padding:"12px 14px",marginBottom:"1rem"}}>
+          <div style={{fontSize:13,fontWeight:600,color:"var(--color-text-danger)",marginBottom:6}}>
+            ⚠️ {huerfanos.length} despacho(s) sin mes válido
+          </div>
+          <div style={{fontSize:12,color:"var(--color-text-danger)",opacity:.9,marginBottom:8}}>
+            Están guardados pero no entran en ninguna pestaña. Asignalos al mes de su fecha:
+          </div>
+          {huerfanos.map(d=>(
+            <div key={d.id} style={{fontSize:12,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:"4px 0"}}>
+              <b>{d.exp}</b><span style={{opacity:.75}}>{d.fecha||"sin fecha"} · ${fmt(Number(d.total||0))}</span>
+              <button onClick={()=>{
+                const m=mesDeFecha(d.fecha);
+                save({...data,bh:{...data.bh,despachos:despachos.map(x=>x.id===d.id?{...x,mes:m}:x)}});
+                showToast("Movido a "+MESES[m]);
+              }} style={{fontSize:11,padding:"3px 9px",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-secondary)",background:"none",color:"var(--color-text-primary)",cursor:"pointer"}}>
+                Mover a {MESES[mesDeFecha(d.fecha)]}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Selector de mes */}
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:"1rem"}}>
@@ -4648,7 +4834,7 @@ function fechaEspToISO(fechaEsp){
 // ── EditPagoInline: add a payment from within the event editor ───────────
 function EditPagoInline({eventoId,eventos,data,save,showToast,blue}){
   const [open,setOpen]=useState(false);
-  const [fp,setFp]=useState({monto:"",moneda:"USD",concepto:"Cuota",fecha:new Date().toISOString().split("T")[0],nota:""});
+  const [fp,setFp]=useState({monto:"",moneda:"USD",concepto:"Cuota",fecha:hoy(),nota:""});
   const tc=blue||1450;
   if(!open) return(
     <button onClick={()=>setOpen(true)} style={{fontSize:11,padding:"5px 12px",borderRadius:"var(--r-pill)",border:"0.5px solid var(--border-info)",background:"var(--bg-tint-blue)",color:"var(--text-info)",cursor:"pointer",fontWeight:500}}>
@@ -4667,7 +4853,7 @@ function EditPagoInline({eventoId,eventos,data,save,showToast,blue}){
     const nuevoSaldo=Math.max(0,Number(evento.cobroUSD||0)-totalPagadoUSD);
     const updEvento={...evento,pagos,saldo:nuevoSaldo,senaUSD:totalPagadoUSD};
     save({...data,dj:{...data.dj,eventos:eventos.map(e=>e.id===eventoId?updEvento:e)}});
-    setFp({monto:"",moneda:"USD",concepto:"Cuota",fecha:new Date().toISOString().split("T")[0],nota:""});
+    setFp({monto:"",moneda:"USD",concepto:"Cuota",fecha:hoy(),nota:""});
     setOpen(false);
     showToast("✓ Pago agregado");
   };
@@ -4958,7 +5144,7 @@ function DJView({data,save,showToast,blue,onGenerarDoc}){
       // New event: if seña specified, create first pago
       const senaRaw=Number(form.sena||0);
       senaUSD=form.monedaCobro==="ARS"?senaRaw/tc:senaRaw;
-      pagos=senaRaw>0?[{id:Date.now().toString(),fecha:new Date().toISOString().split("T")[0],concepto:"Seña",monto:senaRaw,moneda:form.monedaCobro,montoUSD:senaUSD,nota:"Al confirmar"}]:[];
+      pagos=senaRaw>0?[{id:Date.now().toString(),fecha:hoy(),concepto:"Seña",monto:senaRaw,moneda:form.monedaCobro,montoUSD:senaUSD,nota:"Al confirmar"}]:[];
     }
     const saldo=Math.max(0,cobroUSD-senaUSD);
     const evento={
@@ -5582,12 +5768,12 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
   const [ingMoneda,setIngMoneda]=useState("USD");
   const [ingMonto,setIngMonto]=useState("");
   const [ingDesc,setIngDesc]=useState("");
-  const [ingFecha,setIngFecha]=useState(new Date().toISOString().split("T")[0]);
+  const [ingFecha,setIngFecha]=useState(hoy());
   const gastos=data.fin?.gastos||[];
   const balance=totalIngresos-totalGastos;
   const presupuestos=data.fin?.presupuestos||{};
   const mesActual=new Date().getMonth();
-  const gastosMes=gastos.filter(g=>{const d=new Date(g.fecha);return d.getMonth()===mesActual&&d.getFullYear()===new Date().getFullYear();});
+  const gastosMes=gastos.filter(g=>mesDeFecha(g.fecha)===mesActual&&anioDeFecha(g.fecha)===new Date().getFullYear());
   const totalGastosMes=gastosMes.reduce((a,g)=>a+g.monto,0);
   
   const fxTotal=Number(fxCant||0)*Number(fxCotiz||0);
@@ -5599,7 +5785,7 @@ function FinanzasView({data,save,showToast,blue,totalIngresos,totalGastos,totalG
       cantUSD:Number(fxCant),
       cotiz:Number(fxCotiz),
       totalARS:fxTotal,
-      fecha:new Date().toISOString().split("T")[0],
+      fecha:hoy(),
       ts:Date.now(),
     };
     const fx=[...(data.fin?.fx||[]),op];
@@ -6531,7 +6717,7 @@ function AccionesContenedor({cont,data,save,showToast}){
 
 function Dashboard({data,save,showToast,stockUni,blue,mi30Total,pendienteRetiro,setView,setContSel,setContTab}){
   const tc=blue||1450;
-  const hace30=new Date();hace30.setDate(hace30.getDate()-30);const hace30str=hace30.toISOString().split("T")[0];
+  const hace30=new Date();hace30.setDate(hace30.getDate()-30);const hace30str=fechaLocalStr(hace30);
   const ventas30d=(data.ventas||[]).filter(v=>(v.fecha||"")>=hace30str);
   const totalFactUSD=ventas30d.reduce((a,v)=>a+Number(v.usd||0),0);
   const totalCobUSD30d=ventas30d.reduce((a,v)=>a+cobradoUSD(v,data.pagos),0);
@@ -9095,7 +9281,7 @@ function ReportesView({data,save,showToast,blue}){
       console.log("[Reporte] SC_SYSTEM_PROMPT length:",window.SC_SYSTEM_PROMPT.length);
       // Payload: solo datos dinámicos de Firebase — sin ventasHistoricas (ya en la skill)
       const payload={
-        fecha_hoy:new Date().toISOString().split("T")[0],
+        fecha_hoy:hoy(),
         contenedores:(data.contenedores||[]).map(c=>({
           id:c.id,nombre:c.nombre,costoTotal:c.costoTotal||0,
           articulos:c.articulos||[],artsCostoDetalle:c.artsCostoDetalle||[]
@@ -9162,9 +9348,15 @@ function ReportesView({data,save,showToast,blue}){
 
       setLoadingMsg("Guardando...");
       const semana="Semana del "+new Date().toLocaleDateString("es-AR",{day:"numeric",month:"long"});
-      const lista=[...(data.reportesSC||[])];
-      lista.push({fecha:new Date().toISOString(),semana,html});
-      await save({...data,reportesSC:lista.slice(-10)});
+      // Entre el click y este punto pasaron minutos esperando la API. Si se
+      // guardara {...data} se escribiria la foto vieja y se borraria todo lo
+      // que se cargo mientras el reporte se generaba. La forma de funcion
+      // aplica el cambio sobre los datos ACTUALES.
+      await save(prev=>{
+        const lista=[...(prev.reportesSC||[])];
+        lista.push({fecha:new Date().toISOString(),semana,html});
+        return {...prev,reportesSC:lista.slice(-10)};
+      });
       setUltimoReporte({html,semana,fecha:new Date().toISOString()});
       showToast("✓ Reporte generado");
     }catch(err){
@@ -9493,7 +9685,7 @@ function ReportesView({data,save,showToast,blue}){
                 }}>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:600,color:"var(--text-primary)",marginBottom:3}}>{r.semana||"Reporte"}</div>
-                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>{r.fecha?new Date(r.fecha).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric"}):""}</div>
+                    <div style={{fontSize:11,color:"var(--text-secondary)"}}>{r.fecha?parseFecha(r.fecha).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric"}):""}</div>
                   </div>
                   <button onClick={()=>abrirHTML(r.html)} style={{
                     flexShrink:0,padding:"8px 16px",background:"linear-gradient(135deg,#F47920,#e8640a)",
